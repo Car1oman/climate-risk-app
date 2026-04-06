@@ -1,0 +1,136 @@
+{
+  "name": "Asset",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Store/asset name"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "supermercado_grande",
+        "supermercado_mediano",
+        "centro_distribucion",
+        "tienda_express"
+      ],
+      "description": "Type of asset"
+    },
+    "tenant": {
+      "type": "string",
+      "enum": [
+        "spsa",
+        "real_plaza",
+        "financiera_oh",
+        "inkafarma",
+        "promart"
+      ],
+      "default": "spsa",
+      "description": "Business unit / tenant"
+    },
+    "address": {
+      "type": "string",
+      "description": "Full address"
+    },
+    "district": {
+      "type": "string",
+      "description": "District in Lima"
+    },
+    "lat": {
+      "type": "number",
+      "description": "Latitude"
+    },
+    "lng": {
+      "type": "number",
+      "description": "Longitude"
+    },
+    "area_m2": {
+      "type": "number",
+      "description": "Area in square meters"
+    },
+    "condition": {
+      "type": "string",
+      "enum": [
+        "propio",
+        "alquilado"
+      ],
+      "description": "Ownership condition"
+    },
+    "floor_level": {
+      "type": "number",
+      "description": "Floor level (0=ground)"
+    },
+    "monthly_sales": {
+      "type": "number",
+      "description": "Average monthly sales in S/"
+    },
+    "num_employees": {
+      "type": "number",
+      "description": "Number of employees"
+    },
+    "hazard_flood": {
+      "type": "number",
+      "description": "Flood hazard level 0-4"
+    },
+    "hazard_elnino": {
+      "type": "number",
+      "description": "El Nino hazard level 0-4"
+    },
+    "hazard_earthquake": {
+      "type": "number",
+      "description": "Earthquake hazard level 0-4"
+    },
+    "hazard_landslide": {
+      "type": "number",
+      "description": "Landslide hazard level 0-4"
+    },
+    "hazard_drought": {
+      "type": "number",
+      "description": "Drought hazard level 0-4"
+    },
+    "risk_score": {
+      "type": "number",
+      "description": "Composite risk score 0-1"
+    },
+    "risk_level": {
+      "type": "string",
+      "enum": [
+        "bajo",
+        "medio",
+        "alto",
+        "critico"
+      ],
+      "description": "Risk classification"
+    },
+    "hazard_score": {
+      "type": "number",
+      "description": "Calculated hazard score 0-1"
+    },
+    "exposure_score": {
+      "type": "number",
+      "description": "Calculated exposure score 0-1"
+    },
+    "impact_score": {
+      "type": "number",
+      "description": "Calculated impact score 0-1"
+    },
+    "financial_impact": {
+      "type": "number",
+      "description": "Estimated financial impact in S/"
+    },
+    "top_risk": {
+      "type": "string",
+      "description": "Primary risk factor"
+    },
+    "ai_recommendations": {
+      "type": "string",
+      "description": "AI-generated recommendations"
+    }
+  },
+  "required": [
+    "name",
+    "type",
+    "lat",
+    "lng"
+  ]
+}

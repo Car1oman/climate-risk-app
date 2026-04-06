@@ -1,0 +1,59 @@
+{
+  "name": "RiskAlert",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Alert title"
+    },
+    "description": {
+      "type": "string",
+      "description": "Alert description"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "sismo",
+        "inundacion",
+        "elnino",
+        "deslizamiento",
+        "sequia"
+      ],
+      "description": "Alert type"
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "info",
+        "warning",
+        "critical"
+      ],
+      "description": "Alert severity"
+    },
+    "affected_assets": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs of affected assets"
+    },
+    "source": {
+      "type": "string",
+      "description": "Data source (SENAMHI, IGP, etc.)"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether alert is still active"
+    },
+    "region": {
+      "type": "string",
+      "description": "Affected region"
+    }
+  },
+  "required": [
+    "title",
+    "type",
+    "severity"
+  ]
+}
