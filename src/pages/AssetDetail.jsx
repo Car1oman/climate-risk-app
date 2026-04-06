@@ -28,9 +28,28 @@ export default function AssetDetail() {
 
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResponse, setAiResponse] = useState("");
+  const [climate, setClimate] = useState(null);
   const { toast } = useToast();
 
   const asset = assets.find(a => a.id === assetId);
+
+  const fetchClimate = async () => {
+    try {
+      const res = await fetch(
+        `$https://climate-risk-app-91ev.onrender.com/api/climate?lat=${asset.lat}&lng=${asset.lng}`
+      );
+      const data = await res.json();
+      setClimate(data);
+    } catch (error) {
+      console.error('Error obteniendo datos climáticos:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (asset?.lat && asset?.lng) {
+      fetchClimate();
+    }
+  }, [asset]);
 
   const generateRecommendations = async () => {
     if (!asset) return;
@@ -91,6 +110,11 @@ Genera exactamente 3 recomendaciones de adaptación climática específicas para
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <MapPin className="w-3 h-3" /> {asset.district}
             </div>
+            {climate && (
+              <div className="text-xs text-muted-foreground">
+                🌡 {climate.temperature}°C | 🌧 {climate.precipitation} mm
+              </div>
+            )}
             <Badge variant="outline" className="text-xs">{TYPE_LABELS[asset.type] || asset.type}</Badge>
             <Badge variant="outline" className={cn("text-xs", rc.bg, rc.text, rc.border)}>
               {RISK_LABELS[asset.risk_level]}

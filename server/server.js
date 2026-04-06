@@ -84,6 +84,31 @@ La gestión de riesgos climáticos está integrada en la estructura de gobernanz
   }
 });
 
+// 🌤️ Ruta datos climáticos
+app.get('/api/climate', async (req, res) => {
+  try {
+    const { lat, lng } = req.query;
+
+    if (!lat || !lng) {
+      return res.status(400).json({ error: 'lat y lng son requeridos' });
+    }
+
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,precipitation_sum&timezone=auto`;
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    res.json({
+      temperature: data.daily?.temperature_2m_max?.[0] || null,
+      precipitation: data.daily?.precipitation_sum?.[0] || 0,
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error obteniendo datos climáticos' });
+  }
+});
+
 const PORT = process.env.PORT || 3001;
 
 app.listen(PORT, () => {
