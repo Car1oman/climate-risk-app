@@ -31,13 +31,18 @@ export default function AssetDetail() {
   const [climate, setClimate] = useState(null);
   const { toast } = useToast();
 
-  const asset = assets.find(a => a.id === assetId);
+  const asset = assets.find(a => String(a.id) === assetId);
 
   const fetchClimate = async () => {
     try {
       const res = await fetch(
-        `$https://climate-risk-app-91ev.onrender.com/api/climate?lat=${asset.lat}&lng=${asset.lng}`
+        `https://climate-risk-app-91ev.onrender.com/api/climate?lat=${asset.lat}&lng=${asset.lng}`
       );
+
+      if (!res.ok) {
+        throw new Error('Error en la API');
+      }
+
       const data = await res.json();
       setClimate(data);
     } catch (error) {
@@ -49,7 +54,7 @@ export default function AssetDetail() {
     if (asset?.lat && asset?.lng) {
       fetchClimate();
     }
-  }, [asset]);
+  }, [asset?.lat, asset?.lng]);
 
   const generateRecommendations = async () => {
     if (!asset) return;
