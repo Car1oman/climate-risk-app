@@ -29,11 +29,15 @@ export default function AssetDetail() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResponse, setAiResponse] = useState("");
   const [climate, setClimate] = useState(null);
+  const [climateLoading, setClimateLoading] = useState(false);
   const { toast } = useToast();
 
   const asset = assets.find(a => String(a.id) === assetId);
 
   const fetchClimate = async () => {
+    if (climateLoading) return;
+
+    setClimateLoading(true);
     try {
       const res = await fetch(
         `https://climate-risk-app-91ev.onrender.com/api/climate?lat=${asset.lat}&lng=${asset.lng}`
@@ -44,14 +48,21 @@ export default function AssetDetail() {
       }
 
       const data = await res.json();
+
+      if (data.fallback) {
+        console.warn("Usando datos fallback de clima");
+      }
+
       setClimate(data);
     } catch (error) {
       console.error('Error obteniendo datos climáticos:', error);
+    } finally {
+      setClimateLoading(false);
     }
   };
 
   useEffect(() => {
-    if (asset?.lat && asset?.lng) {
+    if (asset?.lat && asset?.lng && !climate) {
       fetchClimate();
     }
   }, [asset?.lat, asset?.lng]);
@@ -115,11 +126,16 @@ Genera exactamente 3 recomendaciones de adaptación climática específicas para
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <MapPin className="w-3 h-3" /> {asset.district}
             </div>
-            {climate && (
+            {climateLoading ? (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Cargando clima...
+              </div>
+            ) : climate ? (
               <div className="text-xs text-muted-foreground">
                 🌡 {climate.temperature}°C | 🌧 {climate.precipitation} mm
               </div>
-            )}
+            ) : null}
             <Badge variant="outline" className="text-xs">{TYPE_LABELS[asset.type] || asset.type}</Badge>
             <Badge variant="outline" className={cn("text-xs", rc.bg, rc.text, rc.border)}>
               {RISK_LABELS[asset.risk_level]}

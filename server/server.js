@@ -17,6 +17,10 @@ if (process.env.GEMINI_API_KEY) {
   });
 }
 
+// 🧠 Caché en memoria para API climática
+const climateCache = {};
+const CACHE_TTL = 1000 * 60 * 30; // 30 minutos
+
 // Ruta de prueba
 app.get('/api/test', (req, res) => {
   res.json({ message: 'Backend funcionando 🚀' });
@@ -121,6 +125,15 @@ app.get('/api/climate', async (req, res) => {
       return res.status(400).json({ error: 'lat y lng son requeridos' });
     }
 
+    // ⚡ Verificar caché
+    const key = `${lat},${lng}`;
+    const now = Date.now();
+
+    if (climateCache[key] && (now - climateCache[key].timestamp < CACHE_TTL)) {
+      console.log("⚡ Usando cache para", key);
+      return res.json(climateCache[key].data);
+    }
+
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true&daily=precipitation_sum&timezone=auto`;
 
     console.log("🌐 URL Open-Meteo:", url);
@@ -146,9 +159,27 @@ app.get('/api/climate', async (req, res) => {
     console.log("✅ JSON parseado:");
     console.log(JSON.stringify(data, null, 2));
 
+    // 🚨 Manejar límite de API
+    if (data.error) {
+      console.log("⚠️ Límite de API alcanzado");
+
+      return res.json({
+        temperature: null,
+        precipitation: 0,
+        fallback: true,
+        message: "Datos climáticos no disponibles temporalmente"
+      });
+    }
+
     const result = {
       temperature: data.current_weather?.temperature ?? null,
       precipitation: data.daily?.precipitation_sum?.[0] ?? 0,
+    };
+
+    // 🎯 Guardar en caché
+    climateCache[key] = {
+      data: result,
+      timestamp: now
     };
 
     console.log("🎯 RESULT FINAL:");
