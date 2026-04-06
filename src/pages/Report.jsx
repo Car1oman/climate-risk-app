@@ -56,7 +56,8 @@ Genera el reporte en formato TCFD con las secciones:
 
 Formato Markdown. Sé específico con los datos proporcionados. Incluye recomendaciones accionables.`;
 
-      const response = await fetch('http://localhost:3001/api/ai', {
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://climate-risk-app-91ev.onrender.com';
+      const response = await fetch(`${apiUrl}/api/ai`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

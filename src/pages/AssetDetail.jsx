@@ -39,8 +39,9 @@ export default function AssetDetail() {
 
     setClimateLoading(true);
     try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://climate-risk-app-91ev.onrender.com';
       const res = await fetch(
-        `https://climate-risk-app-91ev.onrender.com/api/climate?lat=${asset.lat}&lng=${asset.lng}`
+        `${apiUrl}/api/climate?lat=${asset.lat}&lng=${asset.lng}`
       );
 
       if (!res.ok) {
@@ -86,7 +87,8 @@ Impacto Financiero Estimado: S/ ${(asset.financial_impact || 0).toLocaleString()
 Genera exactamente 3 recomendaciones de adaptación climática específicas para esta tienda, priorizadas por costo-beneficio, para incluir en el plan ESG 2025–2026. Sé concreto y cuantifica beneficio esperado. Formato Markdown con bullets.`;
 
     try {
-      const res = await fetch('https://climate-risk-app-91ev.onrender.com/api/ai', {
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://climate-risk-app-91ev.onrender.com';
+      const res = await fetch(`${apiUrl}/api/ai`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt }),
