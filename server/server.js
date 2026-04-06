@@ -84,7 +84,7 @@ La gestión de riesgos climáticos está integrada en la estructura de gobernanz
   }
 });
 
-// 🌤️ Ruta datos climáticos
+/* // 🌤️ Ruta datos climáticos
 app.get('/api/climate', async (req, res) => {
   try {
     const { lat, lng } = req.query;
@@ -96,6 +96,7 @@ app.get('/api/climate', async (req, res) => {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true&daily=precipitation_sum&timezone=auto`;
     const response = await fetch(url);
     const data = await response.json();
+    
 
  res.json({
   temperature: data.current_weather?.temperature ?? null,
@@ -106,7 +107,61 @@ app.get('/api/climate', async (req, res) => {
     console.error(error);
     res.status(500).json({ error: 'Error obteniendo datos climáticos' });
   }
+}); */
+
+app.get('/api/climate', async (req, res) => {
+  try {
+    const { lat, lng } = req.query;
+
+    console.log("👉 Request recibida");
+    console.log("LAT:", lat, "LNG:", lng);
+
+    if (!lat || !lng) {
+      console.log("❌ Faltan parámetros");
+      return res.status(400).json({ error: 'lat y lng son requeridos' });
+    }
+
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true&daily=precipitation_sum&timezone=auto`;
+
+    console.log("🌐 URL Open-Meteo:", url);
+
+    const response = await fetch(url);
+
+    console.log("📡 Status Open-Meteo:", response.status);
+
+    const text = await response.text();
+
+    console.log("📦 RAW RESPONSE:");
+    console.log(text);
+
+    let data;
+
+    try {
+      data = JSON.parse(text);
+    } catch (parseError) {
+      console.log("❌ Error parseando JSON");
+      return res.status(500).json({ error: 'Respuesta inválida de Open-Meteo' });
+    }
+
+    console.log("✅ JSON parseado:");
+    console.log(JSON.stringify(data, null, 2));
+
+    const result = {
+      temperature: data.current_weather?.temperature ?? null,
+      precipitation: data.daily?.precipitation_sum?.[0] ?? 0,
+    };
+
+    console.log("🎯 RESULT FINAL:");
+    console.log(result);
+
+    res.json(result);
+
+  } catch (error) {
+    console.error("🔥 ERROR GENERAL:", error);
+    res.status(500).json({ error: 'Error obteniendo datos climáticos' });
+  }
 });
+
 
 const PORT = process.env.PORT || 3001;
 
