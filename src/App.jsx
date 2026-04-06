@@ -64,7 +64,7 @@ function App() {
   useEffect(() => {
     const pingBackend = async () => {
       try {
-        const response = await fetch('http://localhost:3001/api/test');
+        const response = await fetch(' https://climate-risk-app-91ev.onrender.com');
         const data = await response.json();
         setBackendMessage(data.message);
         console.log('Backend response:', data);
