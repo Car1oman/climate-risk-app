@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { assets } from "@/data/assets";
-import { formatCurrency, getRiskColor } from "@/lib/riskEngine";
+import { formatCurrency, getRiskColor, getCompleteRiskModel } from "@/lib/riskEngine";
 import { Link } from "react-router-dom";
 import { ArrowLeft, MapPin, Building2, Sparkles, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import RiskGauge from "@/components/assets/RiskGauge";
 import HazardBreakdown from "@/components/assets/HazardBreakdown";
 import ImpactBreakdown from "@/components/assets/ImpactBreakdown";
+import RiskModel from "@/components/dashboard/RiskModel";
 import { useToast } from "@/components/ui/use-toast";
 import { MapContainer, TileLayer, CircleMarker } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
@@ -223,6 +224,11 @@ Genera exactamente 3 recomendaciones de adaptación climática específicas para
           </h3>
           <ImpactBreakdown asset={asset} />
         </div>
+      </div>
+
+      {/* Risk Model Section */}
+      <div className="bg-card border border-border rounded-xl p-6">
+        <RiskModel riskData={getCompleteRiskModel(asset)} asset={asset} />
       </div>
 
       {/* AI Recommendations */}

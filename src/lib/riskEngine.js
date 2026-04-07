@@ -153,3 +153,180 @@ export function formatCurrency(value) {
 }
 
 export { HAZARD_LABELS, HAZARD_WEIGHTS, HORIZON, TYPE_FACTOR };
+
+/**
+ * Obtiene las amenazas dominantes (top 2 por score)
+ */
+export function getTopHazards(asset) {
+  const hazards = Object.entries(HAZARD_WEIGHTS).map(([key, weight]) => {
+    const level = asset[key] || 0;
+    const weighted = weight * level;
+    return {
+      key,
+      label: HAZARD_LABELS[key],
+      level,
+      weight,
+      weighted,
+      horizon: HORIZON[key],
+    };
+  });
+
+  return hazards.sort((a, b) => b.weighted - a.weighted).slice(0, 2);
+}
+
+/**
+ * Genera insight narrativo basado en el modelo de riesgo
+ */
+export function generateRiskNarrative(asset, scores) {
+  const district = asset.district || "la zona";
+  const topHazards = getTopHazards(asset);
+  const H = (scores.hazardScore * 100).toFixed(0);
+  const E = (scores.exposureScore * 100).toFixed(0);
+  const I = (scores.impactScore * 100).toFixed(0);
+  const R = (scores.riskScore * 100).toFixed(0);
+
+  let narrative = `En ${district} se identifican riesgos relevantes asociados a `;
+
+  // Agregar amenazas dominantes
+  if (topHazards.length === 2) {
+    narrative += `${topHazards[0].label} (${topHazards[0].level}/4) y ${topHazards[1].label} (${topHazards[1].level}/4)`;
+  } else if (topHazards.length === 1) {
+    narrative += `${topHazards[0].label} (${topHazards[0].level}/4)`;
+  }
+
+  narrative += `. Dado el nivel de exposición del activo (${E}%) y su volumen de ventas, eventos de este tipo podrían generar impactos financieros significativos `;
+
+  // Agregar horizonte temporal basado en amenaza dominante
+  if (topHazards[0]?.horizon === "corto") {
+    narrative += "en el corto plazo (próximos 6-12 meses).";
+  } else if (topHazards[0]?.horizon === "medio") {
+    narrative += "a mediano plazo (1-3 años).";
+  } else {
+    narrative += "a largo plazo (3+ años).";
+  }
+
+  // Agregar contexto financiero
+  const impactLevel = scores.impactScore > 0.75 ? "muy significativo" : 
+                      scores.impactScore > 0.5 ? "significativo" : 
+                      "moderado";
+  
+  narrative += ` El impacto financiero estimado es ${impactLevel}, equivalente a ${formatCurrency(scores.financialImpact)} en pérdidas potenciales.`;
+
+  // Agregar clasificación
+  const riskContext = scores.riskLevel === "critico" ? 
+    " Este riesgo requiere atención inmediata y acciones de mitigación." :
+    scores.riskLevel === "alto" ? 
+    " Se recomienda implementar medidas de adaptación en corto plazo." :
+    scores.riskLevel === "medio" ? 
+    " Se debe monitorear la evolución de este riesgo." :
+    " El riesgo es manejable con medidas estándar de precaución.";
+
+  narrative += riskContext;
+
+  return narrative;
+}
+
+/**
+ * Genera recomendaciones basadas en los riesgos dominantes
+ */
+export function generateRiskRecommendations(asset, scores) {
+  const topHazards = getTopHazards(asset);
+  const recommendations = [];
+
+  // Recomendación basada en amenaza principal
+  if (topHazards[0]) {
+    const key = topHazards[0].key;
+    const level = topHazards[0].level;
+
+    if (key === "hazard_flood" && level >= 2) {
+      recommendations.push({
+        priority: "alta",
+        title: "Implementar sistema de drenaje avanzado",
+        description: "Instalar sistemas de drenaje inteligente y barreras contra inundación para reducir exposición a fenómenos fluviales.",
+        impact: "Reducción 40-60% de riesgo por inundación",
+      });
+    }
+
+    if (key === "hazard_elnino" && level >= 2) {
+      recommendations.push({
+        priority: "alta",
+        title: "Reforzar cadena de suministro",
+        description: "Diversificar proveedores y crear reservas estratégicas para mantener operatividad durante eventos El Niño.",
+        impact: "Continuidad operativa 90%+",
+      });
+    }
+
+    if (key === "hazard_earthquake" && level >= 2) {
+      recommendations.push({
+        priority: "crítica",
+        title: "Refuerzo estructural sísmico",
+        description: "Realizar evaluación sísmica completa e implementar refuerzos estructurales según normativa peruana.",
+        impact: "Reducción 50-70% de riesgo sísmico",
+      });
+    }
+
+    if (key === "hazard_landslide" && level >= 2) {
+      recommendations.push({
+        priority: "alta",
+        title: "Estabilización geotécnica",
+        description: "Ejecutar estudios geotécnicos y obras de estabilización en taludes o laderas cercanas.",
+        impact: "Mitigación de riesgo de deslizamiento",
+      });
+    }
+
+    if (key === "hazard_drought" && level >= 2) {
+      recommendations.push({
+        priority: "media",
+        title: "Plan de eficiencia hídrica",
+        description: "Implementar sistemas de captación de agua lluvia y optimizar consumo en operaciones.",
+        impact: "Reducción 30-40% de costo hídrico",
+      });
+    }
+  }
+
+  // Recomendación basada en exposición
+  if (scores.exposureScore > 0.7) {
+    recommendations.push({
+      priority: "media",
+      title: "Seguro de cobertura integral",
+      description: "Contratar póliza de seguros que cubra pérdidas por eventos climáticos (inundación, sismo, etc).",
+      impact: "Cobertura financiera 80-100%",
+    });
+  }
+
+  // Recomendación basada en impacto financiero
+  if (scores.impactScore > 0.6) {
+    recommendations.push({
+      priority: "media",
+      title: "Programa de continuidad operativa",
+      description: "Desarrollar plan de continuidad de negocio con sitios alternativos y sistemas redundantes.",
+      impact: "Recuperación en 48-72 horas",
+    });
+  }
+
+  return recommendations.slice(0, 3); // Return top 3
+}
+
+/**
+ * Obtiene todas las métricas del modelo de riesgo
+ */
+export function getCompleteRiskModel(asset, maxArea = 5000, elNinoMultiplier = 1.0) {
+  const scores = calculateRiskScore(asset, maxArea, elNinoMultiplier);
+  const topHazards = getTopHazards(asset);
+  const narrative = generateRiskNarrative(asset, scores);
+  const recommendations = generateRiskRecommendations(asset, scores);
+
+  return {
+    ...scores,
+    topHazards,
+    narrative,
+    recommendations,
+    formula: {
+      H: (scores.hazardScore * 100).toFixed(1),
+      E: (scores.exposureScore * 100).toFixed(1),
+      I: (scores.impactScore * 100).toFixed(1),
+      R: (scores.riskScore * 100).toFixed(1),
+      weights: "R = (H × 0.40) + (E × 0.30) + (I × 0.30)",
+    },
+  };
+}
