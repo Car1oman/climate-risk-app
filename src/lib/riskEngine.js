@@ -180,48 +180,66 @@ export function getTopHazards(asset) {
 export function generateRiskNarrative(asset, scores) {
   const district = asset.district || "la zona";
   const topHazards = getTopHazards(asset);
-  const H = (scores.hazardScore * 100).toFixed(0);
-  const E = (scores.exposureScore * 100).toFixed(0);
-  const I = (scores.impactScore * 100).toFixed(0);
-  const R = (scores.riskScore * 100).toFixed(0);
+  const assetName = asset.name || "Esta tienda";
 
-  let narrative = `En ${district} se identifican riesgos relevantes asociados a `;
+  // Construir narrativa consultiva
+  let narrative = "";
 
-  // Agregar amenazas dominantes
-  if (topHazards.length === 2) {
-    narrative += `${topHazards[0].label} (${topHazards[0].level}/4) y ${topHazards[1].label} (${topHazards[1].level}/4)`;
-  } else if (topHazards.length === 1) {
-    narrative += `${topHazards[0].label} (${topHazards[0].level}/4)`;
-  }
-
-  narrative += `. Dado el nivel de exposición del activo (${E}%) y su volumen de ventas, eventos de este tipo podrían generar impactos financieros significativos `;
-
-  // Agregar horizonte temporal basado en amenaza dominante
-  if (topHazards[0]?.horizon === "corto") {
-    narrative += "en el corto plazo (próximos 6-12 meses).";
-  } else if (topHazards[0]?.horizon === "medio") {
-    narrative += "a mediano plazo (1-3 años).";
+  // Introducción según nivel de riesgo
+  if (scores.riskLevel === "critico") {
+    narrative += `⚠️ ESTADO CRÍTICO: ${assetName} en ${district} presenta un nivel de riesgo climático muy elevado que requiere acción inmediata. `;
+  } else if (scores.riskLevel === "alto") {
+    narrative += `⚠️ RIESGO ALTO: ${assetName} en ${district} presenta un nivel de riesgo climático significativo. `;
+  } else if (scores.riskLevel === "medio") {
+    narrative += `⚠️ RIESGO MODERADO: ${assetName} en ${district} presenta un nivel de riesgo climático medio que requiere monitoreo. `;
   } else {
-    narrative += "a largo plazo (3+ años).";
+    narrative += `✓ RIESGO BAJO: ${assetName} en ${district} presenta un riesgo climático manejable. `;
   }
 
-  // Agregar contexto financiero
-  const impactLevel = scores.impactScore > 0.75 ? "muy significativo" : 
-                      scores.impactScore > 0.5 ? "significativo" : 
-                      "moderado";
+  // Describir las amenazas principales en lenguaje disponible
+  if (topHazards.length > 0) {
+    narrative += `La zona se caracteriza principalmente por su vulnerabilidad a `;
+    
+    if (topHazards.length === 2) {
+      narrative += `${topHazards[0].label} (nivel ${topHazards[0].level}/4) y ${topHazards[1].label} (nivel ${topHazards[1].level}/4). `;
+    } else {
+      narrative += `${topHazards[0].label} (nivel ${topHazards[0].level}/4). `;
+    }
+
+    // Agregar contexto del horizonte temporal
+    if (topHazards[0]?.horizon === "corto") {
+      narrative += `Estas amenazas podrían materializarse en los próximos 6-12 meses. `;
+    } else if (topHazards[0]?.horizon === "medio") {
+      narrative += `Estas amenazas podrían materializarse en los próximos 1-3 años. `;
+    } else {
+      narrative += `Aunque estas amenazas son de ocurrencia impredecible, son constantes en la zona. `;
+    }
+  }
+
+  // Explicar por qué esta tienda está expuesta
+  const volumeText = asset.monthly_sales > 2000000 ? "muy alto" : 
+                     asset.monthly_sales > 1000000 ? "alto" : "moderado";
   
-  narrative += ` El impacto financiero estimado es ${impactLevel}, equivalente a ${formatCurrency(scores.financialImpact)} en pérdidas potenciales.`;
+  narrative += `Dado que ${assetName} tiene un volumen de ventas ${volumeText} `;
+  narrative += `(S/ ${asset.monthly_sales ? formatCurrency(asset.monthly_sales) : "no especificado"} mensuales) `;
+  narrative += `y un área de operación importante (${asset.area_m2 || 1000} m²), `;
+  narrative += `un evento climático grave podría interrumpir significativamente las operaciones. `;
 
-  // Agregar clasificación
-  const riskContext = scores.riskLevel === "critico" ? 
-    " Este riesgo requiere atención inmediata y acciones de mitigación." :
-    scores.riskLevel === "alto" ? 
-    " Se recomienda implementar medidas de adaptación en corto plazo." :
-    scores.riskLevel === "medio" ? 
-    " Se debe monitorear la evolución de este riesgo." :
-    " El riesgo es manejable con medidas estándar de precaución.";
+  // Impacto financiero
+  const impactMonths = scores.financialImpact > 5000000 ? "varios meses" : "algunos meses";
+  narrative += `El impacto financiero estimado (${formatCurrency(scores.financialImpact)}) equivale aproximadamente `;
+  narrative += `a ${impactMonths} de ventas netas de la tienda.`;
 
-  narrative += riskContext;
+  // Recomendación de acciones
+  if (scores.riskLevel === "critico") {
+    narrative += "\n\nRECOMENDACIÓN: Se debe desarrollar un plan de reducción de riesgo lo antes posible. Consulte con especialistas en gestión de riesgos climáticos.";
+  } else if (scores.riskLevel === "alto") {
+    narrative += "\n\nRECOMENDACIÓN: Se deben implementar medidas de adaptación y preparación en los próximos meses.";
+  } else if (scores.riskLevel === "medio") {
+    narrative += "\n\nRECOMENDACIÓN: Mantenga monitoreo continuo y considere implementar medidas preventivas.";
+  } else {
+    narrative += "\n\nRECOMENDACIÓN: Mantenga protocolos básicos de seguridad y respuesta ante emergencias.";
+  }
 
   return narrative;
 }
@@ -241,66 +259,76 @@ export function generateRiskRecommendations(asset, scores) {
     if (key === "hazard_flood" && level >= 2) {
       recommendations.push({
         priority: "alta",
-        title: "Implementar sistema de drenaje avanzado",
-        description: "Instalar sistemas de drenaje inteligente y barreras contra inundación para reducir exposición a fenómenos fluviales.",
-        impact: "Reducción 40-60% de riesgo por inundación",
+        title: "Instalar sistemas de protección contra inundaciones",
+        description: "Implementar barreras de agua, drenaje mejorado y sistemas de bombeo para mantener la tienda protegida durante lluvias intensas o desborde de ríos.",
+        impact: "Reduce el riesgo de cierre por inundación en 40-60%",
       });
     }
 
     if (key === "hazard_elnino" && level >= 2) {
       recommendations.push({
         priority: "alta",
-        title: "Reforzar cadena de suministro",
-        description: "Diversificar proveedores y crear reservas estratégicas para mantener operatividad durante eventos El Niño.",
-        impact: "Continuidad operativa 90%+",
+        title: "Asegurar la continuidad del abastecimiento",
+        description: "Identificar proveedores alternativos, crear reservas estratégicas de productos críticos y establecer acuerdos con distribuidores de otras regiones para garantizar inventario durante disrupciones.",
+        impact: "Mantiene operaciones con 90%+ de normalidad durante eventos El Niño",
       });
     }
 
     if (key === "hazard_earthquake" && level >= 2) {
       recommendations.push({
         priority: "crítica",
-        title: "Refuerzo estructural sísmico",
-        description: "Realizar evaluación sísmica completa e implementar refuerzos estructurales según normativa peruana.",
-        impact: "Reducción 50-70% de riesgo sísmico",
+        title: "Evaluar y reforzar la estructura del edificio",
+        description: "Realizar una evaluación sísmica profesional y, si es necesario, ejecutar refuerzos estructurales que cumplan con normativas de construcción antisísmica. Esto es crítico para la seguridad de empleados y clientes.",
+        impact: "Mejora la resistencia sísmica en 50-70% y protege vidas",
       });
     }
 
     if (key === "hazard_landslide" && level >= 2) {
       recommendations.push({
         priority: "alta",
-        title: "Estabilización geotécnica",
-        description: "Ejecutar estudios geotécnicos y obras de estabilización en taludes o laderas cercanas.",
-        impact: "Mitigación de riesgo de deslizamiento",
+        title: "Verificar la estabilidad del terreno circundante",
+        description: "Contratar un estudio geotécnico para evaluar taludes o laderas cercanas. Si hay riesgo, implementar obras de estabilización o considerar relocación parcial de operaciones críticas.",
+        impact: "Mitiga el riesgo de deslizamientos que pudieran afectar la estructura",
       });
     }
 
     if (key === "hazard_drought" && level >= 2) {
       recommendations.push({
         priority: "media",
-        title: "Plan de eficiencia hídrica",
-        description: "Implementar sistemas de captación de agua lluvia y optimizar consumo en operaciones.",
-        impact: "Reducción 30-40% de costo hídrico",
+        title: "Optimizar el uso del agua",
+        description: "Instalar sistemas de captación y reciclaje de agua lluvia, mejorar eficiencia en limpieza y operaciones. Esto reduce costos operativos durante períodos de sequía.",
+        impact: "Reduce costos de agua en 30-40% y asegura disponibilidad",
       });
     }
   }
 
-  // Recomendación basada en exposición
-  if (scores.exposureScore > 0.7) {
+  // Recomendación basada en exposición (tamaño / volumen)
+  if (scores.exposureScore > 0.65) {
     recommendations.push({
       priority: "media",
-      title: "Seguro de cobertura integral",
-      description: "Contratar póliza de seguros que cubra pérdidas por eventos climáticos (inundación, sismo, etc).",
-      impact: "Cobertura financiera 80-100%",
+      title: "Contratar seguro integral contra eventos climáticos",
+      description: "Evaluar pólizas de seguros que cubran daños por inundación, sismo, fenómeno El Niño y otras amenazas. Esto transfiere parte del riesgo financiero a aseguradoras especializadas.",
+      impact: "Protege 80-100% de pérdidas financieras en caso de evento cubierto",
     });
   }
 
   // Recomendación basada en impacto financiero
-  if (scores.impactScore > 0.6) {
+  if (scores.impactScore > 0.55) {
     recommendations.push({
       priority: "media",
-      title: "Programa de continuidad operativa",
-      description: "Desarrollar plan de continuidad de negocio con sitios alternativos y sistemas redundantes.",
-      impact: "Recuperación en 48-72 horas",
+      title: "Desarrollar un plan de continuidad de negocio",
+      description: "Crear protocolos para operar desde ubicaciones alternativas, establecer equipos de respuesta rápida, y capacitar a empleados en procedimientos de emergencia. Esto minimiza pérdidas de ventas durante interrupciones.",
+      impact: "Permite recuperación operativa en 48-72 horas en lugar de semanas",
+    });
+  }
+
+  // Recomendación adicional: Monitoreo y preparación
+  if (scores.riskLevel !== "bajo") {
+    recommendations.push({
+      priority: "alta",
+      title: "Establecer un sistema de alerta temprana",
+      description: "Suscribirse a alertas meteorológicas locales, monitorear pronósticos de El Niño, y recibir avisos sísmicos. Esto permite preparación previa ante eventos predecibles.",
+      impact: "Tiempo de reacción aumenta de horas a días",
     });
   }
 
