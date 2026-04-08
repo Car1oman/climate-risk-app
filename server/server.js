@@ -325,8 +325,8 @@ app.post('/api/assets', async (req, res) => {
       return res.status(409).json({ error: 'Activo duplicado' });
     }
 
-    // Insertar
-    const { data, error } = await supabase
+    // 1. Insertar activo base
+    const { data: asset, error: assetError } = await supabase
       .from('assets')
       .insert({
         name: name.trim(),
@@ -334,22 +334,33 @@ app.post('/api/assets', async (req, res) => {
         district: district.trim(),
         lat,
         lng,
-        monthly_sales,
-        area_m2,
-        num_employees,
-        condition,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       })
       .select()
       .single();
 
-    if (error) {
-      console.error('Error creating asset:', error);
+    if (assetError) {
+      console.error('Error creating asset:', assetError);
       return res.status(500).json({ error: 'Error al crear el activo' });
     }
 
-    res.status(201).json(data);
+    // 2. Insertar métricas
+    const { error: metricsError } = await supabase
+      .from('asset_metrics')
+      .insert({
+        asset_id: asset.id,
+        monthly_sales,
+        area_m2,
+        num_employees,
+        condition,
+        updated_at: new Date().toISOString(),
+      });
+
+    if (metricsError) {
+      console.error('Error creating metrics:', metricsError);
+    }
+
+    res.status(201).json(asset);
   } catch (error) {
     console.error('Error in POST /api/assets:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
