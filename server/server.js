@@ -230,7 +230,7 @@ app.post('/api/calculate-risk/:assetId', async (req, res) => {
     }
 
     const { data: updatedAsset, error: updateError } = await supabase
-      .from('asset_risk_summary')
+      .from('assets')
       .update(updatePayload)
       .eq('id', assetId)
       .select()
@@ -327,7 +327,7 @@ app.post('/api/assets', async (req, res) => {
 
     // Insertar
     const { data, error } = await supabase
-      .from('asset_risk_summary')
+      .from('assets')
       .insert({
         name: name.trim(),
         type,
@@ -400,7 +400,7 @@ app.put('/api/assets/:id', async (req, res) => {
 
     // Actualizar
     const { data, error } = await supabase
-      .from('asset_risk_summary')
+      .from('assets')
       .update({
         name: name.trim(),
         type,
@@ -435,7 +435,7 @@ app.delete('/api/assets/:id', async (req, res) => {
     const { id } = req.params;
 
     const { error } = await supabase
-      .from('asset_risk_summary')
+      .from('assets')
       .delete()
       .eq('id', id);
 
@@ -537,7 +537,7 @@ app.post('/api/assets/bulk', async (req, res) => {
       // Insertar batch válido
       if (validBatch.length > 0) {
         const { error } = await supabase
-          .from('asset_risk_summary')
+          .from('assets')
           .insert(validBatch);
 
         if (error) {
