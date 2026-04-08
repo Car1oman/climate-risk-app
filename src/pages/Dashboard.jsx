@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { assets } from "@/data/assets";
+import { useAssets } from "@/hooks/useAssets";
 import { alerts } from "@/data/alerts";
 import { formatCurrency } from "@/lib/riskEngine";
 import { Building2, DollarSign, AlertTriangle, TrendingUp } from "lucide-react";
@@ -11,9 +11,9 @@ import AlertsFeed from "@/components/dashboard/AlertsFeed";
 
 export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
+  const { data: assets = [], isLoading: assetsLoading, error: assetsError } = useAssets();
 
   useEffect(() => {
-    // Simular carga
     const timer = setTimeout(() => setIsLoading(false), 500);
     return () => clearTimeout(timer);
   }, []);
@@ -26,7 +26,7 @@ export default function Dashboard() {
     ? assets.reduce((s, a) => s + (a.risk_score || 0), 0) / totalAssets
     : 0;
 
-  if (isLoading) {
+  if (isLoading || assetsLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
@@ -45,6 +45,11 @@ export default function Dashboard() {
       </div>
 
       {/* KPI Row */}
+      {assetsError && (
+        <div className="bg-destructive/10 border border-destructive rounded-xl p-4 text-sm text-destructive">
+          Error cargando activos desde backend. Verifica la conexión.
+        </div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Activos"

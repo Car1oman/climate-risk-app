@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { assets } from "@/data/assets";
+import { useAssets } from "@/hooks/useAssets";
 import { calculateRiskScore, formatCurrency, getRiskColor } from "@/lib/riskEngine";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,7 @@ export default function Simulator() {
   const [isLoading, setIsLoading] = useState(true);
   const [intensity, setIntensity] = useState([1.0]);
   const multiplier = intensity[0];
+  const { data: assets = [], isLoading: assetsLoading, error: assetsError } = useAssets();
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 500);
@@ -62,7 +63,7 @@ export default function Simulator() {
     .sort((a, b) => (b.sim_financial_impact || 0) - (a.sim_financial_impact || 0))
     .slice(0, 6);
 
-  if (isLoading) {
+  if (isLoading || assetsLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
@@ -80,32 +81,39 @@ export default function Simulator() {
       </div>
 
       {/* Slider Card */}
+      {assetsError && (
+        <div className="rounded-xl border border-destructive bg-destructive/10 p-4 text-sm text-destructive">
+          No se pudieron cargar los activos. Comprueba la conexión con el backend.
+        </div>
+      )}
       <div className="bg-card border border-border rounded-xl p-6">
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-4">
           <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center">
             <Waves className="w-4 h-4 text-accent" />
           </div>
-          <div>
+          <div className="flex-1">
             <p className="text-sm font-semibold">{currentScenario.label}</p>
             <p className="text-xs text-muted-foreground">{currentScenario.description}</p>
           </div>
-          <Badge variant="outline" className="ml-auto text-xs font-mono">
-            Multiplicador: {multiplier.toFixed(1)}x
+          <Badge variant="outline" className="text-xs font-mono">
+            {multiplier.toFixed(1)}x
           </Badge>
         </div>
-        <Slider
-          value={intensity}
-          onValueChange={setIntensity}
-          min={1.0}
-          max={4.0}
-          step={0.1}
-          className="mt-2"
-        />
-        <div className="flex justify-between mt-2 text-[10px] text-muted-foreground">
-          <span>Normal (1.0x)</span>
-          <span>Moderado (1.5x)</span>
-          <span>Fuerte (2.5x)</span>
-          <span>Extremo (4.0x)</span>
+        <div className="mt-4">
+          <Slider
+            value={intensity}
+            onValueChange={setIntensity}
+            min={1.0}
+            max={4.0}
+            step={0.1}
+            className="mt-2"
+          />
+          <div className="flex justify-between mt-2 text-[10px] text-muted-foreground">
+            <span>Normal (1.0x)</span>
+            <span>Moderado (1.5x)</span>
+            <span>Fuerte (2.5x)</span>
+            <span>Extremo (4.0x)</span>
+          </div>
         </div>
       </div>
 

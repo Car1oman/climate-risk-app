@@ -39,7 +39,7 @@ export default function RiskModel({ riskData, asset }) {
             <p className="text-xs text-muted-foreground mt-2">de 100 (escala de riesgo)</p>
           </div>
           <div className="text-right">
-            <Badge className={cn(
+            <Badge variant="outline" className={cn(
               "px-4 py-2 text-sm font-semibold border",
               levelInfo.bg,
               levelInfo.color,

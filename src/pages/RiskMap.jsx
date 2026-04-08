@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { assets } from "@/data/assets";
+import { useAssets } from "@/hooks/useAssets";
 import { MapContainer, TileLayer, CircleMarker, Popup } from "react-leaflet";
 import { getRiskColor, formatCurrency } from "@/lib/riskEngine";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +25,7 @@ const LABELS = {
 export default function RiskMap() {
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState("all");
+  const { data: assets = [], isLoading: assetsLoading, error: assetsError } = useAssets();
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 500);
@@ -33,7 +34,7 @@ export default function RiskMap() {
 
   const filtered = filter === "all" ? assets : assets.filter((a) => a.risk_level === filter);
 
-  if (isLoading) {
+  if (isLoading || assetsLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
@@ -68,6 +69,11 @@ export default function RiskMap() {
       </div>
 
       {/* Map */}
+      {assetsError && (
+        <div className="mx-6 mb-4 rounded-xl border border-destructive bg-destructive/10 p-4 text-sm text-destructive">
+          No se pudieron cargar los activos. Verifica la conexión al backend.
+        </div>
+      )}
       <div className="flex-1 relative">
         <MapContainer
           center={[-12.046, -77.043]}

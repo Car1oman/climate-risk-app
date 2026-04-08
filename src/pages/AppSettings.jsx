@@ -1,22 +1,16 @@
-import { useState, useEffect } from "react";
-import { assets } from "@/data/assets";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2, RefreshCw } from "lucide-react";
+import { useAssets } from "@/hooks/useAssets";
 
 export default function AppSettings() {
   const { toast } = useToast();
   const [recalculating, setRecalculating] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 500);
-    return () => clearTimeout(timer);
-  }, []);
+  const { data: assets = [], isLoading, error } = useAssets();
 
   const recalculateAll = async () => {
     setRecalculating(true);
-    // Simular recálculo
     setTimeout(() => {
       setRecalculating(false);
       toast({ title: "Recálculo completado", description: `Se recalcularon ${assets.length} activos.` });
@@ -54,7 +48,11 @@ export default function AppSettings() {
 
       {/* Info */}
       <div className="bg-card border border-border rounded-xl p-5">
-        <p className="text-sm">Activos cargados desde datos locales. Funcionalidad de creación deshabilitada en modo demo.</p>
+        <p className="text-sm">
+          {error
+            ? 'No se pudieron cargar los activos desde el backend. Verifica la conexión.'
+            : 'Activos cargados desde el backend. Funcionalidad de creación deshabilitada en modo demo.'}
+        </p>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchAssetDetail } from "@/lib/api";
+import { API_URL, fetchAssetDetail } from "@/lib/api";
 import { formatCurrency, getRiskColor, getCompleteRiskModel } from "@/lib/riskEngine";
 import { Link } from "react-router-dom";
 import { ArrowLeft, MapPin, Building2, Sparkles, Loader2 } from "lucide-react";
@@ -51,10 +51,7 @@ export default function AssetDetail() {
 
     setClimateLoading(true);
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://climate-risk-app-91ev.onrender.com';
-      const res = await fetch(
-        `${apiUrl}/api/climate?lat=${asset.lat}&lng=${asset.lng}`
-      );
+      const res = await fetch(`${API_URL}/api/climate?lat=${asset.lat}&lng=${asset.lng}`);
 
       if (!res.ok) {
         throw new Error('Error en la API');
@@ -99,8 +96,7 @@ Impacto Financiero Estimado: S/ ${(asset.financial_impact || 0).toLocaleString()
 Genera exactamente 3 recomendaciones de adaptación climática específicas para esta tienda, priorizadas por costo-beneficio, para incluir en el plan ESG 2025–2026. Sé concreto y cuantifica beneficio esperado. Formato Markdown con bullets.`;
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://climate-risk-app-91ev.onrender.com';
-      const res = await fetch(`${apiUrl}/api/ai`, {
+      const res = await fetch(`${API_URL}/api/ai`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt }),
@@ -162,7 +158,7 @@ Genera exactamente 3 recomendaciones de adaptación climática específicas para
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Risk Gauge */}
         <div className="bg-card border border-border rounded-xl p-6 flex flex-col items-center justify-center">
-          <RiskGauge score={asset.risk_score || 0} level={asset.risk_level || "bajo"} size="lg" />
+          <RiskGauge score={asset.risk_score || 0} level={asset.risk_level || "bajo"} label={asset.name} size="lg" />
           <div className="grid grid-cols-3 gap-4 mt-6 w-full">
             <div className="text-center">
               <p className="text-xs text-muted-foreground">Amenaza</p>

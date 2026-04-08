@@ -123,52 +123,135 @@ app.get('/api/climate', async (req, res) => {
   try {
     const { lat, lng } = req.query;
 
-    console.log("👉 Request recibida: lat=", lat, "lng=", lng);
-
-    // Validar parámetros
     if (!lat || !lng) {
-      console.log("❌ Parámetros faltantes");
       return res.status(400).json({ error: 'Parámetros lat y lng son requeridos' });
     }
 
-    // ⚡ Verificar caché
     const key = `${lat},${lng}`;
     const now = Date.now();
 
     if (climateCache[key] && (now - climateCache[key].timestamp < CACHE_TTL)) {
-      console.log("⚡ Caché vigente para", key);
       return res.json(climateCache[key].data);
     }
 
-    console.log("🔄 Consultando WeatherAPI...");
-
-    // Obtener datos del servicio climático
     const climateData = await getClimateData(lat, lng);
 
-    // 🎯 Guardar en caché
+    if (!climateData) {
+      return res.json({
+        warning: 'No hay datos climáticos disponibles',
+        temperature: null,
+        humidity: null,
+        wind_kph: null,
+        precipitation: null,
+        condition: 'Datos no disponibles',
+      });
+    }
+
     climateCache[key] = {
       data: climateData,
-      timestamp: now
+      timestamp: now,
     };
 
-    console.log("✅ Datos guardados en caché");
-    res.json(climateData);
-
+    return res.json(climateData);
   } catch (error) {
-    console.error("🔥 Error en /api/climate:", error.message);
-    
-    // Respuesta fallback
-    res.status(500).json({
-      error: 'No se pudieron obtener datos climáticos',
-      fallback: true,
+    console.error('🔥 Error en /api/climate:', error.message);
+    return res.json({
+      warning: 'No hay datos climáticos disponibles',
       temperature: null,
       humidity: null,
       wind_kph: null,
-      condition: 'Datos no disponibles'
+      precipitation: null,
+      condition: 'Datos no disponibles',
     });
   }
 });
 
+app.post('/api/calculate-risk/:assetId', async (req, res) => {
+  try {
+    const { assetId } = req.params;
+
+    const { data: asset, error: assetError } = await supabase
+      .from('asset_risk_summary')
+      .select('*')
+      .eq('id', assetId)
+      .single();
+
+    if (assetError) {
+      console.error('Error leyendo activo:', assetError.message);
+      return res.status(500).json({ error: 'No se pudo obtener el activo' });
+    }
+
+    if (!asset) {
+      return res.status(404).json({ error: 'Activo no encontrado' });
+    }
+
+    const climate = await getClimateData(asset.lat, asset.lng);
+
+    if (!climate) {
+      return res.json({
+        warning: 'No hay datos climáticos disponibles',
+        riskScore: 0,
+        riskLevel: 'bajo',
+      });
+    }
+
+    const lastCalculated = asset.risk_calculated_at || asset.updated_at || asset.created_at;
+    const recalcThresholdMs = 1000 * 60 * 60 * 24;
+    const shouldRecalculate = !lastCalculated || (Date.now() - new Date(lastCalculated).getTime()) > recalcThresholdMs;
+
+    if (!shouldRecalculate) {
+      return res.json({
+        warning: 'El cálculo de riesgo ya está vigente',
+        riskScore: asset.risk_score ?? 0,
+        riskLevel: asset.risk_level ?? 'bajo',
+        asset,
+        climate,
+      });
+    }
+
+    const floodRisk = climate.precipitation > 50 ? 0.8 : 0.3;
+    const heatRisk = climate.temperature > 30 ? 0.7 : 0.2;
+    const windRisk = climate.wind_kph > 25 ? 0.6 : 0.2;
+
+    const hazard = floodRisk * 0.4 + heatRisk * 0.3 + windRisk * 0.3;
+    const riskScore = Math.min(1, hazard * 0.65 + (asset.impact_score || 0) * 0.35);
+    const riskLevel = riskScore >= 0.75 ? 'critico' : riskScore >= 0.5 ? 'alto' : riskScore >= 0.25 ? 'medio' : 'bajo';
+    const topRisk = climate.precipitation > 50 ? 'Inundación' : climate.temperature > 30 ? 'Ola de calor' : 'Vientos fuertes';
+
+    const updatePayload = {
+      hazard_score: hazard,
+      risk_score: riskScore,
+      risk_level: riskLevel,
+      top_risk: topRisk,
+    };
+
+    if (Object.prototype.hasOwnProperty.call(asset, 'risk_calculated_at')) {
+      updatePayload.risk_calculated_at = new Date().toISOString();
+    }
+
+    const { data: updatedAsset, error: updateError } = await supabase
+      .from('asset_risk_summary')
+      .update(updatePayload)
+      .eq('id', assetId)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.warn('No se pudo actualizar el cálculo de riesgo:', updateError.message);
+    }
+
+    return res.json({
+      asset: updatedAsset || asset,
+      climate,
+      hazard,
+      riskScore,
+      riskLevel,
+    });
+  } catch (error) {
+    console.error('🔥 Error en /api/calculate-risk:', error.message);
+    return res.status(500).json({ error: 'Error al calcular el riesgo' });
+  }
+});
 
 const PORT = process.env.PORT || 3001;
 

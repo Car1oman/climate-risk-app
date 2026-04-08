@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { assets as mockAssets } from "@/data/assets";
 import { fetchAssets } from "@/lib/api";
 import { getRiskColor, formatCurrency } from "@/lib/riskEngine";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +25,7 @@ const RISK_LABELS = {
 
 export default function Assets() {
   const [isLoading, setIsLoading] = useState(true);
-  const [assetsList, setAssetsList] = useState(mockAssets);
+  const [assetsList, setAssetsList] = useState([]);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [riskFilter, setRiskFilter] = useState("all");
@@ -38,10 +37,10 @@ export default function Assets() {
       setError(null);
       try {
         const data = await fetchAssets();
-        setAssetsList(Array.isArray(data) ? data : mockAssets);
+        setAssetsList(Array.isArray(data) ? data : []);
       } catch (fetchError) {
-        setAssetsList(mockAssets);
-        setError('No se pudieron cargar activos desde el servidor. Usando datos locales.');
+        setAssetsList([]);
+        setError('No se pudieron cargar activos desde el servidor. Intenta recargar la página.');
       } finally {
         setIsLoading(false);
       }

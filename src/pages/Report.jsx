@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { assets } from "@/data/assets";
-import { formatCurrency, getRiskColor } from "@/lib/riskEngine";
+import { useAssets } from "@/hooks/useAssets";
+import { API_URL } from "@/lib/api";
+import { formatCurrency } from "@/lib/riskEngine";
 import { Button } from "@/components/ui/button";
-import { FileText, Download, Loader2 } from "lucide-react";
+import { FileText, Loader2 } from "lucide-react";
 
 const RISK_LABELS = { critico: "Crítico", alto: "Alto", medio: "Medio", bajo: "Bajo" };
 
@@ -10,6 +11,7 @@ export default function Report() {
   const [isLoading, setIsLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [report, setReport] = useState(null);
+  const { data: assets = [], isLoading: assetsLoading, error: assetsError } = useAssets();
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 500);
@@ -56,8 +58,7 @@ Genera el reporte en formato TCFD con las secciones:
 
 Formato Markdown. Sé específico con los datos proporcionados. Incluye recomendaciones accionables.`;
 
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://climate-risk-app-91ev.onrender.com';
-      const response = await fetch(`${apiUrl}/api/ai`, {
+      const response = await fetch(`${API_URL}/api/ai`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -96,13 +97,17 @@ Formato Markdown. Sé específico con los datos proporcionados. Incluye recomend
             Genera reportes compatibles con marcos de divulgación climática
           </p>
         </div>
-        <Button onClick={generateReport} disabled={generating} className="gap-2">
+        <Button onClick={generateReport} disabled={generating || assetsError || assets.length === 0} className="gap-2">
           {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
           {generating ? "Generando..." : "Generar Reporte"}
         </Button>
       </div>
 
-      {/* Summary Cards */}
+      {assetsError && (
+        <div className="rounded-xl border border-destructive bg-destructive/10 p-4 text-sm text-destructive">
+          No se pudieron cargar los activos desde el backend.
+        </div>
+      )}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-card border border-border rounded-xl p-4 text-center">
           <p className="text-xs text-muted-foreground">Activos</p>
