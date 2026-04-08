@@ -248,7 +248,7 @@ app.post('/api/calculate-risk/:assetId', async (req, res) => {
       riskLevel,
     });
   } catch (error) {
-    console.error('🔥 Error en /api/calculate-risk:', error.message);
+    console.error(' Error en /api/calculate-risk:', error.message);
     return res.status(500).json({ error: 'Error al calcular el riesgo' });
   }
 });
@@ -556,7 +556,7 @@ app.post('/api/assets/bulk', async (req, res) => {
   }
 });
 
-// Carga masiva de datos climáticos
+// Carga masiva de datos climáticos for endpoint climático (para pruebas o integración con fuentes externas)
 app.post('/api/climate/bulk', async (req, res) => {
   try {
     const { climateData } = req.body;
