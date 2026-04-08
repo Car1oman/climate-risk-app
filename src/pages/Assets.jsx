@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { assets } from "@/data/assets";
+import { assets as mockAssets } from "@/data/assets";
+import { fetchAssets } from "@/lib/api";
 import { getRiskColor, formatCurrency } from "@/lib/riskEngine";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -25,16 +26,31 @@ const RISK_LABELS = {
 
 export default function Assets() {
   const [isLoading, setIsLoading] = useState(true);
+  const [assetsList, setAssetsList] = useState(mockAssets);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [riskFilter, setRiskFilter] = useState("all");
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 500);
-    return () => clearTimeout(timer);
+    const loadAssets = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const data = await fetchAssets();
+        setAssetsList(Array.isArray(data) ? data : mockAssets);
+      } catch (fetchError) {
+        setAssetsList(mockAssets);
+        setError('No se pudieron cargar activos desde el servidor. Usando datos locales.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadAssets();
   }, []);
 
-  const filtered = assets.filter((a) => {
+  const filtered = assetsList.filter((a) => {
     const matchSearch = !search || a.name?.toLowerCase().includes(search.toLowerCase()) || a.district?.toLowerCase().includes(search.toLowerCase());
     const matchType = typeFilter === "all" || a.type === typeFilter;
     const matchRisk = riskFilter === "all" || a.risk_level === riskFilter;
@@ -54,8 +70,11 @@ export default function Assets() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Activos</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          {assets.length} activos registrados en el portafolio
+          {assetsList.length} activos registrados en el portafolio
         </p>
+        {error && (
+          <p className="text-xs text-orange-500 mt-2">{error}</p>
+        )}
       </div>
 
       {/* Filters */}

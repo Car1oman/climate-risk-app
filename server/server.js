@@ -3,12 +3,39 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import { getClimateData } from './services/climateService.js';
+import { supabase } from "./supabaseClient.js";
 
 dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+//Acceso a la base de datos Supabase
+app.get("/api/assets", async (req, res) => {
+  const { data, error } = await supabase
+    .from("asset_risk_summary")
+    .select("*");
+
+  if (error) return res.status(500).json(error);
+
+  res.json(data);
+});
+
+//Endpoint detallado de un activo
+app.get("/api/assets/:id", async (req, res) => {
+  const { id } = req.params;
+
+  const { data, error } = await supabase
+    .from("asset_risk_summary")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) return res.status(500).json(error);
+
+  res.json(data);
+});
 
 // Inicializar Gemini solo si hay API key
 let ai = null;

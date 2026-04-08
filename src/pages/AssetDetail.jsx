@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { assets } from "@/data/assets";
+import { fetchAssetDetail } from "@/lib/api";
 import { formatCurrency, getRiskColor, getCompleteRiskModel } from "@/lib/riskEngine";
 import { Link } from "react-router-dom";
 import { ArrowLeft, MapPin, Building2, Sparkles, Loader2 } from "lucide-react";
@@ -27,13 +27,24 @@ export default function AssetDetail() {
   const pathParts = window.location.pathname.split("/");
   const assetId = pathParts[pathParts.length - 1];
 
+  const [asset, setAsset] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(true);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResponse, setAiResponse] = useState("");
   const [climate, setClimate] = useState(null);
   const [climateLoading, setClimateLoading] = useState(false);
   const { toast } = useToast();
 
-  const asset = assets.find(a => String(a.id) === assetId);
+  useEffect(() => {
+    const loadAsset = async () => {
+      setDetailLoading(true);
+      const data = await fetchAssetDetail(assetId);
+      setAsset(data);
+      setDetailLoading(false);
+    };
+
+    loadAsset();
+  }, [assetId]);
 
   const fetchClimate = async () => {
     if (climateLoading) return;
@@ -67,7 +78,7 @@ export default function AssetDetail() {
     if (asset?.lat && asset?.lng && !climate) {
       fetchClimate();
     }
-  }, [asset?.lat, asset?.lng]);
+  }, [asset?.lat, asset?.lng, climate]);
 
   const generateRecommendations = async () => {
     if (!asset) return;
@@ -105,7 +116,7 @@ Genera exactamente 3 recomendaciones de adaptación climática específicas para
     }
   };
 
-  if (!asset) {
+  if (detailLoading || !asset) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
