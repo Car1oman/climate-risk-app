@@ -16,6 +16,7 @@ import Simulator from './pages/Simulator';
 import Alerts from './pages/Alerts';
 import Report from './pages/Report';
 import AppSettings from './pages/AppSettings';
+import DataManagement from './pages/DataManagement';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -50,6 +51,7 @@ const AuthenticatedApp = () => {
         <Route path="/simulator" element={<Simulator />} />
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/report" element={<Report />} />
+        <Route path="/data-management" element={<DataManagement />} />
         <Route path="/settings" element={<AppSettings />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />

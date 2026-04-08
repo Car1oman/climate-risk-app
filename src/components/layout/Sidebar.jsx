@@ -10,6 +10,7 @@ import {
   Shield,
   ChevronLeft,
   ChevronRight,
+  Database,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -18,6 +19,7 @@ const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
   { icon: Map, label: "Mapa de Riesgos", path: "/map" },
   { icon: Building2, label: "Activos", path: "/assets" },
+  { icon: Database, label: "Gestión de Datos", path: "/data-management" },
   { icon: Waves, label: "Simulador El Niño", path: "/simulator" },
   { icon: Bell, label: "Alertas", path: "/alerts" },
   { icon: FileText, label: "Reporte TCFD", path: "/report" },
