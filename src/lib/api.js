@@ -29,6 +29,20 @@ export const fetchAssetDetail = async (id) => {
   }
 };
 
+/** @param {any[]} data @returns {Promise<any>} */
+export const uploadClimateRisks = async (data) => {
+  const res = await fetch(`${API_URL}/api/climate-risks/upload`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ data }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || `Error ${res.status}`);
+  }
+  return res.json();
+};
+
 export const calculateRisk = async (assetId) => {
   try {
     const res = await fetch(`${API_URL}/api/calculate-risk/${assetId}`, {

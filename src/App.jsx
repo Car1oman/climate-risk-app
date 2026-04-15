@@ -17,6 +17,7 @@ import Alerts from './pages/Alerts';
 import Report from './pages/Report';
 import AppSettings from './pages/AppSettings';
 import DataManagement from './pages/DataManagement';
+import ClimateDataUpload from './pages/ClimateDataUpload';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -52,6 +53,7 @@ const AuthenticatedApp = () => {
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/report" element={<Report />} />
         <Route path="/data-management" element={<DataManagement />} />
+        <Route path="/climate-upload" element={<ClimateDataUpload />} />
         <Route path="/settings" element={<AppSettings />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />

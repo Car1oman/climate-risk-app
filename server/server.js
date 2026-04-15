@@ -654,6 +654,92 @@ app.post('/api/climate/bulk', async (req, res) => {
   }
 });
 
+// 🌍 Carga de datos climáticos del Banco Mundial hacia climate_risks_grid
+app.post('/api/climate-risks/upload', async (req, res) => {
+  try {
+    const { data } = req.body;
+
+    if (!data || !Array.isArray(data)) {
+      return res.status(400).json({ error: 'El campo "data" es requerido y debe ser un array' });
+    }
+
+    if (data.length === 0) {
+      return res.status(400).json({ error: 'El array "data" no puede estar vacío' });
+    }
+
+    const datasetVersion = `v_${Date.now()}`;
+    const BATCH_SIZE = 500;
+
+    let inserted = 0;
+    let errors = 0;
+    const validRecords = [];
+
+    // Transformar y validar registros
+    for (const item of data) {
+      const lat = parseFloat(item.lat);
+      const lng = parseFloat(item.lng);
+      const value = parseFloat(item.value);
+
+      if (isNaN(lat) || lat < -90 || lat > 90) { errors++; continue; }
+      if (isNaN(lng) || lng < -180 || lng > 180) { errors++; continue; }
+      if (!item.risk_type || !item.horizon || !item.level) { errors++; continue; }
+
+      validRecords.push({
+        lat,
+        lng,
+        risk_type: String(item.risk_type),
+        horizon: String(item.horizon),
+        level: String(item.level),
+        value: isNaN(value) ? null : value,
+        source: item.source || 'world_bank',
+        dataset_version: datasetVersion,
+        created_at: new Date().toISOString(),
+      });
+    }
+
+    // Insertar en bloques de 500
+    for (let i = 0; i < validRecords.length; i += BATCH_SIZE) {
+      const batch = validRecords.slice(i, i + BATCH_SIZE);
+      const { error: insertError } = await supabase
+        .from('climate_risks_grid')
+        .insert(batch);
+
+      if (insertError) {
+        console.error(`Error en batch ${Math.floor(i / BATCH_SIZE) + 1}:`, insertError.message);
+        return res.status(500).json({
+          error: `Error al insertar lote ${Math.floor(i / BATCH_SIZE) + 1}: ${insertError.message}`,
+          total: data.length,
+          inserted,
+          errors,
+          datasetVersion,
+        });
+      }
+      inserted += batch.length;
+    }
+
+    // Control de versiones: desactivar anteriores e insertar nueva versión activa
+    await supabase
+      .from('climate_dataset_control')
+      .update({ is_active: false })
+      .neq('version', datasetVersion);
+
+    await supabase
+      .from('climate_dataset_control')
+      .insert({ version: datasetVersion, is_active: true });
+
+    return res.json({
+      total: data.length,
+      inserted,
+      errors,
+      datasetVersion,
+    });
+
+  } catch (error) {
+    console.error('Error en /api/climate-risks/upload:', error.message);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
 const PORT = process.env.PORT || 3001;
 
 app.listen(PORT, () => {
