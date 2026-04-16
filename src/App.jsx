@@ -81,9 +81,21 @@ function App() {
         console.error('Backend connection error:', error);
       }
     };
-
     pingBackend();
   }, []);
+
+  // Auto-dismiss notifications after 5 seconds
+  useEffect(() => {
+    if (!backendMessage) return;
+    const t = setTimeout(() => setBackendMessage(null), 5000);
+    return () => clearTimeout(t);
+  }, [backendMessage]);
+
+  useEffect(() => {
+    if (!backendError) return;
+    const t = setTimeout(() => setBackendError(null), 5000);
+    return () => clearTimeout(t);
+  }, [backendError]);
 
   return (
     <AuthProvider>

@@ -658,7 +658,7 @@ app.post('/api/climate/bulk', async (req, res) => {
 // 🔍 Consulta de riesgos climáticos por coordenadas (Banco Mundial)
 app.get('/api/climate-risks/lookup', async (req, res) => {
   try {
-    const { lat, lng, radius = '1.5' } = req.query;
+    const { lat, lng, radius = '1.5', scenario = 'pesimista' } = req.query;
 
     if (!lat || !lng) {
       return res.status(400).json({ error: 'lat y lng son requeridos' });
@@ -672,7 +672,34 @@ app.get('/api/climate-risks/lookup', async (req, res) => {
       return res.status(400).json({ error: 'Coordenadas inválidas' });
     }
 
-    // Obtener versión activa del dataset
+    // Unidad por variable (no almacenada en DB — se enriquece aquí)
+    const UNITS = {
+      calor_extremo: '°C', temperatura_maxima: '°C', temperatura_media: '°C',
+      noches_calurosas: 'días', mortalidad_calor: 'índice',
+      precipitacion_extrema: 'mm', precipitacion_media: 'mm/día',
+      cambio_precipitacion: '%', inundacion: 'días/año',
+    };
+
+    // Pesos de nivel para comparar escenarios
+    const LEVEL_SCORES = { bajo: 1, medio: 2, alto: 3 };
+    const score = (r) => LEVEL_SCORES[(r.level || '').toLowerCase()] || 0;
+
+    // Elige el registro según escenario entre duplicados del mismo risk_type+horizon
+    // (existen porque el dataset contiene SSP2-4.5 y SSP5-8.5)
+    function pickRecord(records) {
+      if (records.length === 1) return records[0];
+      return records.reduce((pick, r) => {
+        const ps = score(pick), rs = score(r);
+        if (scenario === 'pesimista') {
+          // SSP5-8.5 proxy: peor nivel / mayor valor
+          return rs > ps || (rs === ps && (r.value || 0) > (pick.value || 0)) ? r : pick;
+        }
+        // moderado / actual: SSP2-4.5 proxy: mejor nivel / menor valor
+        return rs < ps || (rs === ps && (r.value || 0) < (pick.value || 0)) ? r : pick;
+      });
+    }
+
+    // Obtener versión activa
     const { data: control } = await supabase
       .from('climate_dataset_control')
       .select('version')
@@ -686,11 +713,9 @@ app.get('/api/climate-risks/lookup', async (req, res) => {
       .lte('lat', latNum + radiusNum)
       .gte('lng', lngNum - radiusNum)
       .lte('lng', lngNum + radiusNum)
-      .limit(2000);
+      .limit(3000);
 
-    if (control?.version) {
-      query = query.eq('dataset_version', control.version);
-    }
+    if (control?.version) query = query.eq('dataset_version', control.version);
 
     const { data, error } = await query;
 
@@ -706,49 +731,97 @@ app.get('/api/climate-risks/lookup', async (req, res) => {
       });
     }
 
-    // Encontrar el punto de grilla más cercano a las coordenadas consultadas
+    // Punto de grilla más cercano
     const uniquePoints = [];
-    const seen = new Set();
+    const seenPts = new Set();
     for (const r of data) {
       const key = `${r.lat},${r.lng}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        const dist = Math.sqrt(Math.pow(r.lat - latNum, 2) + Math.pow(r.lng - lngNum, 2));
+      if (!seenPts.has(key)) {
+        seenPts.add(key);
+        const dist = Math.hypot(r.lat - latNum, r.lng - lngNum);
         uniquePoints.push({ lat: r.lat, lng: r.lng, dist });
       }
     }
     uniquePoints.sort((a, b) => a.dist - b.dist);
     const nearest = uniquePoints[0];
 
-    // Registros del punto más cercano
     const nearestRecords = data.filter(
       (r) => r.lat === nearest.lat && r.lng === nearest.lng
     );
 
-    // Agrupar por horizonte
-    const byHorizon = {};
+    // Deduplicar: 1 registro por (risk_type, horizon) — aplica lógica de escenario
+    const grouped = {};
     for (const r of nearestRecords) {
-      if (!byHorizon[r.horizon]) byHorizon[r.horizon] = [];
-      byHorizon[r.horizon].push(r);
+      const key = `${r.risk_type}|${r.horizon}`;
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(r);
     }
+    const deduped = Object.values(grouped).map(pickRecord);
 
-    // Distancia real en km (Haversine)
+    // Enriquecer con unidad
+    deduped.forEach((r) => { r.unit = UNITS[r.risk_type] || ''; });
+
+    // Haversine (km)
     const toRad = (d) => (d * Math.PI) / 180;
-    const R = 6371;
+    const Rearth = 6371;
     const dLat = toRad(nearest.lat - latNum);
     const dLon = toRad(nearest.lng - lngNum);
     const a =
       Math.sin(dLat / 2) ** 2 +
       Math.cos(toRad(latNum)) * Math.cos(toRad(nearest.lat)) * Math.sin(dLon / 2) ** 2;
-    const distKm = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+    const distKm = Math.round(Rearth * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+
+    const scenarioMeta = {
+      actual:    { label: 'Situación Actual',    sublabel: 'Histórico 1985–2014 · línea base', color: 'slate' },
+      moderado:  { label: 'Escenario Moderado',  sublabel: 'SSP2-4.5 · Emisiones moderadas',   color: 'amber' },
+      pesimista: { label: 'Escenario Pesimista', sublabel: 'SSP5-8.5 · Altas emisiones',        color: 'red'   },
+    };
+
+    // Separar futuros (corto/mediano) de histórico
+    const historicalRecs = deduped.filter((r) => r.horizon === 'historico');
+    const futureRecs     = deduped.filter((r) => r.horizon !== 'historico');
+
+    if (scenario === 'actual') {
+      // Mostrar datos históricos como contenido principal (sin proyecciones)
+      const byHorizon = {};
+      for (const r of historicalRecs) {
+        if (!byHorizon[r.horizon]) byHorizon[r.horizon] = [];
+        byHorizon[r.horizon].push(r);
+      }
+      return res.json({
+        found: true,
+        queried: { lat: latNum, lng: lngNum },
+        nearestPoint: { lat: nearest.lat, lng: nearest.lng, distanceKm: distKm },
+        scenario,
+        scenarioMeta: scenarioMeta.actual,
+        horizons: Object.keys(byHorizon).sort(),
+        byHorizon,
+        baseline: {},
+        totalRecords: historicalRecs.length,
+      });
+    }
+
+    // Escenario moderado o pesimista: proyecciones futuras + línea base histórica
+    const byHorizon = {};
+    for (const r of futureRecs) {
+      if (!byHorizon[r.horizon]) byHorizon[r.horizon] = [];
+      byHorizon[r.horizon].push(r);
+    }
+    const baseline = {};
+    for (const r of historicalRecs) {
+      baseline[r.risk_type] = { level: r.level, value: r.value, unit: UNITS[r.risk_type] || '' };
+    }
 
     return res.json({
       found: true,
       queried: { lat: latNum, lng: lngNum },
       nearestPoint: { lat: nearest.lat, lng: nearest.lng, distanceKm: distKm },
+      scenario,
+      scenarioMeta: scenarioMeta[scenario] || scenarioMeta.pesimista,
       horizons: Object.keys(byHorizon).sort(),
       byHorizon,
-      totalRecords: nearestRecords.length,
+      baseline,
+      totalRecords: futureRecs.length,
     });
   } catch (error) {
     console.error('Error en /api/climate-risks/lookup:', error.message);

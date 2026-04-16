@@ -1,31 +1,38 @@
-import { Bell, Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { useLocation } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
-import { alerts } from "@/data/alerts";
+import { Globe } from "lucide-react";
+
+const PAGE_TITLES = {
+  "/":                   { title: "Consulta de Riesgos Climáticos", sub: "Banco Mundial · CMIP6 · SSP" },
+  "/climate-risk-lookup":{ title: "Consulta de Riesgos Climáticos", sub: "Banco Mundial · CMIP6 · SSP" },
+  "/climate-upload":     { title: "Gestión de Datos Climáticos",    sub: "Carga de dataset del Banco Mundial" },
+  "/settings":           { title: "Configuración",                  sub: "Preferencias de la plataforma" },
+};
 
 export default function TopBar() {
-  const activeCount = alerts.filter(a => a.is_active !== false).length;
+  const location = useLocation();
+  const page = PAGE_TITLES[location.pathname] || { title: "ClimateRisk", sub: "Intercorp Retail" };
 
   return (
     <header className="h-14 border-b border-border flex items-center justify-between px-6 bg-card/50 backdrop-blur-sm">
-      <div className="flex items-center gap-3 flex-1 max-w-md">
-        <Search className="w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar activos, distritos..."
-          className="border-0 bg-transparent shadow-none h-8 text-sm placeholder:text-muted-foreground/50 focus-visible:ring-0"
-        />
-      </div>
-      <div className="flex items-center gap-4">
-        <div className="relative">
-          <Bell className="w-4 h-4 text-muted-foreground" />
-          {activeCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-destructive rounded-full flex items-center justify-center">
-              <span className="text-[9px] font-bold text-white">{activeCount}</span>
-            </span>
-          )}
+      {/* Título de página */}
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="w-6 h-6 rounded-md bg-primary/15 flex items-center justify-center flex-shrink-0">
+          <Globe className="w-3.5 h-3.5 text-primary" />
         </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold leading-none truncate">{page.title}</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5 leading-none">{page.sub}</p>
+        </div>
+      </div>
+
+      {/* Acciones derecha */}
+      <div className="flex items-center gap-3">
+        <Badge variant="outline" className="text-[10px] font-mono px-2 py-0.5 text-muted-foreground hidden sm:flex">
+          v1.0 · MVP
+        </Badge>
         <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center">
-          <span className="text-xs font-semibold text-primary">IR</span>
+          <span className="text-xs font-bold text-primary">IR</span>
         </div>
       </div>
     </header>

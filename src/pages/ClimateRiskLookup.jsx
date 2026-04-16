@@ -10,18 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { API_URL } from "@/lib/api";
 import {
-  Search,
-  MapPin,
-  Loader2,
-  AlertTriangle,
-  Info,
-  Sparkles,
-  ChevronDown,
-  ChevronUp,
+  Search, MapPin, Loader2, AlertTriangle, Info,
+  Sparkles, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Minus,
 } from "lucide-react";
 import { toast } from "sonner";
 
-// ── Leaflet icon fix for Vite ────────────────────────────────────────────────
+// ── Leaflet icon fix ──────────────────────────────────────────────────────────
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
@@ -29,138 +23,129 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
 });
 
-// ── Risk catalogue ───────────────────────────────────────────────────────────
-// Keys: lowercase, underscored. Add new entries freely — getRiskMeta does fuzzy fallback.
-const RISK_CATALOGUE = {
-  // ─ Inundación
-  flood:          { label: "Inundación",         emoji: "🌊", impacts: ["Daño estructural al local e interrupción de operaciones (estimado 7–45 días)","Pérdida de inventario perecedero y equipos de refrigeración","Corte de acceso vial para empleados, clientes y proveedores","Costos de rehabilitación: S/ 80–200/m²"] },
-  inundacion:     { label: "Inundación",         emoji: "🌊", impacts: ["Daño estructural al local e interrupción de operaciones (estimado 7–45 días)","Pérdida de inventario perecedero y equipos de refrigeración","Corte de acceso vial para empleados, clientes y proveedores","Costos de rehabilitación: S/ 80–200/m²"] },
-  // ─ Calor / Temperatura
-  calor_extremo:  { label: "Calor Extremo",      emoji: "🌡️", impacts: ["Riesgo de salud para empleados y clientes en pisos de ventas sin refrigeración adecuada","Incremento del 20–35% en consumo eléctrico de sistemas HVAC","Deterioro acelerado de productos perecederos y sensibles al calor","Posibles cortes eléctricos en picos de demanda regional"] },
-  olas_calor:     { label: "Olas de Calor",      emoji: "🌡️", impacts: ["Riesgo de salud para empleados y clientes en pisos de ventas sin refrigeración adecuada","Incremento del 20–35% en consumo eléctrico de sistemas HVAC","Deterioro acelerado de productos perecederos y sensibles al calor","Posibles cortes eléctricos en picos de demanda regional"] },
-  ola_calor:      { label: "Ola de Calor",       emoji: "🌡️", impacts: ["Riesgo de salud para empleados y clientes en pisos de ventas sin refrigeración adecuada","Incremento del 20–35% en consumo eléctrico de sistemas HVAC","Deterioro acelerado de productos perecederos y sensibles al calor","Posibles cortes eléctricos en picos de demanda regional"] },
-  heatwave:       { label: "Ola de Calor",       emoji: "🌡️", impacts: ["Riesgo de salud para empleados y clientes en pisos de ventas sin refrigeración adecuada","Incremento del 20–35% en consumo eléctrico de sistemas HVAC","Deterioro acelerado de productos perecederos y sensibles al calor","Posibles cortes eléctricos en picos de demanda regional"] },
-  heat:           { label: "Calor Extremo",      emoji: "🌡️", impacts: ["Riesgo de salud para empleados y clientes en pisos de ventas sin refrigeración adecuada","Incremento del 20–35% en consumo eléctrico de sistemas HVAC","Deterioro acelerado de productos perecederos y sensibles al calor","Posibles cortes eléctricos en picos de demanda regional"] },
-  temperatura_media: { label: "Aumento de Temperatura", emoji: "🌡️", impacts: ["Cambio en el patrón de demanda de productos según temperatura (mayor consumo de bebidas frías, menos de abrigos)","Mayor consumo energético sostenido para climatización de instalaciones","Ajuste necesario en gestión de cadena de frío y temperaturas de almacenamiento","Impacto gradual en el bienestar y productividad del personal"] },
-  // ─ Sequía
-  drought:        { label: "Sequía",             emoji: "☀️", impacts: ["Escasez hídrica que afecta limpieza, cocinas y servicios higiénicos del local","Disrupciones en cadena de suministro de proveedores agrícolas","Mayor presión sobre costos energéticos de refrigeración al aumentar temperatura","Reducción de tráfico de clientes durante condiciones extremas"] },
-  sequia:         { label: "Sequía",             emoji: "☀️", impacts: ["Escasez hídrica que afecta limpieza, cocinas y servicios higiénicos del local","Disrupciones en cadena de suministro de proveedores agrícolas","Mayor presión sobre costos energéticos de refrigeración al aumentar temperatura","Reducción de tráfico de clientes durante condiciones extremas"] },
-  // ─ Deslizamiento
-  landslide:      { label: "Deslizamiento",      emoji: "🏔️", impacts: ["Bloqueo de acceso vehicular y peatonal al local","Daño a infraestructura de transporte logístico (proveedores y distribución)","Evacuación de personal y cierre prolongado del establecimiento","Costos de limpieza, habilitación de vías y reparaciones estructurales"] },
-  deslizamiento:  { label: "Deslizamiento",      emoji: "🏔️", impacts: ["Bloqueo de acceso vehicular y peatonal al local","Daño a infraestructura de transporte logístico (proveedores y distribución)","Evacuación de personal y cierre prolongado del establecimiento","Costos de limpieza, habilitación de vías y reparaciones estructurales"] },
-  // ─ Ciclón / Tormenta
-  cyclone:        { label: "Ciclón / Tormenta",  emoji: "🌀", impacts: ["Daño físico severo a techo, fachadas y señalización exterior","Interrupción del suministro eléctrico por varios días","Corte de la cadena de frío y pérdida de inventario perecedero","Posible inundación combinada con daños al inmueble"] },
-  storm:          { label: "Tormenta",           emoji: "⛈️", impacts: ["Daño físico al edificio y equipos exteriores","Interrupción eléctrica y de conectividad","Riesgo de seguridad para empleados durante la tormenta","Impacto en logística de última milla"] },
-  // ─ Precipitación
-  precipitacion:  { label: "Precipitación",      emoji: "🌧️", impacts: ["Mayor riesgo de inundaciones locales y encharcamiento en zonas de carga/descarga","Deterioro de vías de acceso y aumento de accidentes","Impacto en cadena logística por retrasos de proveedores","Aumento en costos de mantenimiento de techos e impermeabilización"] },
-  precipitation:  { label: "Precipitación",      emoji: "🌧️", impacts: ["Mayor riesgo de inundaciones locales y encharcamiento en zonas de carga/descarga","Deterioro de vías de acceso y aumento de accidentes","Impacto en cadena logística por retrasos de proveedores","Aumento en costos de mantenimiento de techos e impermeabilización"] },
-  // ─ Riesgo climático genérico
-  riesgo_climatico: { label: "Riesgo Climático", emoji: "🌍", impacts: ["Posible incremento en la frecuencia de eventos climáticos extremos","Mayor variabilidad en patrones de temperatura y precipitación que afectan planificación","Necesidad de actualizar planes de continuidad operacional y BCP","Impacto en seguros: posible aumento de primas o reducción de cobertura"] },
-  climate_risk:   { label: "Riesgo Climático",   emoji: "🌍", impacts: ["Posible incremento en la frecuencia de eventos climáticos extremos","Mayor variabilidad en patrones de temperatura y precipitación que afectan planificación","Necesidad de actualizar planes de continuidad operacional y BCP","Impacto en seguros: posible aumento de primas o reducción de cobertura"] },
+// ── Constantes de dominio ────────────────────────────────────────────────────
+
+const RISK_GROUPS = {
+  calor: {
+    id: "calor",
+    label: "Riesgo de Calor",
+    emoji: "🌡️",
+    variables: ["calor_extremo", "temperatura_maxima", "temperatura_media", "noches_calurosas", "mortalidad_calor"],
+    impacts: [
+      "Mayor consumo energético para climatización (+20–35%), impacto directo en costos operativos del local",
+      "Riesgo de salud laboral para empleados en zonas sin climatización adecuada (merma de productividad 8–12%)",
+      "Deterioro acelerado de productos perecederos y sensibles al calor (aumento de mermas 3–7%)",
+      "Posible reducción de tráfico de clientes durante olas de calor extremo (hasta –10% en ventas diarias)",
+    ],
+  },
+  hidrico: {
+    id: "hidrico",
+    label: "Riesgo Hídrico",
+    emoji: "🌧️",
+    variables: ["inundacion", "precipitacion_extrema", "precipitacion_media", "cambio_precipitacion"],
+    impacts: [
+      "Inundaciones que interrumpen operaciones por 7–45 días según severidad (daños estructurales S/ 80–200/m²)",
+      "Corte de acceso logístico (proveedores, distribución) ante lluvias extremas o desborde de ríos",
+      "Pérdida de inventario por daños por agua en almacenes y pisos de venta bajos",
+      "Mayor variabilidad en cadena de suministro por disrupciones en zonas proveedoras",
+    ],
+  },
 };
 
-const LEVEL_ORDER = { low: 1, bajo: 1, medium: 2, medio: 2, high: 3, alto: 3, very_high: 4, muy_alto: 4, critical: 5, critico: 5 };
+const VARIABLE_META = {
+  calor_extremo:         { label: "Temp. máx. extrema",      desc: "Temperatura máxima diaria más alta del año" },
+  temperatura_maxima:    { label: "Temp. máx. media anual",   desc: "Promedio anual de temperaturas máximas diarias" },
+  temperatura_media:     { label: "Temperatura media",        desc: "Temperatura promedio anual" },
+  noches_calurosas:      { label: "Noches cálidas",           desc: "Días/año con temperatura nocturna sobre umbral de calor" },
+  mortalidad_calor:      { label: "Índice mortalidad calor",  desc: "Riesgo relativo de mortalidad por calor extremo" },
+  inundacion:            { label: "Días de inundación",       desc: "Días al año con inundación en la zona" },
+  precipitacion_extrema: { label: "Precipitación extrema",    desc: "Precipitación máxima en evento de 24 h" },
+  precipitacion_media:   { label: "Precipitación media",      desc: "Precipitación media diaria anual" },
+  cambio_precipitacion:  { label: "Cambio precipitación",     desc: "Cambio porcentual vs línea base histórica (1985–2014)" },
+};
+
+const HORIZON_INFO = {
+  historico: { label: "Situación Actual",  period: "1985–2014", ringColor: "ring-slate-400/40",  textColor: "text-slate-400",  bg: "bg-slate-500/10" },
+  corto:     { label: "Corto Plazo",       period: "~2030–2040", ringColor: "ring-blue-400/40",   textColor: "text-blue-400",   bg: "bg-blue-500/10" },
+  mediano:   { label: "Mediano Plazo",     period: "~2050–2060", ringColor: "ring-amber-400/40",  textColor: "text-amber-400",  bg: "bg-amber-500/10" },
+};
+
+const TILE_LAYERS = {
+  osm: {
+    label: "Calles",
+    icon: "🗺️",
+    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  },
+  topo: {
+    label: "Topográfico",
+    icon: "🌄",
+    url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+    attribution: '&copy; <a href="https://opentopomap.org">OpenTopoMap</a> contributors',
+  },
+  satellite: {
+    label: "Satélite",
+    icon: "🛰️",
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    attribution: '&copy; <a href="https://www.esri.com">Esri</a>',
+  },
+};
 
 const LEVEL_CONFIG = {
-  1: { label: "Bajo",     color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" },
-  2: { label: "Medio",    color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" },
-  3: { label: "Alto",     color: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400" },
-  4: { label: "Muy Alto", color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" },
-  5: { label: "Crítico",  color: "bg-red-200 text-red-900 dark:bg-red-900/50 dark:text-red-300" },
+  bajo:  { label: "Baja exposición",     color: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300", dot: "bg-emerald-500", score: 1 },
+  medio: { label: "Exposición moderada", color: "bg-amber-100  text-amber-800  dark:bg-amber-900/40  dark:text-amber-300",  dot: "bg-amber-500",   score: 2 },
+  alto:  { label: "Alta exposición",     color: "bg-red-100    text-red-800    dark:bg-red-900/40    dark:text-red-300",    dot: "bg-red-500",     score: 3 },
 };
 
-// Fuzzy lookup in catalogue
-function getRiskMeta(riskType) {
-  const key = (riskType || "").toLowerCase().replace(/[\s-]+/g, "_");
-  if (RISK_CATALOGUE[key]) return RISK_CATALOGUE[key];
-  // Try partial match (a key word appears in the entry)
-  for (const [k, v] of Object.entries(RISK_CATALOGUE)) {
-    if (key.includes(k) || k.includes(key)) return v;
-  }
-  // Keyword hints
-  if (key.includes("calor") || key.includes("heat") || key.includes("temp"))
-    return RISK_CATALOGUE.calor_extremo;
-  if (key.includes("inunda") || key.includes("flood")) return RISK_CATALOGUE.flood;
-  if (key.includes("sequia") || key.includes("drought")) return RISK_CATALOGUE.drought;
-  if (key.includes("desliz") || key.includes("landslide")) return RISK_CATALOGUE.landslide;
-  if (key.includes("lluvias") || key.includes("precip") || key.includes("rain"))
-    return RISK_CATALOGUE.precipitacion;
-  // Generic fallback
-  return {
-    label: riskType.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
-    emoji: "⚠️",
-    impacts: [
-      "Posibles disrupciones en las operaciones del local",
-      "Impacto en la cadena de suministro y logística",
-      "Necesidad de revisar plan de continuidad operacional",
-      "Monitorear evolución del indicador climático",
-    ],
+function getLevelCfg(level) {
+  return LEVEL_CONFIG[(level || "").toLowerCase()] || {
+    label: level, color: "bg-muted text-muted-foreground", dot: "bg-muted-foreground", score: 0,
   };
 }
 
-function levelScore(level) {
-  return LEVEL_ORDER[(level || "").toLowerCase()] || 0;
-}
-
-function getLevelConfig(level) {
-  const score = levelScore(level);
-  return LEVEL_CONFIG[score] || { label: level, color: "bg-muted text-muted-foreground" };
-}
-
-function labelHorizon(h) {
-  const lower = (h || "").toLowerCase().replace(/[_\s]/g, "");
-  if (lower === "corto" || lower === "cortplazo" || lower === "short") return "Corto plazo";
-  if (lower === "mediano" || lower === "medianoplazo" || lower === "mid" || lower === "medium")
-    return "Mediano plazo";
-  if (lower === "largo" || lower === "largoplazo" || lower === "long") return "Largo plazo";
-  const year = parseInt(h);
-  if (!isNaN(year) && year > 2000 && year < 2200) {
-    if (year <= 2040) return `Corto plazo · ${year}`;
-    if (year <= 2060) return `Mediano plazo · ${year}`;
-    return `Largo plazo · ${year}`;
+function getGroupForVariable(riskType) {
+  for (const [key, g] of Object.entries(RISK_GROUPS)) {
+    if (g.variables.includes(riskType)) return key;
   }
-  return h;
+  return null;
 }
 
-// ── Pre-analysis ─────────────────────────────────────────────────────────────
-// Groups ALL records by risk_type, keeping only the peak level per horizon.
-// Returns array sorted by severity (highest first).
-function preAnalyzeRisks(byHorizon) {
-  const allRecords = Object.values(byHorizon).flat();
-  const grouped = {};
+// Calcula tendencia respecto al histórico (para valores numéricos)
+function trend(current, base) {
+  if (base == null || current == null || base === 0) return null;
+  const delta = current - base;
+  const pct = ((delta / Math.abs(base)) * 100).toFixed(1);
+  return { delta: parseFloat(delta.toFixed(3)), pct: parseFloat(pct) };
+}
 
-  for (const r of allRecords) {
-    const key = r.risk_type;
-    if (!grouped[key]) grouped[key] = { perHorizon: {}, all: [] };
-    grouped[key].all.push(r);
-    const h = r.horizon;
-    const prev = grouped[key].perHorizon[h];
-    if (!prev || levelScore(r.level) > levelScore(prev.level)) {
-      grouped[key].perHorizon[h] = r;
-    }
+// Agrupa registros de un horizonte en los 2 grupos temáticos con nivel headline
+function buildGroups(horizonRecords, baseline) {
+  const grouped = { calor: [], hidrico: [] };
+  for (const r of horizonRecords) {
+    const g = getGroupForVariable(r.risk_type);
+    if (g) grouped[g].push(r);
   }
 
-  return Object.entries(grouped)
-    .map(([riskType, { perHorizon, all }]) => {
-      const peakLevel = all.reduce(
-        (best, r) => (levelScore(r.level) > levelScore(best) ? r.level : best),
-        all[0].level
-      );
-      const horizonEntries = Object.entries(perHorizon)
-        .sort(([a], [b]) => String(a).localeCompare(String(b)))
-        .map(([h, r]) => ({ horizon: h, level: r.level }));
-      return {
-        riskType,
-        peakLevel,
-        peakScore: levelScore(peakLevel),
-        horizonEntries,
-        meta: getRiskMeta(riskType),
-      };
-    })
-    .sort((a, b) => b.peakScore - a.peakScore);
+  return Object.entries(grouped).map(([groupId, records]) => {
+    const group = RISK_GROUPS[groupId];
+    // Headline = nivel más alto del grupo
+    const headlineScore = records.reduce((m, r) => Math.max(m, getLevelCfg(r.level).score), 0);
+    const headlineLevel = Object.keys(LEVEL_CONFIG).find(
+      (k) => LEVEL_CONFIG[k].score === headlineScore
+    ) || "bajo";
+
+    // Enriquecer con baseline
+    const enriched = records.map((r) => ({
+      ...r,
+      baseline: baseline[r.risk_type] || null,
+      varMeta: VARIABLE_META[r.risk_type] || { label: r.risk_type, desc: "" },
+    }));
+
+    return { groupId, group, headlineLevel, records: enriched };
+  }).filter((g) => g.records.length > 0);
 }
 
-// ── Subcomponents ─────────────────────────────────────────────────────────────
+// ── Subcomponentes ────────────────────────────────────────────────────────────
 
 function MapClickHandler({ onMapClick }) {
   useMapEvents({
@@ -174,26 +159,105 @@ function MapClickHandler({ onMapClick }) {
   return null;
 }
 
-function RiskCard({ item }) {
+function ScenarioSelector({ value, onChange, disabled }) {
+  const opts = [
+    { id: "actual",    icon: "📍", label: "Actual",    sub: "Histórico 1985–2014" },
+    { id: "moderado",  icon: "🟡", label: "Moderado",  sub: "SSP2-4.5 · emisiones mod." },
+    { id: "pesimista", icon: "🔴", label: "Pesimista", sub: "SSP5-8.5 · altas emisiones" },
+  ];
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs text-muted-foreground">Escenario climático</Label>
+      <div className="grid grid-cols-3 gap-1.5">
+        {opts.map((o) => (
+          <button
+            key={o.id}
+            disabled={disabled}
+            onClick={() => onChange(o.id)}
+            className={`rounded-xl border px-2 py-2.5 text-left transition-all ${
+              value === o.id
+                ? "border-primary bg-primary/10 ring-1 ring-primary/40"
+                : "border-border hover:bg-muted/40"
+            } disabled:opacity-40`}
+          >
+            <div className="flex items-center gap-1 text-xs font-medium">
+              <span>{o.icon}</span>
+              <span>{o.label}</span>
+            </div>
+            <p className="text-[9px] text-muted-foreground mt-0.5 leading-tight">{o.sub}</p>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function VariableRow({ record }) {
+  const levelCfg = getLevelCfg(record.level);
+  const t = record.baseline ? trend(record.value, record.baseline.value) : null;
+
+  const TrendIcon =
+    t == null ? null
+    : t.delta > 0 ? TrendingUp
+    : t.delta < 0 ? TrendingDown
+    : Minus;
+  const trendColor =
+    t == null ? ""
+    : t.delta > 0 ? "text-red-400"
+    : "text-emerald-400";
+
+  return (
+    <div className="flex items-start gap-2 py-1.5 border-b border-border/40 last:border-0">
+      <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${levelCfg.dot}`} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-xs font-medium">{record.varMeta.label}</span>
+          <Badge className={`text-[10px] px-1.5 py-0 ${levelCfg.color}`}>{levelCfg.label}</Badge>
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-0.5">{record.varMeta.desc}</p>
+      </div>
+      <div className="text-right flex-shrink-0 space-y-0.5">
+        {record.value != null && (
+          <div className="text-xs font-mono text-foreground/80">
+            {record.value % 1 === 0 ? record.value : record.value.toFixed(2)} {record.unit}
+          </div>
+        )}
+        {t && TrendIcon && (
+          <div className={`flex items-center justify-end gap-0.5 text-[10px] ${trendColor}`}>
+            <TrendIcon className="w-2.5 h-2.5" />
+            {t.delta > 0 ? "+" : ""}{t.delta % 1 === 0 ? t.delta : t.delta.toFixed(2)} {record.unit}
+          </div>
+        )}
+        {record.baseline && (
+          <div className="text-[10px] text-muted-foreground/60">
+            base: {record.baseline.value % 1 === 0 ? record.baseline.value : record.baseline.value?.toFixed(2)} {record.unit}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function GroupCard({ groupData }) {
   const [open, setOpen] = useState(false);
-  const levelCfg = getLevelConfig(item.peakLevel);
-  const showTimeline = item.horizonEntries.length > 1;
+  const { group, headlineLevel, records } = groupData;
+  const levelCfg = getLevelCfg(headlineLevel);
 
   return (
     <div className="border border-border rounded-xl overflow-hidden transition-shadow hover:shadow-sm">
-      {/* Header — always visible */}
       <button
-        className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-muted/30 transition-colors"
+        className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-muted/20 transition-colors"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
       >
-        <span className="text-xl flex-shrink-0" aria-hidden="true">
-          {item.meta.emoji}
-        </span>
-        <span className="flex-1 font-medium text-sm">{item.meta.label}</span>
-        <Badge className={`text-xs font-semibold px-2.5 py-0.5 ${levelCfg.color}`}>
-          {levelCfg.label}
-        </Badge>
+        <span className="text-xl flex-shrink-0">{group.emoji}</span>
+        <span className="flex-1 text-sm font-semibold">{group.label}</span>
+        <div className="flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full ${levelCfg.dot}`} />
+          <Badge className={`text-xs font-medium px-2.5 py-0.5 border-0 ${levelCfg.color}`}>
+            {levelCfg.label}
+          </Badge>
+        </div>
         {open ? (
           <ChevronUp className="w-4 h-4 text-muted-foreground ml-1 flex-shrink-0" />
         ) : (
@@ -201,44 +265,30 @@ function RiskCard({ item }) {
         )}
       </button>
 
-      {/* Expanded content */}
       {open && (
-        <div className="border-t border-border bg-muted/10 px-4 pb-4 pt-3 space-y-4">
-          {/* Temporal evolution */}
-          {showTimeline && (
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                Evolución temporal
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {item.horizonEntries.map(({ horizon, level }) => {
-                  const cfg = getLevelConfig(level);
-                  return (
-                    <div
-                      key={horizon}
-                      className="flex items-center gap-1.5 bg-background border border-border rounded-lg px-2.5 py-1.5 text-xs"
-                    >
-                      <span className="text-muted-foreground">{labelHorizon(horizon)}</span>
-                      <span className={`font-semibold rounded px-1 ${cfg.color}`}>
-                        {cfg.label}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Impacts */}
+        <div className="border-t border-border bg-muted/5 px-4 py-3 space-y-4">
+          {/* Indicadores técnicos */}
           <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-              Posibles impactos operacionales
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+              Indicadores técnicos
+            </p>
+            <div className="space-y-0">
+              {records.map((r) => (
+                <VariableRow key={r.risk_type} record={r} />
+              ))}
+            </div>
+          </div>
+
+          {/* Impactos */}
+          <div>
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+              Impactos operacionales en retail
             </p>
             <ul className="space-y-1.5">
-              {item.meta.impacts.map((impact, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-foreground/80">
-                  <span className="mt-1 w-1.5 h-1.5 rounded-full bg-primary/60 flex-shrink-0" />
-                  {impact}
+              {group.impacts.map((imp, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-foreground/75">
+                  <span className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${levelCfg.dot}`} />
+                  {imp}
                 </li>
               ))}
             </ul>
@@ -249,7 +299,30 @@ function RiskCard({ item }) {
   );
 }
 
-function AIPanel({ analyzed, queried, nearestPoint }) {
+function HorizonSection({ horizon, records, baseline }) {
+  const hInfo = HORIZON_INFO[horizon] || {
+    label: horizon, period: "", ringColor: "ring-border", textColor: "text-muted-foreground", bg: "bg-muted/10",
+  };
+  const groups = buildGroups(records, baseline);
+
+  return (
+    <div className={`rounded-xl ring-1 ${hInfo.ringColor} overflow-hidden`}>
+      <div className={`${hInfo.bg} px-4 py-2.5 flex items-center gap-2`}>
+        <span className={`text-sm font-bold ${hInfo.textColor}`}>{hInfo.label}</span>
+        {hInfo.period && (
+          <span className="text-xs text-muted-foreground">{hInfo.period}</span>
+        )}
+      </div>
+      <div className="p-3 space-y-2 bg-card">
+        {groups.map((g) => (
+          <GroupCard key={g.groupId} groupData={g} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AIPanel({ results }) {
   const [loading, setLoading] = useState(false);
   const [text, setText] = useState(null);
 
@@ -257,29 +330,28 @@ function AIPanel({ analyzed, queried, nearestPoint }) {
     setLoading(true);
     setText(null);
     try {
-      const riskList = analyzed
-        .map((item) => {
-          const horizons = item.horizonEntries
-            .map(({ horizon, level }) => `${labelHorizon(horizon)}: ${getLevelConfig(level).label}`)
-            .join(" | ");
-          return `- ${item.meta.label} [${getLevelConfig(item.peakLevel).label}]${horizons ? ` → ${horizons}` : ""}`;
-        })
-        .join("\n");
+      const lines = results.horizons.flatMap((h) => {
+        const hInfo = HORIZON_INFO[h] || { label: h, period: "" };
+        return results.byHorizon[h].map(
+          (r) => `  - ${VARIABLE_META[r.risk_type]?.label || r.risk_type}: ${r.value} ${r.unit} [${r.level}]`
+        ).concat([`  Horizonte: ${hInfo.label} ${hInfo.period}`]);
+      });
 
-      const prompt = `Eres un asesor experto en riesgos climáticos para Intercorp Retail (SPSA) en Perú.
+      const prompt = `Eres asesor experto en riesgos climáticos para Intercorp Retail (SPSA) en Perú.
 
-Datos del Banco Mundial para la ubicación (lat: ${queried.lat}, lng: ${queried.lng}).
-Punto de datos más cercano: (${nearestPoint.lat}, ${nearestPoint.lng}) — ${nearestPoint.distanceKm} km de distancia.
+Ubicación consultada: lat ${results.queried.lat}, lng ${results.queried.lng}
+Punto de datos (Banco Mundial CCKP): ${results.nearestPoint.lat}, ${results.nearestPoint.lng} (${results.nearestPoint.distanceKm} km)
+Escenario: ${results.scenarioMeta?.label} — ${results.scenarioMeta?.sublabel}
 
-Riesgos climáticos identificados:
-${riskList}
+Indicadores climáticos proyectados:
+${lines.join("\n")}
 
-Elabora un análisis ejecutivo en 4 secciones, conciso y práctico:
+Elabora un análisis ejecutivo estructurado en 4 secciones, breve y accionable para gestores de riesgo de retail:
 
-1. **Resumen del perfil de riesgo** (2–3 oraciones)
-2. **Impactos operacionales prioritarios** (máx. 4 puntos con cifras estimadas, enfocado en retail)
-3. **Acciones de adaptación inmediatas** (0–2 años, máx. 4 puntos accionables y específicos)
-4. **Inversiones en resiliencia** (mediano y largo plazo, máx. 4 puntos)
+1. **Perfil de riesgo** (2–3 oraciones: ¿cuál es el riesgo principal y su magnitud?)
+2. **Impactos operacionales** (máx. 4 puntos con cifras estimadas — inventario, personal, energía, logística)
+3. **Acciones inmediatas (0–2 años)** (máx. 4 puntos específicos y aplicables)
+4. **Inversiones en resiliencia (2–10 años)** (máx. 4 puntos con foco en infraestructura y cadena de suministro)
 
 Responde en español. Sé directo y específico para operaciones de supermercados y retail en Perú.`;
 
@@ -299,53 +371,31 @@ Responde en español. Sé directo y específico para operaciones de supermercado
   };
 
   return (
-    <div className="space-y-3 pt-2">
+    <div className="space-y-3 pt-1">
       <div className="border-t border-border" />
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-semibold flex items-center gap-1.5">
-            <Sparkles className="w-4 h-4 text-primary" />
-            Recomendaciones con IA
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Análisis de impactos y estrategias de mitigación
-          </p>
-        </div>
+      <div>
+        <p className="text-sm font-semibold flex items-center gap-1.5">
+          <Sparkles className="w-4 h-4 text-primary" />
+          Recomendaciones con IA
+        </p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Estrategias de mitigación generadas con Gemini AI
+        </p>
       </div>
-
-      {!text && (
-        <Button
-          className="w-full gap-2"
-          onClick={handleGenerate}
-          disabled={loading}
-          variant="default"
-          size="sm"
-        >
+      {!text ? (
+        <Button className="w-full gap-2" size="sm" onClick={handleGenerate} disabled={loading}>
           {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Analizando con IA...
-            </>
+            <><Loader2 className="w-4 h-4 animate-spin" />Analizando con IA...</>
           ) : (
-            <>
-              <Sparkles className="w-4 h-4" />
-              Generar recomendaciones
-            </>
+            <><Sparkles className="w-4 h-4" />Generar recomendaciones</>
           )}
         </Button>
-      )}
-
-      {text && (
+      ) : (
         <div className="space-y-2">
-          <div className="rounded-xl border border-border bg-muted/20 p-4 text-sm leading-relaxed whitespace-pre-wrap text-foreground/85">
+          <div className="rounded-xl border border-border bg-muted/10 p-4 text-sm leading-relaxed whitespace-pre-wrap text-foreground/85">
             {text}
           </div>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-xs text-muted-foreground h-7"
-            onClick={() => setText(null)}
-          >
+          <Button size="sm" variant="ghost" className="text-xs h-7 text-muted-foreground" onClick={() => setText(null)}>
             Regenerar
           </Button>
         </div>
@@ -354,17 +404,18 @@ Responde en español. Sé directo y específico para operaciones de supermercado
   );
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
+// ── Página principal ──────────────────────────────────────────────────────────
 
 export default function ClimateRiskLookup() {
   const DEFAULT_CENTER = [-12.0464, -77.0428];
 
   const [lat, setLat] = useState("");
   const [lng, setLng] = useState("");
+  const [scenario, setScenario] = useState("pesimista");
+  const [tileLayer, setTileLayer] = useState("osm");
   const [markerPos, setMarkerPos] = useState(null);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
-  const [analyzed, setAnalyzed] = useState(null);
   const [noData, setNoData] = useState(false);
 
   const handleMapClick = useCallback((clickLat, clickLng) => {
@@ -372,43 +423,29 @@ export default function ClimateRiskLookup() {
     setLng(String(clickLng));
     setMarkerPos([clickLat, clickLng]);
     setResults(null);
-    setAnalyzed(null);
     setNoData(false);
   }, []);
 
-  const handleSearch = async () => {
+  const handleSearch = async (overrideScenario) => {
     const latNum = parseFloat(lat);
     const lngNum = parseFloat(lng);
-    if (isNaN(latNum) || latNum < -90 || latNum > 90) {
-      toast.error("Latitud inválida (entre -90 y 90)");
-      return;
-    }
-    if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) {
-      toast.error("Longitud inválida (entre -180 y 180)");
-      return;
-    }
+    if (isNaN(latNum) || latNum < -90 || latNum > 90) { toast.error("Latitud inválida"); return; }
+    if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) { toast.error("Longitud inválida"); return; }
 
+    const useScenario = overrideScenario || scenario;
     setLoading(true);
     setResults(null);
-    setAnalyzed(null);
     setNoData(false);
     setMarkerPos([latNum, lngNum]);
 
     try {
       const res = await fetch(
-        `${API_URL}/api/climate-risks/lookup?lat=${latNum}&lng=${lngNum}`
+        `${API_URL}/api/climate-risks/lookup?lat=${latNum}&lng=${lngNum}&scenario=${useScenario}`
       );
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Error al consultar");
-      }
+      if (!res.ok) throw new Error((await res.json()).error || "Error al consultar");
       const data = await res.json();
-      if (!data.found) {
-        setNoData(true);
-      } else {
-        setResults(data);
-        setAnalyzed(preAnalyzeRisks(data.byHorizon));
-      }
+      if (!data.found) { setNoData(true); }
+      else { setResults(data); }
     } catch (err) {
       toast.error(err.message || "Error al consultar riesgos");
     } finally {
@@ -416,35 +453,38 @@ export default function ClimateRiskLookup() {
     }
   };
 
+  // Re-fetch cuando cambia escenario y ya hay resultados
+  const handleScenarioChange = (s) => {
+    setScenario(s);
+    if (lat && lng && (results || noData)) {
+      setNoData(false);
+      handleSearch(s);
+    }
+  };
+
   return (
     <div className="p-6 max-w-[1400px] mx-auto space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Consulta de Riesgos Climáticos</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Selecciona un punto en el mapa o ingresa coordenadas para conocer los riesgos climáticos
-          según datos del Banco Mundial
+          Selecciona un punto en el mapa o ingresa coordenadas · datos del Banco Mundial (CCKP · CMIP6)
         </p>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
 
-        {/* ── Mapa ──────────────────────────────── */}
+        {/* ── Mapa ────────────────────────────── */}
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground flex items-center gap-1.5">
             <MapPin className="w-3.5 h-3.5" />
             Haz clic en el mapa para seleccionar una ubicación
           </p>
-          <div className="rounded-xl overflow-hidden border border-border shadow-sm">
-            <MapContainer
-              center={DEFAULT_CENTER}
-              zoom={7}
-              style={{ height: "480px", width: "100%" }}
-              className="z-0"
-            >
+          <div className="rounded-xl border border-border shadow-sm relative" style={{ height: "480px" }}>
+            <MapContainer center={DEFAULT_CENTER} zoom={7} style={{ height: "100%", width: "100%", borderRadius: "0.75rem" }} className="z-0">
               <TileLayer
-                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                attribution='&copy; <a href="https://carto.com">CARTO</a>'
+                key={tileLayer}
+                url={TILE_LAYERS[tileLayer].url}
+                attribution={TILE_LAYERS[tileLayer].attribution}
               />
               <MapClickHandler onMapClick={handleMapClick} />
               {markerPos && <Marker position={markerPos} />}
@@ -455,53 +495,57 @@ export default function ClimateRiskLookup() {
                     iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
                     iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
                     shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
-                    iconSize: [16, 26],
-                    iconAnchor: [8, 26],
-                    className: "opacity-50",
+                    iconSize: [16, 26], iconAnchor: [8, 26], className: "opacity-50",
                   })}
                 />
               )}
             </MapContainer>
+            {/* Selector de capa flotante */}
+            <div className="absolute bottom-3 left-3 z-[1000] flex gap-1 bg-card/90 backdrop-blur-sm rounded-lg border border-border p-1 shadow-md">
+              {Object.entries(TILE_LAYERS).map(([key, t]) => (
+                <button
+                  key={key}
+                  onClick={() => setTileLayer(key)}
+                  className={`text-[10px] px-2 py-1 rounded-md transition-colors whitespace-nowrap ${
+                    tileLayer === key
+                      ? "bg-primary text-primary-foreground font-medium"
+                      : "text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {t.icon} {t.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* ── Panel derecho ─────────────────────── */}
-        <div className="space-y-4">
+        {/* ── Panel derecho ─────────────────── */}
+        <div className="space-y-4 overflow-y-auto" style={{ maxHeight: "82vh" }}>
 
-          {/* Coordinate form */}
+          {/* Formulario */}
           <Card>
-            <CardContent className="pt-4 space-y-3">
+            <CardContent className="pt-4 space-y-4">
+              {/* Coordenadas */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="lat" className="text-xs text-muted-foreground">Latitud</Label>
-                  <Input
-                    id="lat"
-                    type="number"
-                    step="any"
-                    placeholder="-12.0464"
-                    value={lat}
+                  <Input id="lat" type="number" step="any" placeholder="-12.0464" value={lat}
                     onChange={(e) => setLat(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                  />
+                    onKeyDown={(e) => e.key === "Enter" && handleSearch()} />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="lng" className="text-xs text-muted-foreground">Longitud</Label>
-                  <Input
-                    id="lng"
-                    type="number"
-                    step="any"
-                    placeholder="-77.0428"
-                    value={lng}
+                  <Input id="lng" type="number" step="any" placeholder="-77.0428" value={lng}
                     onChange={(e) => setLng(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                  />
+                    onKeyDown={(e) => e.key === "Enter" && handleSearch()} />
                 </div>
               </div>
-              <Button
-                className="w-full gap-2"
-                onClick={handleSearch}
-                disabled={loading || (!lat && !lng)}
-              >
+
+              {/* Escenario */}
+              <ScenarioSelector value={scenario} onChange={handleScenarioChange} disabled={loading} />
+
+              {/* Botón buscar */}
+              <Button className="w-full gap-2" onClick={() => handleSearch()} disabled={loading || (!lat && !lng)}>
                 {loading ? (
                   <><Loader2 className="w-4 h-4 animate-spin" />Consultando...</>
                 ) : (
@@ -511,62 +555,64 @@ export default function ClimateRiskLookup() {
             </CardContent>
           </Card>
 
-          {/* No data */}
+          {/* Sin datos */}
           {noData && (
             <Alert variant="destructive">
               <AlertTriangle className="w-4 h-4" />
               <AlertDescription>
-                No se encontraron datos para esta ubicación. Asegúrate de haber cargado un
-                dataset en{" "}
-                <a href="/climate-upload" className="underline">
-                  Datos Climáticos
-                </a>
-                .
+                No se encontraron datos para esta ubicación. Asegúrate de haber cargado un dataset en{" "}
+                <a href="/climate-upload" className="underline">Datos Climáticos</a>.
               </AlertDescription>
             </Alert>
           )}
 
-          {/* Results */}
-          {results && analyzed && (
+          {/* Resultados */}
+          {results && (
             <Card>
               <CardHeader className="pb-2 pt-4">
-                {/* Summary line */}
                 <Alert className="border-primary/20 bg-primary/5 p-3">
                   <Info className="w-4 h-4 flex-shrink-0" />
-                  <AlertDescription className="text-xs">
-                    <span className="font-semibold">{analyzed.length} riesgo{analyzed.length !== 1 ? "s" : ""} identificado{analyzed.length !== 1 ? "s" : ""}</span>
-                    {" "}para ({results.queried.lat}, {results.queried.lng}).{" "}
-                    Punto de datos del Banco Mundial:{" "}
-                    <span className="font-mono">
-                      {results.nearestPoint.lat}, {results.nearestPoint.lng}
-                    </span>{" "}
-                    a{" "}
-                    <span className="font-semibold">{results.nearestPoint.distanceKm} km</span>.
+                  <AlertDescription className="text-xs space-y-0.5">
+                    <div>
+                      <span className="font-semibold">
+                        {results.horizons.length} horizonte{results.horizons.length !== 1 ? "s" : ""},&nbsp;
+                        {Object.values(results.byHorizon).flat().length} indicadores
+                      </span>
+                      {" "}para ({results.queried.lat}, {results.queried.lng}).
+                    </div>
+                    <div className="text-muted-foreground">
+                      Punto más cercano del Banco Mundial:{" "}
+                      <span className="font-mono">{results.nearestPoint.lat}, {results.nearestPoint.lng}</span>
+                      {" "}· <span className="font-semibold text-foreground">{results.nearestPoint.distanceKm} km</span>
+                    </div>
+                    <div className="text-muted-foreground">
+                      Escenario:{" "}
+                      <span className="font-medium text-foreground">{results.scenarioMeta?.label}</span>
+                      {" "}— {results.scenarioMeta?.sublabel}
+                    </div>
                   </AlertDescription>
                 </Alert>
 
-                <CardTitle className="text-sm text-muted-foreground font-normal mt-2 px-1">
-                  Haz clic en cada riesgo para ver sus impactos
+                <CardTitle className="text-xs text-muted-foreground font-normal mt-2 px-0.5">
+                  Haz clic en cada grupo de riesgo para ver indicadores e impactos
                 </CardTitle>
               </CardHeader>
 
-              <CardContent className="space-y-2 pb-4">
-                {/* Risk cards */}
-                {analyzed.map((item) => (
-                  <RiskCard key={item.riskType} item={item} />
+              <CardContent className="space-y-4 pb-4">
+                {results.horizons.map((h) => (
+                  <HorizonSection
+                    key={h}
+                    horizon={h}
+                    records={results.byHorizon[h]}
+                    baseline={results.baseline}
+                  />
                 ))}
-
-                {/* AI section */}
-                <AIPanel
-                  analyzed={analyzed}
-                  queried={results.queried}
-                  nearestPoint={results.nearestPoint}
-                />
+                <AIPanel results={results} />
               </CardContent>
             </Card>
           )}
 
-          {/* Empty state */}
+          {/* Estado vacío */}
           {!results && !noData && !loading && (
             <div className="text-center py-16 text-muted-foreground">
               <MapPin className="w-10 h-10 mx-auto mb-3 opacity-20" />
