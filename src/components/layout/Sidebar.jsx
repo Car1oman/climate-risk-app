@@ -13,6 +13,7 @@ import {
   Database,
   CloudUpload,
   Lock,
+  SearchCheck,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -27,6 +28,7 @@ const mvpNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
   { icon: Map, label: "Mapa de Riesgos", path: "/map" },
   { icon: Building2, label: "Activos", path: "/assets" },
+  { icon: SearchCheck, label: "Consulta de Riesgos", path: "/climate-risk-lookup" },
   { icon: Database, label: "Gestión de Datos", path: "/data-management" },
   { icon: CloudUpload, label: "Datos Climáticos", path: "/climate-upload" },
   { icon: Settings, label: "Configuración", path: "/settings" },

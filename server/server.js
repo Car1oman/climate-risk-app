@@ -9,7 +9,8 @@ dotenv.config();
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 //Acceso a la base de datos Supabase
 app.get("/api/assets", async (req, res) => {
@@ -651,6 +652,107 @@ app.post('/api/climate/bulk', async (req, res) => {
   } catch (error) {
     console.error('Error in POST /api/climate/bulk:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// 🔍 Consulta de riesgos climáticos por coordenadas (Banco Mundial)
+app.get('/api/climate-risks/lookup', async (req, res) => {
+  try {
+    const { lat, lng, radius = '1.5' } = req.query;
+
+    if (!lat || !lng) {
+      return res.status(400).json({ error: 'lat y lng son requeridos' });
+    }
+
+    const latNum = parseFloat(lat);
+    const lngNum = parseFloat(lng);
+    const radiusNum = Math.min(parseFloat(radius) || 1.5, 5.0);
+
+    if (isNaN(latNum) || isNaN(lngNum)) {
+      return res.status(400).json({ error: 'Coordenadas inválidas' });
+    }
+
+    // Obtener versión activa del dataset
+    const { data: control } = await supabase
+      .from('climate_dataset_control')
+      .select('version')
+      .eq('is_active', true)
+      .single();
+
+    let query = supabase
+      .from('climate_risks_grid')
+      .select('lat, lng, risk_type, horizon, level, value, source')
+      .gte('lat', latNum - radiusNum)
+      .lte('lat', latNum + radiusNum)
+      .gte('lng', lngNum - radiusNum)
+      .lte('lng', lngNum + radiusNum)
+      .limit(2000);
+
+    if (control?.version) {
+      query = query.eq('dataset_version', control.version);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error en lookup:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+
+    if (!data || data.length === 0) {
+      return res.json({
+        found: false,
+        message: 'No hay datos climáticos para esta zona. Carga primero un dataset del Banco Mundial.',
+      });
+    }
+
+    // Encontrar el punto de grilla más cercano a las coordenadas consultadas
+    const uniquePoints = [];
+    const seen = new Set();
+    for (const r of data) {
+      const key = `${r.lat},${r.lng}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        const dist = Math.sqrt(Math.pow(r.lat - latNum, 2) + Math.pow(r.lng - lngNum, 2));
+        uniquePoints.push({ lat: r.lat, lng: r.lng, dist });
+      }
+    }
+    uniquePoints.sort((a, b) => a.dist - b.dist);
+    const nearest = uniquePoints[0];
+
+    // Registros del punto más cercano
+    const nearestRecords = data.filter(
+      (r) => r.lat === nearest.lat && r.lng === nearest.lng
+    );
+
+    // Agrupar por horizonte
+    const byHorizon = {};
+    for (const r of nearestRecords) {
+      if (!byHorizon[r.horizon]) byHorizon[r.horizon] = [];
+      byHorizon[r.horizon].push(r);
+    }
+
+    // Distancia real en km (Haversine)
+    const toRad = (d) => (d * Math.PI) / 180;
+    const R = 6371;
+    const dLat = toRad(nearest.lat - latNum);
+    const dLon = toRad(nearest.lng - lngNum);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(latNum)) * Math.cos(toRad(nearest.lat)) * Math.sin(dLon / 2) ** 2;
+    const distKm = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+
+    return res.json({
+      found: true,
+      queried: { lat: latNum, lng: lngNum },
+      nearestPoint: { lat: nearest.lat, lng: nearest.lng, distanceKm: distKm },
+      horizons: Object.keys(byHorizon).sort(),
+      byHorizon,
+      totalRecords: nearestRecords.length,
+    });
+  } catch (error) {
+    console.error('Error en /api/climate-risks/lookup:', error.message);
+    return res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
 
