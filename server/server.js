@@ -12,6 +12,9 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// Servir archivos estáticos (build de Vite)
+app.use(express.static('dist'));
+
 //Acceso a la base de datos Supabase
 app.get("/api/assets", async (req, res) => {
   const { data, error } = await supabase
@@ -916,6 +919,15 @@ app.post('/api/climate-risks/upload', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
+
+// Fallback para SPA: servir index.html para rutas no encontradas
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/api/')) {
+    res.sendFile('../dist/index.html', { root: __dirname });
+  } else {
+    res.status(404).json({ error: 'API endpoint no encontrado' });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);
