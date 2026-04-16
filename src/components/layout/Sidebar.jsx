@@ -25,16 +25,16 @@ import {
 } from "@/components/ui/tooltip";
 
 const mvpNavItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
-  { icon: Map, label: "Mapa de Riesgos", path: "/map" },
-  { icon: Building2, label: "Activos", path: "/assets" },
-  { icon: SearchCheck, label: "Consulta de Riesgos", path: "/climate-risk-lookup" },
-  { icon: Database, label: "Gestión de Datos", path: "/data-management" },
+  { icon: SearchCheck, label: "Consulta de Riesgos", path: "/" },
   { icon: CloudUpload, label: "Datos Climáticos", path: "/climate-upload" },
   { icon: Settings, label: "Configuración", path: "/settings" },
 ];
 
 const comingSoonItems = [
+  { icon: LayoutDashboard, label: "Dashboard" },
+  { icon: Map, label: "Mapa de Riesgos" },
+  { icon: Building2, label: "Activos" },
+  { icon: Database, label: "Gestión de Datos" },
   { icon: Waves, label: "Simulador El Niño" },
   { icon: Bell, label: "Alertas" },
   { icon: FileText, label: "Reporte TCFD" },

@@ -46,7 +46,8 @@ const AuthenticatedApp = () => {
   return (
     <Routes>
       <Route element={<AppLayout />}>
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/" element={<ClimateRiskLookup />} />
+        <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/map" element={<RiskMap />} />
         <Route path="/assets" element={<Assets />} />
         <Route path="/assets/:id" element={<AssetDetail />} />
