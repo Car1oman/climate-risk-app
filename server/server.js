@@ -3,6 +3,15 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import { getClimateData } from './services/climateService.js';
+import {
+  getClimateByLocation,
+  interpretClimateRisks,
+} from './services/climateGeospatialService.js';
+import {
+  parseClimateFile,
+  upsertClimateData,
+  uploadClimateFile,
+} from './services/climateImportService.js';
 import { supabase } from "./supabaseClient.js";
 
 dotenv.config();
@@ -169,6 +178,189 @@ app.get('/api/climate', async (req, res) => {
     });
   }
 });
+
+// ============================================
+// 🆕 NUEVOS ENDPOINTS - CLIMATE CELLS (PostGIS)
+// ============================================
+
+/**
+ * GET /api/climate-cells/query
+ * Consulta datos climáticos de la tabla climate_cells por ubicación (PostGIS)
+ * Parámetros: lat, lon
+ * Retorna: datos completos con todos los horizontes temporales
+ */
+app.get('/api/climate-cells/query', async (req, res) => {
+  try {
+    const { lat, lng, lon } = req.query;
+    const latitude = parseFloat(lat);
+    const longitude = parseFloat(lng || lon);
+
+    if (isNaN(latitude) || isNaN(longitude)) {
+      return res.status(400).json({
+        error: 'Parámetros lat y lon (o lng) son requeridos y deben ser números',
+      });
+    }
+
+    const cacheKey = `climate-cells-${latitude}-${longitude}`;
+    const now = Date.now();
+
+    // Verificar cache
+    if (climateCache[cacheKey] && now - climateCache[cacheKey].timestamp < CACHE_TTL) {
+      return res.json({
+        ...climateCache[cacheKey].data,
+        cached: true,
+        cacheAge: Math.floor((now - climateCache[cacheKey].timestamp) / 1000) + 's',
+      });
+    }
+
+    // Consultar datos climáticos geoespaciales
+    const climateData = await getClimateByLocation(latitude, longitude);
+
+    if (!climateData) {
+      return res.status(404).json({
+        error: 'No hay datos climáticos disponibles para esta ubicación',
+        location: { lat: latitude, lon: longitude },
+      });
+    }
+
+    // Generar interpretaciones automáticas
+    const risks = interpretClimateRisks(climateData);
+
+    const response = {
+      location: climateData.location,
+      climate: climateData.climate,
+      risks_interpretation: risks,
+      source: 'climate_cells',
+      generated_at: new Date().toISOString(),
+    };
+
+    // Guardar en cache
+    climateCache[cacheKey] = {
+      data: response,
+      timestamp: now,
+    };
+
+    return res.json(response);
+  } catch (error) {
+    console.error('❌ Error en /api/climate-cells/query:', error.message);
+    return res.status(500).json({
+      error: error.message,
+      hint: 'Intenta con coordenadas válidas dentro de Perú',
+    });
+  }
+});
+
+/**
+ * POST /api/climate-cells/upload
+ * Cargar datos climáticos desde archivo JSON o JSONL
+ * Body: {
+ *   data: string (JSON array o JSONL con registros),
+ *   format?: 'auto' (default) | 'json' | 'jsonl'
+ * }
+ * 
+ * Retorna: 3-phase pipeline results con estadísticas detalladas
+ */
+app.post('/api/climate-cells/upload', async (req, res) => {
+  try {
+    const { data, format = 'auto' } = req.body;
+
+    if (!data) {
+      return res.status(400).json({
+        error: 'Campo "data" es requerido',
+        hint: 'Envía contenido JSON o JSONL como string',
+      });
+    }
+
+    if (typeof data !== 'string') {
+      return res.status(400).json({
+        error: 'El campo "data" debe ser un string con contenido JSON o JSONL',
+        hint: 'Convierte el archivo a string antes de enviar',
+      });
+    }
+
+    console.log(`📦 Cargando datos climáticos (formato: ${format})...`);
+
+    // Usar la nueva función unificada que hace todo: Parse → Process → Upsert
+    const result = await uploadClimateFile(data, format);
+
+    const isSuccessful =
+      result.parseResult.errors.length === 0 &&
+      result.processResult.validRecords.length > 0 &&
+      result.upsertResult.failed === 0;
+
+    return res.json({
+      success: isSuccessful,
+      phases: {
+        parse: {
+          detected_format: result.parseResult.detectedFormat,
+          total_records_parsed: result.parseResult.records.length,
+          parse_errors: result.parseResult.errors.length,
+          errors: result.parseResult.errors.slice(0, 50),
+        },
+        process: {
+          valid_records: result.processResult.validRecords.length,
+          normalized_records: result.processResult.validRecords.length,
+          invalid_records: result.processResult.invalidRecords.length,
+          validation_errors: result.processResult.validationErrors.slice(0, 50),
+        },
+        upsert: {
+          total_processed: result.upsertResult.total,
+          batches_processed: result.upsertResult.batches,
+          duration_ms: result.upsertResult.duration_ms,
+          records_per_second: Math.round(result.upsertResult.records_per_second),
+          upsert_errors: result.upsertResult.errors.slice(0, 50),
+        },
+      },
+      summary: {
+        total_input_records: result.parseResult.records.length,
+        successfully_processed: result.processResult.validRecords.length,
+        skipped_invalid: result.processResult.invalidRecords.length,
+        database_errors: result.upsertResult.errors.length,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('❌ Error en /api/climate-cells/upload:', error.message);
+    return res.status(500).json({
+      error: 'Error interno del servidor',
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+    });
+  }
+});
+
+/**
+ * GET /api/climate-cells/status
+ * Información sobre los datos disponibles en climate_cells
+ */
+app.get('/api/climate-cells/status', async (req, res) => {
+  try {
+    const { data: stats, error } = await supabase
+      .rpc('get_climate_cells_stats');
+
+    if (error) {
+      return res.status(500).json({
+        error: 'No se pudo obtener estadísticas',
+      });
+    }
+
+    return res.json({
+      database_stats: stats,
+      cache_size: Object.keys(climateCache).length,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Error en /api/climate-cells/status:', error.message);
+    return res.status(500).json({
+      error: error.message,
+    });
+  }
+});
+
+// ============================================
+// FIN NUEVOS ENDPOINTS
+// ============================================
+
 
 app.post('/api/calculate-risk/:assetId', async (req, res) => {
   try {
