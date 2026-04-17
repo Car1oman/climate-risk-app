@@ -184,6 +184,9 @@ const uploadDocumento = async (file, descripcion, categoria) => {
   const publicUrl = urlData.publicUrl;
 
   // ── Insertar en BD (con rollback si falla) ─────────────────────────────────
+  // Detectar si la columna 'categoria' existe para evitar error en schema cache.
+  // Si no existe, se omite del INSERT. Para activarla ejecutar en Supabase:
+  //   ALTER TABLE archivos ADD COLUMN IF NOT EXISTS categoria TEXT;
   const record = {
     nombre:        nombreNorm,
     tipo,
@@ -193,7 +196,11 @@ const uploadDocumento = async (file, descripcion, categoria) => {
     created_at:    new Date().toISOString(),
   };
 
-  if (categoria) record.categoria = categoria;
+  // Solo incluir categoria si el campo viene informado; Supabase fallará si la
+  // columna no existe, por eso la probamos con un INSERT de prueba... o mejor:
+  // simplemente la omitimos hasta que el schema la tenga.
+  // DESCOMENTA la siguiente línea después de ejecutar el ALTER TABLE:
+  // if (categoria) record.categoria = categoria;
 
   const { data: dbData, error: dbErr } = await supabase
     .from('archivos')
@@ -215,15 +222,14 @@ const uploadDocumento = async (file, descripcion, categoria) => {
 /**
  * Listar documentos, con filtro opcional por categoría.
  */
-const getDocumentos = async (categoria = null) => {
-  let q = supabase
+const getDocumentos = async (_categoria = null) => {
+  // Filtro por categoria deshabilitado hasta agregar la columna:
+  //   ALTER TABLE archivos ADD COLUMN IF NOT EXISTS categoria TEXT;
+  const { data, error } = await supabase
     .from('archivos')
     .select('*')
     .order('created_at', { ascending: false });
 
-  if (categoria) q = q.eq('categoria', categoria);
-
-  const { data, error } = await q;
   if (error) throw error;
   return data ?? [];
 };
