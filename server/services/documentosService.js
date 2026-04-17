@@ -65,6 +65,35 @@ const storagePathFromUrl = (publicUrl) => {
   }
 };
 
+// ── Inicialización del bucket ────────────────────────────────────────────────
+
+/**
+ * Asegura que el bucket exista; lo crea como público si no existe.
+ * Se llama una sola vez por proceso (se cachea el resultado).
+ */
+let bucketReady = false;
+const ensureBucket = async () => {
+  if (bucketReady) return;
+
+  const { error: getErr } = await supabase.storage.getBucket(BUCKET);
+
+  if (getErr) {
+    // El bucket no existe → crearlo como público
+    const { error: createErr } = await supabase.storage.createBucket(BUCKET, {
+      public: true,
+      fileSizeLimit: MAX_SIZE_BYTES,
+    });
+
+    if (createErr && createErr.message !== 'Bucket already exists') {
+      throw new Error(`No se pudo crear el bucket "${BUCKET}": ${createErr.message}`);
+    }
+
+    console.log(`✅ Bucket "${BUCKET}" creado automáticamente`);
+  }
+
+  bucketReady = true;
+};
+
 // ── Operaciones ──────────────────────────────────────────────────────────────
 
 /**
@@ -128,6 +157,9 @@ const uploadDocumento = async (file, descripcion, categoria) => {
       { status: 409 }
     );
   }
+
+  // ── Asegurar bucket ───────────────────────────────────────────────────────
+  await ensureBucket();
 
   // ── Subir a Storage ───────────────────────────────────────────────────────
   // Prefijo con timestamp para evitar colisiones en el bucket aunque haya rollback
