@@ -25,12 +25,14 @@ L.Icon.Default.mergeOptions({
 
 // ── Constantes de dominio ────────────────────────────────────────────────────
 
+// Variables de calor y precipitación del CCKP / CMIP6
 const RISK_GROUPS = {
   calor: {
     id: "calor",
     label: "Riesgo de Calor",
     emoji: "🌡️",
-    variables: ["calor_extremo", "temperatura_maxima", "temperatura_media", "noches_calurosas", "mortalidad_calor"],
+    // txx, hd35, hd30, tasmax, tr, tas, tx84rr
+    variables: ["txx", "hd35", "hd30", "tasmax", "tr", "tas", "tx84rr"],
     impacts: [
       "Mayor consumo energético para climatización (+20–35%), impacto directo en costos operativos del local",
       "Riesgo de salud laboral para empleados en zonas sin climatización adecuada (merma de productividad 8–12%)",
@@ -42,7 +44,8 @@ const RISK_GROUPS = {
     id: "hidrico",
     label: "Riesgo Hídrico",
     emoji: "🌧️",
-    variables: ["inundacion", "precipitacion_extrema", "precipitacion_media", "cambio_precipitacion"],
+    // rx1day, rx5day, r20mm, r50mm, pr, prpercnt
+    variables: ["rx1day", "rx5day", "r20mm", "r50mm", "pr", "prpercnt"],
     impacts: [
       "Inundaciones que interrumpen operaciones por 7–45 días según severidad (daños estructurales S/ 80–200/m²)",
       "Corte de acceso logístico (proveedores, distribución) ante lluvias extremas o desborde de ríos",
@@ -52,22 +55,30 @@ const RISK_GROUPS = {
   },
 };
 
+// Metadatos de cada variable climática (CMIP6 · CCKP)
 const VARIABLE_META = {
-  calor_extremo:         { label: "Temp. máx. extrema",      desc: "Temperatura máxima diaria más alta del año" },
-  temperatura_maxima:    { label: "Temp. máx. media anual",   desc: "Promedio anual de temperaturas máximas diarias" },
-  temperatura_media:     { label: "Temperatura media",        desc: "Temperatura promedio anual" },
-  noches_calurosas:      { label: "Noches cálidas",           desc: "Días/año con temperatura nocturna sobre umbral de calor" },
-  mortalidad_calor:      { label: "Índice mortalidad calor",  desc: "Riesgo relativo de mortalidad por calor extremo" },
-  inundacion:            { label: "Días de inundación",       desc: "Días al año con inundación en la zona" },
-  precipitacion_extrema: { label: "Precipitación extrema",    desc: "Precipitación máxima en evento de 24 h" },
-  precipitacion_media:   { label: "Precipitación media",      desc: "Precipitación media diaria anual" },
-  cambio_precipitacion:  { label: "Cambio precipitación",     desc: "Cambio porcentual vs línea base histórica (1985–2014)" },
+  // Calor
+  txx:      { label: "Temp. máx. extrema",      desc: "Temperatura máxima diaria más alta del año (°C)" },
+  hd35:     { label: "Días calurosos (>35 °C)",  desc: "Días al año con temperatura máxima superior a 35 °C" },
+  hd30:     { label: "Días cálidos (>30 °C)",    desc: "Días al año con temperatura máxima superior a 30 °C" },
+  tasmax:   { label: "Temp. máx. media anual",   desc: "Promedio anual de temperaturas máximas diarias (°C)" },
+  tr:       { label: "Noches tropicales",        desc: "Noches al año con temperatura mínima superior a 20 °C" },
+  tas:      { label: "Temperatura media",        desc: "Temperatura media superficial del aire (°C)" },
+  tx84rr:   { label: "Índice mortalidad calor",  desc: "Exceso de mortalidad estimada por calor extremo (índice)" },
+  // Precipitación
+  rx1day:   { label: "Lluvia extrema (1 día)",   desc: "Mayor precipitación acumulada en un solo día del año (mm)" },
+  rx5day:   { label: "Lluvia extrema (5 días)",  desc: "Mayor precipitación en 5 días consecutivos (mm)" },
+  r20mm:    { label: "Días lluvia intensa",       desc: "Días al año con precipitación superior a 20 mm" },
+  r50mm:    { label: "Días lluvia severa",        desc: "Días al año con precipitación superior a 50 mm" },
+  pr:       { label: "Precipitación media",       desc: "Precipitación total media acumulada del período (mm)" },
+  prpercnt: { label: "Cambio precipitación",      desc: "Porcentaje relativo al histórico (100% = sin cambio)" },
 };
 
+// Etiquetas de horizonte temporal
 const HORIZON_INFO = {
-  historico: { label: "Situación Actual",  period: "1985–2014", ringColor: "ring-slate-400/40",  textColor: "text-slate-400",  bg: "bg-slate-500/10" },
-  corto:     { label: "Corto Plazo",       period: "~2030–2040", ringColor: "ring-blue-400/40",   textColor: "text-blue-400",   bg: "bg-blue-500/10" },
-  mediano:   { label: "Mediano Plazo",     period: "~2050–2060", ringColor: "ring-amber-400/40",  textColor: "text-amber-400",  bg: "bg-amber-500/10" },
+  historico: { label: "¿Cómo fue?",                  period: "1995–2014", ringColor: "ring-slate-400/40",  textColor: "text-slate-500",  bg: "bg-slate-500/10" },
+  corto:     { label: "Corto plazo",                  period: "2020–2039", ringColor: "ring-blue-400/40",   textColor: "text-blue-500",   bg: "bg-blue-500/10"  },
+  mediano:   { label: "Mediano plazo",                period: "2040–2059", ringColor: "ring-amber-400/40",  textColor: "text-amber-600",  bg: "bg-amber-500/10" },
 };
 
 const TILE_LAYERS = {
@@ -161,7 +172,7 @@ function MapClickHandler({ onMapClick }) {
 
 function ScenarioSelector({ value, onChange, disabled }) {
   const opts = [
-    { id: "actual",    icon: "📍", label: "Actual",    sub: "Histórico 1985–2014" },
+    { id: "actual",    icon: "📍", label: "Actual",    sub: "Histórico 1995–2014" },
     { id: "moderado",  icon: "🟡", label: "Moderado",  sub: "SSP2-4.5 · emisiones mod." },
     { id: "pesimista", icon: "🔴", label: "Pesimista", sub: "SSP5-8.5 · altas emisiones" },
   ];
@@ -192,45 +203,57 @@ function ScenarioSelector({ value, onChange, disabled }) {
   );
 }
 
+// Formatear número: entero si no tiene decimales, 2 dec. si los tiene
+const fmtVal = (v) =>
+  v == null ? "—" : v % 1 === 0 ? String(v) : v.toFixed(2);
+
 function VariableRow({ record }) {
   const levelCfg = getLevelCfg(record.level);
   const t = record.baseline ? trend(record.value, record.baseline.value) : null;
 
-  const TrendIcon =
-    t == null ? null
-    : t.delta > 0 ? TrendingUp
-    : t.delta < 0 ? TrendingDown
-    : Minus;
-  const trendColor =
-    t == null ? ""
-    : t.delta > 0 ? "text-red-400"
-    : "text-emerald-400";
+  // Solo mostrar delta si hay cambio real (evita Minus 0.00 en histórico)
+  const showTrend = t != null && Math.abs(t.delta) > 0.001;
+  const TrendIcon = !showTrend ? null : t.delta > 0 ? TrendingUp : TrendingDown;
+  const trendColor = !showTrend ? "" : t.delta > 0 ? "text-red-400" : "text-emerald-400";
+
+  // Mostrar rango p10–p90 solo si difieren del valor mediano
+  const hasRange = record.p10 != null && record.p90 != null
+    && !(record.p10 === record.value && record.p90 === record.value);
 
   return (
-    <div className="flex items-start gap-2 py-1.5 border-b border-border/40 last:border-0">
+    <div className="flex items-start gap-2 py-2 border-b border-border/40 last:border-0">
       <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${levelCfg.dot}`} />
+
+      {/* Etiqueta y descripción */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-xs font-medium">{record.varMeta.label}</span>
           <Badge className={`text-[10px] px-1.5 py-0 ${levelCfg.color}`}>{levelCfg.label}</Badge>
         </div>
-        <p className="text-[11px] text-muted-foreground mt-0.5">{record.varMeta.desc}</p>
+        <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{record.varMeta.desc}</p>
       </div>
-      <div className="text-right flex-shrink-0 space-y-0.5">
+
+      {/* Valores */}
+      <div className="text-right flex-shrink-0 space-y-0.5 min-w-[80px]">
+        {/* Mediana */}
         {record.value != null && (
-          <div className="text-xs font-mono text-foreground/80">
-            {record.value % 1 === 0 ? record.value : record.value.toFixed(2)} {record.unit}
+          <div className="text-xs font-mono font-semibold text-foreground/85">
+            {fmtVal(record.value)} <span className="font-normal text-muted-foreground">{record.unit}</span>
           </div>
         )}
-        {t && TrendIcon && (
+
+        {/* Rango p10–p90 (incertidumbre del ensemble) */}
+        {hasRange && (
+          <div className="text-[10px] text-muted-foreground/65 font-mono">
+            {fmtVal(record.p10)} – {fmtVal(record.p90)}
+          </div>
+        )}
+
+        {/* Delta vs histórico */}
+        {showTrend && TrendIcon && (
           <div className={`flex items-center justify-end gap-0.5 text-[10px] ${trendColor}`}>
             <TrendIcon className="w-2.5 h-2.5" />
-            {t.delta > 0 ? "+" : ""}{t.delta % 1 === 0 ? t.delta : t.delta.toFixed(2)} {record.unit}
-          </div>
-        )}
-        {record.baseline && (
-          <div className="text-[10px] text-muted-foreground/60">
-            base: {record.baseline.value % 1 === 0 ? record.baseline.value : record.baseline.value?.toFixed(2)} {record.unit}
+            {t.delta > 0 ? "+" : ""}{fmtVal(t.delta)} {record.unit} vs. hist.
           </div>
         )}
       </div>
@@ -305,13 +328,24 @@ function HorizonSection({ horizon, records, baseline }) {
   };
   const groups = buildGroups(records, baseline);
 
+  // Ícono de reloj por horizonte
+  const horizonIcon = { historico: "📋", corto: "📅", mediano: "🔭" }[horizon] ?? "📊";
+
   return (
     <div className={`rounded-xl ring-1 ${hInfo.ringColor} overflow-hidden`}>
-      <div className={`${hInfo.bg} px-4 py-2.5 flex items-center gap-2`}>
-        <span className={`text-sm font-bold ${hInfo.textColor}`}>{hInfo.label}</span>
-        {hInfo.period && (
-          <span className="text-xs text-muted-foreground">{hInfo.period}</span>
-        )}
+      <div className={`${hInfo.bg} px-4 py-3 flex items-center gap-2.5`}>
+        <span className="text-base">{horizonIcon}</span>
+        <div>
+          <span className={`text-sm font-bold ${hInfo.textColor}`}>{hInfo.label}</span>
+          {hInfo.period && (
+            <span className="text-xs text-muted-foreground ml-2">{hInfo.period}</span>
+          )}
+          {horizon !== "historico" && (
+            <p className="text-[10px] text-muted-foreground/70 mt-0.5">
+              Los valores muestran la mediana del ensemble · el rango (p10–p90) indica la incertidumbre proyectada
+            </p>
+          )}
+        </div>
       </div>
       <div className="p-3 space-y-2 bg-card">
         {groups.map((g) => (
@@ -572,16 +606,16 @@ export default function ClimateRiskLookup() {
               <CardHeader className="pb-2 pt-4">
                 <Alert className="border-primary/20 bg-primary/5 p-3">
                   <Info className="w-4 h-4 flex-shrink-0" />
-                  <AlertDescription className="text-xs space-y-0.5">
+                  <AlertDescription className="text-xs space-y-1">
                     <div>
                       <span className="font-semibold">
-                        {results.horizons.length} horizonte{results.horizons.length !== 1 ? "s" : ""},&nbsp;
+                        {results.horizons.length} período{results.horizons.length !== 1 ? "s" : ""},&nbsp;
                         {Object.values(results.byHorizon).flat().length} indicadores
                       </span>
-                      {" "}para ({results.queried.lat}, {results.queried.lng}).
+                      {" "}para ({results.queried.lat}, {results.queried.lng})
                     </div>
                     <div className="text-muted-foreground">
-                      Punto más cercano del Banco Mundial:{" "}
+                      Celda CMIP6 más cercana:{" "}
                       <span className="font-mono">{results.nearestPoint.lat}, {results.nearestPoint.lng}</span>
                       {" "}· <span className="font-semibold text-foreground">{results.nearestPoint.distanceKm} km</span>
                     </div>
@@ -589,6 +623,9 @@ export default function ClimateRiskLookup() {
                       Escenario:{" "}
                       <span className="font-medium text-foreground">{results.scenarioMeta?.label}</span>
                       {" "}— {results.scenarioMeta?.sublabel}
+                    </div>
+                    <div className="text-muted-foreground/70 text-[10px]">
+                      Fuente: World Bank CCKP · CMIP6 ensemble-all · resolución 0.25°
                     </div>
                   </AlertDescription>
                 </Alert>

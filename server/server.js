@@ -850,10 +850,69 @@ app.post('/api/climate/bulk', async (req, res) => {
   }
 });
 
-// 🔍 Consulta de riesgos climáticos por coordenadas (Banco Mundial)
+// ── Helpers para climate_cells lookup ────────────────────────────────────────
+
+// Unidades por variable (CMIP6 / CCKP)
+const CLIMATE_VAR_UNITS = {
+  txx:      '°C',
+  hd35:     'días/año',
+  hd30:     'días/año',
+  tasmax:   '°C',
+  tr:       'días/año',
+  tas:      '°C',
+  tx84rr:   'índice',
+  rx1day:   'mm',
+  rx5day:   'mm',
+  r20mm:    'días/año',
+  r50mm:    'días/año',
+  pr:       'mm',
+  prpercnt: '%',
+};
+
+// Clasificar nivel de exposición por variable y valor mediano
+function classifyRiskLevel(varName, value) {
+  if (value == null || isNaN(value)) return 'bajo';
+  switch (varName) {
+    case 'txx':     return value > 38  ? 'alto' : value > 32   ? 'medio' : 'bajo';
+    case 'hd35':    return value > 60  ? 'alto' : value > 20   ? 'medio' : 'bajo';
+    case 'hd30':    return value > 150 ? 'alto' : value > 60   ? 'medio' : 'bajo';
+    case 'tasmax':  return value > 32  ? 'alto' : value > 27   ? 'medio' : 'bajo';
+    case 'tr':      return value > 180 ? 'alto' : value > 90   ? 'medio' : 'bajo';
+    case 'tas':     return value > 27  ? 'alto' : value > 22   ? 'medio' : 'bajo';
+    case 'tx84rr':  return value > 0.05? 'alto' : value > 0.02 ? 'medio' : 'bajo';
+    case 'rx1day':  return value > 50  ? 'alto' : value > 20   ? 'medio' : 'bajo';
+    case 'rx5day':  return value > 150 ? 'alto' : value > 60   ? 'medio' : 'bajo';
+    case 'r20mm':   return value > 20  ? 'alto' : value > 5    ? 'medio' : 'bajo';
+    case 'r50mm':   return value > 10  ? 'alto' : value > 3    ? 'medio' : 'bajo';
+    case 'pr':      return value > 400 ? 'alto' : value > 200  ? 'medio' : 'bajo';
+    case 'prpercnt': {
+      const d = Math.abs(value - 100);
+      return d > 15 ? 'alto' : d > 5 ? 'medio' : 'bajo';
+    }
+    default: return 'bajo';
+  }
+}
+
+// Convertir un período del JSONB a array de registros listos para el frontend
+function extractClimatePeriod(periodData) {
+  if (!periodData || typeof periodData !== 'object') return [];
+  return Object.entries(periodData)
+    .filter(([k]) => CLIMATE_VAR_UNITS[k])
+    .map(([varName, stats]) => ({
+      risk_type: varName,
+      value:     stats?.median ?? null,
+      p10:       stats?.p10   ?? null,
+      p90:       stats?.p90   ?? null,
+      unit:      CLIMATE_VAR_UNITS[varName],
+      level:     classifyRiskLevel(varName, stats?.median ?? null),
+      source:    'climate_cells',
+    }));
+}
+
+// 🔍 Consulta de riesgos climáticos por coordenadas (climate_cells · PostGIS)
 app.get('/api/climate-risks/lookup', async (req, res) => {
   try {
-    const { lat, lng, radius = '1.5', scenario = 'pesimista' } = req.query;
+    const { lat, lng, scenario = 'pesimista' } = req.query;
 
     if (!lat || !lng) {
       return res.status(400).json({ error: 'lat y lng son requeridos' });
@@ -861,58 +920,15 @@ app.get('/api/climate-risks/lookup', async (req, res) => {
 
     const latNum = parseFloat(lat);
     const lngNum = parseFloat(lng);
-    const radiusNum = Math.min(parseFloat(radius) || 1.5, 5.0);
 
-    if (isNaN(latNum) || isNaN(lngNum)) {
-      return res.status(400).json({ error: 'Coordenadas inválidas' });
-    }
+    if (isNaN(latNum) || latNum < -90  || latNum > 90)
+      return res.status(400).json({ error: 'lat inválido (rango: -90 a 90)' });
+    if (isNaN(lngNum) || lngNum < -180 || lngNum > 180)
+      return res.status(400).json({ error: 'lng inválido (rango: -180 a 180)' });
 
-    // Unidad por variable (no almacenada en DB — se enriquece aquí)
-    const UNITS = {
-      calor_extremo: '°C', temperatura_maxima: '°C', temperatura_media: '°C',
-      noches_calurosas: 'días', mortalidad_calor: 'índice',
-      precipitacion_extrema: 'mm', precipitacion_media: 'mm/día',
-      cambio_precipitacion: '%', inundacion: 'días/año',
-    };
-
-    // Pesos de nivel para comparar escenarios
-    const LEVEL_SCORES = { bajo: 1, medio: 2, alto: 3 };
-    const score = (r) => LEVEL_SCORES[(r.level || '').toLowerCase()] || 0;
-
-    // Elige el registro según escenario entre duplicados del mismo risk_type+horizon
-    // (existen porque el dataset contiene SSP2-4.5 y SSP5-8.5)
-    function pickRecord(records) {
-      if (records.length === 1) return records[0];
-      return records.reduce((pick, r) => {
-        const ps = score(pick), rs = score(r);
-        if (scenario === 'pesimista') {
-          // SSP5-8.5 proxy: peor nivel / mayor valor
-          return rs > ps || (rs === ps && (r.value || 0) > (pick.value || 0)) ? r : pick;
-        }
-        // moderado / actual: SSP2-4.5 proxy: mejor nivel / menor valor
-        return rs < ps || (rs === ps && (r.value || 0) < (pick.value || 0)) ? r : pick;
-      });
-    }
-
-    // Obtener versión activa
-    const { data: control } = await supabase
-      .from('climate_dataset_control')
-      .select('version')
-      .eq('is_active', true)
-      .single();
-
-    let query = supabase
-      .from('climate_risks_grid')
-      .select('lat, lng, risk_type, horizon, level, value, source')
-      .gte('lat', latNum - radiusNum)
-      .lte('lat', latNum + radiusNum)
-      .gte('lng', lngNum - radiusNum)
-      .lte('lng', lngNum + radiusNum)
-      .limit(3000);
-
-    if (control?.version) query = query.eq('dataset_version', control.version);
-
-    const { data, error } = await query;
+    // Celda más cercana vía función PostGIS definida en Supabase
+    const { data, error } = await supabase
+      .rpc('get_climate_by_location', { p_lat: latNum, p_lon: lngNum });
 
     if (error) {
       console.error('Error en lookup:', error.message);
@@ -922,101 +938,69 @@ app.get('/api/climate-risks/lookup', async (req, res) => {
     if (!data || data.length === 0) {
       return res.json({
         found: false,
-        message: 'No hay datos climáticos para esta zona. Carga primero un dataset del Banco Mundial.',
+        message: 'No hay datos climáticos para esta zona. Carga primero un dataset en Datos Climáticos (ETL).',
       });
     }
 
-    // Punto de grilla más cercano
-    const uniquePoints = [];
-    const seenPts = new Set();
-    for (const r of data) {
-      const key = `${r.lat},${r.lng}`;
-      if (!seenPts.has(key)) {
-        seenPts.add(key);
-        const dist = Math.hypot(r.lat - latNum, r.lng - lngNum);
-        uniquePoints.push({ lat: r.lat, lng: r.lng, dist });
+    const cell    = data[0];
+    const cellData = cell.data;
+
+    // Distancia Haversine (km)
+    const toRad = d => (d * Math.PI) / 180;
+    const dLat = toRad(cell.lat - latNum);
+    const dLon = toRad(cell.lon - lngNum);
+    const a = Math.sin(dLat / 2) ** 2
+            + Math.cos(toRad(latNum)) * Math.cos(toRad(cell.lat)) * Math.sin(dLon / 2) ** 2;
+    const distKm = Math.round(6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+
+    // Mapa de claves JSONB según escenario seleccionado
+    const PERIOD_MAPS = {
+      actual: {
+        historico: 'historical',
+      },
+      moderado: {
+        historico: 'historical',
+        corto:     'ensemble-all-ssp245_2020-2039',
+        mediano:   'ensemble-all-ssp245_2040-2059',
+      },
+      pesimista: {
+        historico: 'historical',
+        corto:     'ensemble-all-ssp585_2020-2039',
+        mediano:   'ensemble-all-ssp585_2040-2059',
+      },
+    };
+
+    const periodMap = PERIOD_MAPS[scenario] || PERIOD_MAPS.pesimista;
+    const byHorizon = {};
+    const baseline  = {};
+
+    for (const [horizon, periodKey] of Object.entries(periodMap)) {
+      if (cellData[periodKey]) {
+        byHorizon[horizon] = extractClimatePeriod(cellData[periodKey]);
       }
     }
-    uniquePoints.sort((a, b) => a.dist - b.dist);
-    const nearest = uniquePoints[0];
 
-    const nearestRecords = data.filter(
-      (r) => r.lat === nearest.lat && r.lng === nearest.lng
-    );
-
-    // Deduplicar: 1 registro por (risk_type, horizon) — aplica lógica de escenario
-    const grouped = {};
-    for (const r of nearestRecords) {
-      const key = `${r.risk_type}|${r.horizon}`;
-      if (!grouped[key]) grouped[key] = [];
-      grouped[key].push(r);
+    // Línea base histórica para calcular deltas en el frontend
+    for (const r of (byHorizon.historico || [])) {
+      baseline[r.risk_type] = { level: r.level, value: r.value, unit: r.unit };
     }
-    const deduped = Object.values(grouped).map(pickRecord);
 
-    // Enriquecer con unidad
-    deduped.forEach((r) => { r.unit = UNITS[r.risk_type] || ''; });
-
-    // Haversine (km)
-    const toRad = (d) => (d * Math.PI) / 180;
-    const Rearth = 6371;
-    const dLat = toRad(nearest.lat - latNum);
-    const dLon = toRad(nearest.lng - lngNum);
-    const a =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos(toRad(latNum)) * Math.cos(toRad(nearest.lat)) * Math.sin(dLon / 2) ** 2;
-    const distKm = Math.round(Rearth * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-
-    const scenarioMeta = {
-      actual:    { label: 'Situación Actual',    sublabel: 'Histórico 1985–2014 · línea base', color: 'slate' },
+    const SCENARIO_META = {
+      actual:    { label: 'Situación Actual',    sublabel: 'Histórico 1995–2014 · línea base', color: 'slate' },
       moderado:  { label: 'Escenario Moderado',  sublabel: 'SSP2-4.5 · Emisiones moderadas',   color: 'amber' },
       pesimista: { label: 'Escenario Pesimista', sublabel: 'SSP5-8.5 · Altas emisiones',        color: 'red'   },
     };
 
-    // Separar futuros (corto/mediano) de histórico
-    const historicalRecs = deduped.filter((r) => r.horizon === 'historico');
-    const futureRecs     = deduped.filter((r) => r.horizon !== 'historico');
-
-    if (scenario === 'actual') {
-      // Mostrar datos históricos como contenido principal (sin proyecciones)
-      const byHorizon = {};
-      for (const r of historicalRecs) {
-        if (!byHorizon[r.horizon]) byHorizon[r.horizon] = [];
-        byHorizon[r.horizon].push(r);
-      }
-      return res.json({
-        found: true,
-        queried: { lat: latNum, lng: lngNum },
-        nearestPoint: { lat: nearest.lat, lng: nearest.lng, distanceKm: distKm },
-        scenario,
-        scenarioMeta: scenarioMeta.actual,
-        horizons: Object.keys(byHorizon).sort(),
-        byHorizon,
-        baseline: {},
-        totalRecords: historicalRecs.length,
-      });
-    }
-
-    // Escenario moderado o pesimista: proyecciones futuras + línea base histórica
-    const byHorizon = {};
-    for (const r of futureRecs) {
-      if (!byHorizon[r.horizon]) byHorizon[r.horizon] = [];
-      byHorizon[r.horizon].push(r);
-    }
-    const baseline = {};
-    for (const r of historicalRecs) {
-      baseline[r.risk_type] = { level: r.level, value: r.value, unit: UNITS[r.risk_type] || '' };
-    }
-
     return res.json({
-      found: true,
-      queried: { lat: latNum, lng: lngNum },
-      nearestPoint: { lat: nearest.lat, lng: nearest.lng, distanceKm: distKm },
+      found:        true,
+      queried:      { lat: latNum, lng: lngNum },
+      nearestPoint: { lat: cell.lat, lng: cell.lon, distanceKm: distKm },
       scenario,
-      scenarioMeta: scenarioMeta[scenario] || scenarioMeta.pesimista,
-      horizons: Object.keys(byHorizon).sort(),
+      scenarioMeta: SCENARIO_META[scenario] || SCENARIO_META.pesimista,
+      horizons:     Object.keys(byHorizon),
       byHorizon,
       baseline,
-      totalRecords: futureRecs.length,
+      totalRecords: Object.values(byHorizon).flat().length,
     });
   } catch (error) {
     console.error('Error en /api/climate-risks/lookup:', error.message);
