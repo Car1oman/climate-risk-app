@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import multer from 'multer';
 import { GoogleGenAI } from '@google/genai';
 import { getClimateData } from './services/climateService.js';
 import {
@@ -12,6 +13,12 @@ import {
   upsertClimateData,
   uploadClimateFile,
 } from './services/climateImportService.js';
+import {
+  uploadDocumento,
+  getDocumentos,
+  deleteDocumento,
+  CATEGORIAS,
+} from './services/documentosService.js';
 import { supabase } from "./supabaseClient.js";
 
 dotenv.config();
@@ -1093,6 +1100,84 @@ app.post('/api/climate-risks/upload', async (req, res) => {
     return res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
+
+// ============================================
+// ENDPOINTS — DOCUMENTOS CLIMÁTICOS
+// ============================================
+
+// Multer: almacena en memoria (el buffer se pasa a Supabase Storage)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB — defensa extra
+});
+
+/**
+ * POST /api/documentos/upload
+ * Sube un documento a Storage y registra metadata en "archivos".
+ * multipart/form-data:
+ *   - archivo   (File)   — requerido
+ *   - descripcion (string) — opcional
+ *   - categoria  (string) — opcional: riesgo | impacto | adaptacion | informe
+ */
+app.post('/api/documentos/upload', upload.single('archivo'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No se recibió ningún archivo (campo: "archivo")' });
+    }
+
+    const { descripcion, categoria } = req.body;
+    const doc = await uploadDocumento(req.file, descripcion || null, categoria || null);
+
+    return res.status(201).json({
+      success: true,
+      documento: doc,
+    });
+  } catch (err) {
+    console.error('❌ /api/documentos/upload:', err.message);
+    return res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/documentos
+ * Lista todos los documentos, con filtro opcional ?categoria=riesgo
+ */
+app.get('/api/documentos', async (req, res) => {
+  try {
+    const { categoria } = req.query;
+    const docs = await getDocumentos(categoria || null);
+    return res.json(docs);
+  } catch (err) {
+    console.error('❌ /api/documentos:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/documentos/:id
+ * Elimina el documento de la BD y del Storage.
+ */
+app.delete('/api/documentos/:id', async (req, res) => {
+  try {
+    const result = await deleteDocumento(req.params.id);
+    return res.json(result);
+  } catch (err) {
+    console.error('❌ /api/documentos/:id DELETE:', err.message);
+    return res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/documentos/categorias
+ * Devuelve las categorías disponibles.
+ */
+app.get('/api/documentos/categorias', (_req, res) => {
+  res.json(CATEGORIAS);
+});
+
+// ============================================
+// FIN ENDPOINTS DOCUMENTOS
+// ============================================
 
 const PORT = process.env.PORT || 3001;
 

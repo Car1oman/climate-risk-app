@@ -14,6 +14,7 @@ import {
   CloudUpload,
   Lock,
   SearchCheck,
+  FolderOpen,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -27,6 +28,7 @@ import {
 const mvpNavItems = [
   { icon: SearchCheck, label: "Consulta de Riesgos", path: "/" },
   { icon: CloudUpload, label: "Datos Climáticos", path: "/climate-upload" },
+  { icon: FolderOpen, label: "Documentos", path: "/documentos" },
   { icon: Settings, label: "Configuración", path: "/settings" },
 ];
 
