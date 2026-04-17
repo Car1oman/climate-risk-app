@@ -84,10 +84,12 @@ const validateClimateRecord = (record, lineIndex) => {
     errors.push(`${prefix}: 'data' debe ser un objeto JSON válido`);
   }
 
-  // Validar geom (opcional — si existe debe ser POINT)
+  // Validar geom (opcional — se ignora en normalización pero se valida si viene)
+  // Acepta: "POINT(lon lat)" o "SRID=4326;POINT(lon lat)"
   if (record.geom !== undefined && record.geom !== null) {
-    if (typeof record.geom !== 'string' || !record.geom.toUpperCase().startsWith('POINT')) {
-      errors.push(`${prefix}: 'geom' inválido — debe tener formato POINT(lon lat)`);
+    const g = typeof record.geom === 'string' ? record.geom.toUpperCase() : '';
+    if (!g.includes('POINT')) {
+      errors.push(`${prefix}: 'geom' inválido — debe contener POINT(lon lat)`);
     }
   }
 
@@ -108,9 +110,9 @@ const normalizeRecord = (record) => {
   const lat = parseFloat(record.lat);
   const lon = parseFloat(record.lon ?? record.lng);
 
-  const geom = (record.geom && typeof record.geom === 'string')
-    ? record.geom
-    : `POINT(${lon} ${lat})`;
+  // GEOGRAPHY(POINT, 4326) requires EWKT with explicit SRID
+  // Always recompute from lat/lon to guarantee correctness
+  const geom = `SRID=4326;POINT(${lon} ${lat})`;
 
   return {
     lat,
@@ -294,13 +296,13 @@ const upsertClimateData = async (records, batchSize = DEFAULT_BATCH_SIZE) => {
           batch.map((r) => ({
             lat: r.lat,
             lon: r.lon,
-            geom: r.geom,
+            geom: r.geom,   // SRID=4326;POINT(lon lat) — EWKT para PostGIS geography
             data: r.data,
-            updated_at: new Date().toISOString(),
+            // Sin updated_at — la tabla no tiene esa columna
           })),
           {
-            onConflict: 'lat,lon',
-            ignoreDuplicates: false, // actualizar si existe
+            onConflict: 'lat,lon',  // referencia al UNIQUE INDEX idx_unique_location
+            ignoreDuplicates: false, // false = DO UPDATE (reemplaza data existente)
           }
         );
 
