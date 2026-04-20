@@ -1179,6 +1179,182 @@ app.get('/api/documentos/categorias', (_req, res) => {
 // FIN ENDPOINTS DOCUMENTOS
 // ============================================
 
+// ============================================
+// ENDPOINTS — BÚSQUEDA GEOGRÁFICA HÍBRIDA
+// ============================================
+
+/**
+ * GET /api/search?q=
+ * 1. Busca en assets (search_assets RPC)
+ * 2. Busca en places (search_places RPC)
+ * 3. Si no hay resultados → Mapbox Geocoding → Google fallback
+ * 4. Inserta en places si viene de API externa
+ */
+app.get('/api/search', async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q || q.trim().length < 2) return res.json([]);
+
+    const query = q.trim();
+
+    const [{ data: assetResults, error: assetError }, { data: placeResults, error: placeError }] =
+      await Promise.all([
+        supabase.rpc('search_assets', { query }),
+        supabase.rpc('search_places', { query }),
+      ]);
+
+    if (assetError) console.warn('search_assets:', assetError.message);
+    if (placeError)  console.warn('search_places:', placeError.message);
+
+    const combined = [...(assetResults || []), ...(placeResults || [])];
+    if (combined.length > 0) return res.json(combined);
+
+    // No hay resultados en BD → llamar API externa
+    let geoResults = null;
+
+    if (process.env.MAPBOX_TOKEN) {
+      try {
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${process.env.MAPBOX_TOKEN}&country=PE&limit=5&language=es`;
+        const r = await fetch(url);
+        if (r.ok) {
+          const d = await r.json();
+          if (d.features?.length > 0) {
+            geoResults = d.features.map(f => ({
+              direccion: f.place_name,
+              lat: f.center[1],
+              lng: f.center[0],
+              source: 'mapbox',
+            }));
+          }
+        }
+      } catch (e) { console.warn('Mapbox Geocoding error:', e.message); }
+    }
+
+    if (!geoResults && process.env.GOOGLE_GEOCODING_KEY) {
+      try {
+        const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&key=${process.env.GOOGLE_GEOCODING_KEY}&region=PE&language=es`;
+        const r = await fetch(url);
+        if (r.ok) {
+          const d = await r.json();
+          if (d.results?.length > 0) {
+            geoResults = d.results.map(item => ({
+              direccion: item.formatted_address,
+              lat: item.geometry.location.lat,
+              lng: item.geometry.location.lng,
+              source: 'google',
+            }));
+          }
+        }
+      } catch (e) { console.warn('Google Geocoding error:', e.message); }
+    }
+
+    if (!geoResults) return res.json([]);
+
+    // Insertar en places y devolver resultados tipo 'place'
+    const saved = [];
+    for (const geo of geoResults) {
+      const { data: inserted, error: insertErr } = await supabase
+        .from('places')
+        .insert({ direccion: geo.direccion, lat: geo.lat, lng: geo.lng, source: geo.source })
+        .select('id, direccion, lat, lng')
+        .single();
+
+      if (insertErr) {
+        if (insertErr.code !== '23505') console.error('Insert place error:', insertErr.message);
+        // Buscar el registro existente (conflicto por unique_place_address)
+        const { data: existing } = await supabase
+          .from('places')
+          .select('id, direccion, lat, lng')
+          .ilike('direccion', geo.direccion)
+          .limit(1)
+          .maybeSingle();
+        if (existing) saved.push({ ...existing, tipo: 'place' });
+      } else if (inserted) {
+        saved.push({ ...inserted, tipo: 'place' });
+      }
+    }
+
+    return res.json(saved);
+  } catch (error) {
+    console.error('Error en /api/search:', error.message);
+    return res.status(500).json({ error: 'Error en la búsqueda' });
+  }
+});
+
+/**
+ * POST /api/places/assets
+ * Registra un nuevo activo en una ubicación existente
+ * Body: { place_id, name, unidad_negocio }
+ */
+app.post('/api/places/assets', async (req, res) => {
+  try {
+    const { place_id, name, unidad_negocio } = req.body;
+    if (!place_id || !name?.trim()) {
+      return res.status(400).json({ error: 'place_id y name son requeridos' });
+    }
+
+    const { data: place } = await supabase
+      .from('places')
+      .select('id')
+      .eq('id', place_id)
+      .single();
+
+    if (!place) return res.status(404).json({ error: 'Ubicación no encontrada' });
+
+    const { data: asset, error } = await supabase
+      .from('assets')
+      .insert({
+        place_id,
+        name: name.trim(),
+        unidad_negocio: unidad_negocio || null,
+        status: 'enriched',
+      })
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === '23505') {
+        return res.status(409).json({ error: 'Ya existe un activo con ese nombre en esta ubicación' });
+      }
+      console.error('Error insertando asset:', error.message);
+      return res.status(500).json({ error: 'Error al registrar el activo' });
+    }
+
+    return res.status(201).json(asset);
+  } catch (error) {
+    console.error('Error en POST /api/places/assets:', error.message);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+/**
+ * GET /api/place/:id/assets
+ * Devuelve todos los activos asociados a una ubicación
+ */
+app.get('/api/place/:id/assets', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('assets')
+      .select('id, name, unidad_negocio, status, created_at')
+      .eq('place_id', req.params.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error obteniendo assets de place:', error.message);
+      return res.status(500).json({ error: 'Error al obtener los activos' });
+    }
+
+    return res.json(data || []);
+  } catch (error) {
+    console.error('Error en GET /api/place/:id/assets:', error.message);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// ============================================
+// FIN ENDPOINTS BÚSQUEDA GEOGRÁFICA HÍBRIDA
+// ============================================
+
 const PORT = process.env.PORT || 3001;
 
 // Fallback para SPA: servir index.html para rutas no encontradas
