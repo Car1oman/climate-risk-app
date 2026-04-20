@@ -1185,92 +1185,143 @@ app.get('/api/documentos/categorias', (_req, res) => {
 
 /**
  * GET /api/search?q=
- * 1. Busca en assets (search_assets RPC)
- * 2. Busca en places (search_places RPC)
- * 3. Si no hay resultados → Mapbox Geocoding → Google fallback
- * 4. Inserta en places si viene de API externa
+ * Búsqueda geográfica híbrida con contexto forzado a Perú.
+ * Orden: assets (BD) → places (BD) → Mapbox → Google → guardar en places.
  */
+
+// Bounding box de Perú para validar resultados de APIs externas
+const PERU_BOUNDS = { latMin: -18.5, latMax: 0.1, lngMin: -81.5, lngMax: -68.5 };
+
+function isInPeru(lat, lng) {
+  return lat >= PERU_BOUNDS.latMin && lat <= PERU_BOUNDS.latMax
+      && lng >= PERU_BOUNDS.lngMin && lng <= PERU_BOUNDS.lngMax;
+}
+
+function normalizeGeoQuery(raw) {
+  const q = raw.trim();
+  const lower = q.toLowerCase();
+  if (lower.includes('peru') || lower.includes('perú')) return q;
+  const words = q.split(/\s+/).filter(Boolean);
+  return words.length <= 2 ? `${q}, Lima, Perú` : `${q}, Perú`;
+}
+
 app.get('/api/search', async (req, res) => {
   try {
     const { q } = req.query;
     if (!q || q.trim().length < 2) return res.json([]);
 
-    const query = q.trim();
+    const rawQuery = q.trim();
 
+    // ── 1 & 2. Buscar en BD (assets primero, luego places) ──────────────────
     const [{ data: assetResults, error: assetError }, { data: placeResults, error: placeError }] =
       await Promise.all([
-        supabase.rpc('search_assets', { query }),
-        supabase.rpc('search_places', { query }),
+        supabase.rpc('search_assets', { query: rawQuery }),
+        supabase.rpc('search_places', { query: rawQuery }),
       ]);
 
     if (assetError) console.warn('search_assets:', assetError.message);
     if (placeError)  console.warn('search_places:', placeError.message);
 
-    const combined = [...(assetResults || []), ...(placeResults || [])];
-    if (combined.length > 0) return res.json(combined);
+    // Filtrar resultados de BD: solo los que están dentro de Perú
+    const validAssets = (assetResults || []).filter(r => isInPeru(r.lat, r.lng));
+    const validPlaces = (placeResults  || []).filter(r => isInPeru(r.lat, r.lng));
+    const fromDB = [...validAssets, ...validPlaces];
 
-    // No hay resultados en BD → llamar API externa
+    if (fromDB.length > 0) return res.json(fromDB);
+
+    // ── 3. Mapbox Geocoding (primario) ──────────────────────────────────────
+    const geoQuery = normalizeGeoQuery(rawQuery);
     let geoResults = null;
 
     if (process.env.MAPBOX_TOKEN) {
       try {
-        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${process.env.MAPBOX_TOKEN}&country=PE&limit=5&language=es`;
-        const r = await fetch(url);
+        const url = new URL(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(geoQuery)}.json`
+        );
+        url.searchParams.set('access_token', process.env.MAPBOX_TOKEN);
+        url.searchParams.set('country', 'PE');
+        url.searchParams.set('limit', '5');
+        url.searchParams.set('language', 'es');
+        url.searchParams.set('types', 'place,locality,neighborhood,address');
+
+        const r = await fetch(url.toString());
         if (r.ok) {
           const d = await r.json();
-          if (d.features?.length > 0) {
-            geoResults = d.features.map(f => ({
-              direccion: f.place_name,
-              lat: f.center[1],
-              lng: f.center[0],
-              source: 'mapbox',
+          const features = (d.features || []).filter(f => {
+            const [lng, lat] = f.center;
+            return isInPeru(lat, lng) && f.place_name.toLowerCase().includes('perú');
+          });
+          if (features.length > 0) {
+            geoResults = features.map(f => ({
+              direccion:     f.place_name,
+              lat:           f.center[1],
+              lng:           f.center[0],
+              source:        'mapbox',
+              place_type_db: f.place_type?.[0] || 'place',
             }));
           }
         }
-      } catch (e) { console.warn('Mapbox Geocoding error:', e.message); }
+      } catch (e) { console.warn('Mapbox error:', e.message); }
     }
 
+    // ── 4. Google Geocoding (fallback) ──────────────────────────────────────
     if (!geoResults && process.env.GOOGLE_GEOCODING_KEY) {
       try {
-        const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&key=${process.env.GOOGLE_GEOCODING_KEY}&region=PE&language=es`;
-        const r = await fetch(url);
+        const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
+        url.searchParams.set('address', geoQuery);
+        url.searchParams.set('components', 'country:PE');
+        url.searchParams.set('key', process.env.GOOGLE_GEOCODING_KEY);
+        url.searchParams.set('language', 'es');
+
+        const r = await fetch(url.toString());
         if (r.ok) {
           const d = await r.json();
-          if (d.results?.length > 0) {
-            geoResults = d.results.map(item => ({
-              direccion: item.formatted_address,
-              lat: item.geometry.location.lat,
-              lng: item.geometry.location.lng,
-              source: 'google',
+          const items = (d.results || []).filter(item => {
+            const { lat, lng } = item.geometry.location;
+            return isInPeru(lat, lng)
+              && item.formatted_address.toLowerCase().includes('per');
+          });
+          if (items.length > 0) {
+            geoResults = items.map(item => ({
+              direccion:     item.formatted_address,
+              lat:           item.geometry.location.lat,
+              lng:           item.geometry.location.lng,
+              source:        'google',
+              place_type_db: item.types?.[0] || 'place',
             }));
           }
         }
       } catch (e) { console.warn('Google Geocoding error:', e.message); }
     }
 
-    if (!geoResults) return res.json([]);
+    if (!geoResults || geoResults.length === 0) return res.json([]);
 
-    // Insertar en places y devolver resultados tipo 'place'
+    // ── 5. Guardar en places y devolver ─────────────────────────────────────
     const saved = [];
     for (const geo of geoResults) {
       const { data: inserted, error: insertErr } = await supabase
         .from('places')
-        .insert({ direccion: geo.direccion, lat: geo.lat, lng: geo.lng, source: geo.source })
+        .insert({
+          direccion:  geo.direccion,
+          lat:        geo.lat,
+          lng:        geo.lng,
+          source:     geo.source,
+        })
         .select('id, direccion, lat, lng')
         .single();
 
       if (insertErr) {
+        // Conflicto por unique_place_address → recuperar existente
         if (insertErr.code !== '23505') console.error('Insert place error:', insertErr.message);
-        // Buscar el registro existente (conflicto por unique_place_address)
         const { data: existing } = await supabase
           .from('places')
           .select('id, direccion, lat, lng')
           .ilike('direccion', geo.direccion)
           .limit(1)
           .maybeSingle();
-        if (existing) saved.push({ ...existing, tipo: 'place' });
+        if (existing) saved.push({ ...existing, tipo: 'place', source: geo.source });
       } else if (inserted) {
-        saved.push({ ...inserted, tipo: 'place' });
+        saved.push({ ...inserted, tipo: 'place', source: geo.source });
       }
     }
 
