@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Button } from "@/components/ui/button";
@@ -376,6 +376,18 @@ function MapClickHandler({ onMapClick }) {
   return null;
 }
 
+// Mueve el mapa animadamente cuando cambia el target (sólo desde búsqueda o botón)
+function MapFlyTo({ target }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!target || !target.pos) return;
+    const [lat, lng] = target.pos;
+    if (!isFinite(lat) || !isFinite(lng)) return;
+    map.flyTo(target.pos, target.zoom, { animate: true, duration: 1.2 });
+  }, [target]); // eslint-disable-line react-hooks/exhaustive-deps
+  return null;
+}
+
 function ScenarioSelector({ value, onChange, disabled }) {
   const opts = [
     { id: "actual",    icon: "📍", label: "Actual",    sub: "Histórico 1995–2014" },
@@ -654,6 +666,7 @@ export default function ClimateRiskLookup() {
   const [scenario, setScenario] = useState("pesimista");
   const [tileLayer, setTileLayer] = useState("osm");
   const [markerPos, setMarkerPos] = useState(null);
+  const [flyTarget, setFlyTarget] = useState(null); // { pos: [lat, lng], zoom: number }
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [noData, setNoData] = useState(false);
@@ -677,6 +690,7 @@ export default function ClimateRiskLookup() {
     setResults(null);
     setNoData(false);
     setMarkerPos([latNum, lngNum]);
+    setFlyTarget({ pos: [latNum, lngNum], zoom: 14 });
 
     try {
       const res = await fetch(
@@ -727,6 +741,7 @@ export default function ClimateRiskLookup() {
                 attribution={TILE_LAYERS[tileLayer].attribution}
               />
               <MapClickHandler onMapClick={handleMapClick} />
+              <MapFlyTo target={flyTarget} />
               {markerPos && <Marker position={markerPos} />}
               {results?.nearestPoint && (
                 <Marker
@@ -768,9 +783,14 @@ export default function ClimateRiskLookup() {
               {/* Búsqueda híbrida */}
               <SearchPanel
                 onLocationSelect={(newLat, newLng) => {
+                  if (!isFinite(newLat) || !isFinite(newLng)) {
+                    console.warn("Coordenadas inválidas recibidas de búsqueda", newLat, newLng);
+                    return;
+                  }
                   setLat(String(newLat));
                   setLng(String(newLng));
                   setMarkerPos([newLat, newLng]);
+                  setFlyTarget({ pos: [newLat, newLng], zoom: 16 });
                   setResults(null);
                   setNoData(false);
                 }}
