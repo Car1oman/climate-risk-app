@@ -1197,12 +1197,21 @@ function isInPeru(lat, lng) {
       && lng >= PERU_BOUNDS.lngMin && lng <= PERU_BOUNDS.lngMax;
 }
 
+// Limpia ruido léxico antes de geocodificar
+function cleanAddress(q) {
+  return q
+    .replace(/\bintersection with\b/gi, '&')
+    .replace(/\bs\/n\b|\bsn\b|\bsin\s+número\b/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+// Normaliza query para APIs externas: garantiza contexto Perú
 function normalizeGeoQuery(raw) {
-  const q = raw.trim();
+  const q = cleanAddress(raw.trim());
   const lower = q.toLowerCase();
   if (lower.includes('peru') || lower.includes('perú')) return q;
-  const words = q.split(/\s+/).filter(Boolean);
-  return words.length <= 2 ? `${q}, Lima, Perú` : `${q}, Perú`;
+  return `${q}, Lima, Peru`;
 }
 
 app.get('/api/search', async (req, res) => {
@@ -1229,42 +1238,12 @@ app.get('/api/search', async (req, res) => {
 
     if (fromDB.length > 0) return res.json(fromDB);
 
-    // ── 3. Mapbox Geocoding (primario) ──────────────────────────────────────
+    // ── 3. Preparar query normalizado para APIs externas ────────────────────
     const geoQuery = normalizeGeoQuery(rawQuery);
+    const isIntersection = rawQuery.includes('&');
     let geoResults = null;
 
-    if (process.env.MAPBOX_TOKEN) {
-      try {
-        const url = new URL(
-          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(geoQuery)}.json`
-        );
-        url.searchParams.set('access_token', process.env.MAPBOX_TOKEN);
-        url.searchParams.set('country', 'PE');
-        url.searchParams.set('limit', '5');
-        url.searchParams.set('language', 'es');
-        url.searchParams.set('types', 'place,locality,neighborhood,address');
-
-        const r = await fetch(url.toString());
-        if (r.ok) {
-          const d = await r.json();
-          const features = (d.features || []).filter(f => {
-            const [lng, lat] = f.center;
-            return isInPeru(lat, lng) && f.place_name.toLowerCase().includes('perú');
-          });
-          if (features.length > 0) {
-            geoResults = features.map(f => ({
-              direccion:     f.place_name,
-              lat:           f.center[1],
-              lng:           f.center[0],
-              source:        'mapbox',
-              place_type_db: f.place_type?.[0] || 'place',
-            }));
-          }
-        }
-      } catch (e) { console.warn('Mapbox error:', e.message); }
-    }
-
-    // ── 4. Google Geocoding (fallback) ──────────────────────────────────────
+    // ── 4. Google Geocoding (primario) ──────────────────────────────────────
     if (!geoResults && process.env.GOOGLE_GEOCODING_KEY) {
       try {
         const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
@@ -1274,12 +1253,13 @@ app.get('/api/search', async (req, res) => {
         url.searchParams.set('language', 'es');
 
         const r = await fetch(url.toString());
-        if (r.ok) {
+        if (!r.ok) {
+          console.warn(`Google Geocoding HTTP ${r.status} para: ${geoQuery}`);
+        } else {
           const d = await r.json();
           const items = (d.results || []).filter(item => {
-            const { lat, lng } = item.geometry.location;
-            return isInPeru(lat, lng)
-              && item.formatted_address.toLowerCase().includes('per');
+            const loc = item.geometry?.location;
+            return loc && isInPeru(loc.lat, loc.lng);
           });
           if (items.length > 0) {
             geoResults = items.map(item => ({
@@ -1292,6 +1272,44 @@ app.get('/api/search', async (req, res) => {
           }
         }
       } catch (e) { console.warn('Google Geocoding error:', e.message); }
+    }
+
+    // ── 5. Mapbox Geocoding (fallback) ──────────────────────────────────────
+    if (!geoResults && process.env.MAPBOX_TOKEN) {
+      try {
+        const url = new URL(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(geoQuery)}.json`
+        );
+        url.searchParams.set('access_token', process.env.MAPBOX_TOKEN);
+        url.searchParams.set('country', 'PE');
+        url.searchParams.set('limit', '5');
+        url.searchParams.set('language', 'es');
+        url.searchParams.set('types', isIntersection ? 'address,poi' : 'place,locality,neighborhood,address');
+        url.searchParams.set('proximity', '-76.95,-12.05');
+        url.searchParams.set('bbox', '-81.5,-18.5,-68.5,0.1');
+        url.searchParams.set('autocomplete', 'true');
+        url.searchParams.set('fuzzyMatch', 'true');
+
+        const r = await fetch(url.toString());
+        if (!r.ok) {
+          console.warn(`Mapbox Geocoding HTTP ${r.status} para: ${geoQuery}`);
+        } else {
+          const d = await r.json();
+          const features = (d.features || []).filter(f => {
+            const [fLng, fLat] = f.center || [];
+            return fLat != null && fLng != null && isInPeru(fLat, fLng);
+          });
+          if (features.length > 0) {
+            geoResults = features.map(f => ({
+              direccion:     f.place_name,
+              lat:           f.center[1],
+              lng:           f.center[0],
+              source:        'mapbox',
+              place_type_db: f.place_type?.[0] || 'place',
+            }));
+          }
+        }
+      } catch (e) { console.warn('Mapbox error:', e.message); }
     }
 
     if (!geoResults || geoResults.length === 0) return res.json([]);
