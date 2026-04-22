@@ -331,7 +331,7 @@ function SearchPanel({ onLocationSelect }) {
                 placeholder="Ej. Plaza Vea San Isidro"
                 value={registerForm.name}
                 onChange={(e) => setRegisterForm(f => ({ ...f, name: e.target.value }))}
-                className="h-8 text-sm"
+                className="h-8 text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800"
               />
             </div>
             <div className="space-y-1">
@@ -340,7 +340,7 @@ function SearchPanel({ onLocationSelect }) {
                 placeholder="Ej. Supermercados"
                 value={registerForm.unidad_negocio}
                 onChange={(e) => setRegisterForm(f => ({ ...f, unidad_negocio: e.target.value }))}
-                className="h-8 text-sm"
+                className="h-8 text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800"
               />
             </div>
             <div className="flex gap-2">
