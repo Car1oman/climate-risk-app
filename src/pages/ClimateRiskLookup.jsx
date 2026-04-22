@@ -311,14 +311,14 @@ function SearchPanel({ onLocationSelect }) {
 
       {/* Formulario de registro de activo */}
       {selectedPlace && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50/60 dark:bg-amber-950/20 dark:border-amber-800/40 p-3 space-y-3">
+        <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-900/50 dark:border-amber-600 p-3 space-y-3">
           <div className="flex items-start gap-2">
-            <MapPin className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+            <MapPin className="w-4 h-4 text-amber-600 dark:text-amber-300 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+              <p className="text-xs font-semibold text-amber-900 dark:text-amber-200">
                 No hay activos registrados aquí
               </p>
-              <p className="text-[11px] text-amber-700/70 dark:text-amber-400/60 mt-0.5 leading-snug">
+              <p className="text-[11px] text-amber-800 dark:text-amber-300 mt-0.5 leading-snug">
                 {selectedPlace.direccion}
               </p>
             </div>
