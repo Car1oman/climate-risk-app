@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { API_URL, fetchAssetDetail } from "@/lib/api";
 import { formatCurrency, getRiskColor, getCompleteRiskModel } from "@/lib/riskEngine";
 import { Link } from "react-router-dom";
-import { ArrowLeft, MapPin, Building2, Sparkles, Loader2 } from "lucide-react";
+import { ArrowLeft, MapPin, Sparkles, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";

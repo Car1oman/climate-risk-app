@@ -57,3 +57,12 @@ export const calculateRisk = async (assetId) => {
     return null;
   }
 };
+
+export const fetchExternalRisks = async (lat, lng) => {
+  const res = await fetch(`${API_URL}/api/external-risks/lookup?lat=${lat}&lng=${lng}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || err.error || `Error ${res.status}`);
+  }
+  return res.json();
+};

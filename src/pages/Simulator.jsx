@@ -4,7 +4,7 @@ import { calculateRiskScore, formatCurrency, getRiskColor } from "@/lib/riskEngi
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { Waves, AlertTriangle, Building2, DollarSign } from "lucide-react";
+import { Waves } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
 
 const RISK_FILL = { critico: "#ef4444", alto: "#f97316", medio: "#eab308", bajo: "#22c55e" };

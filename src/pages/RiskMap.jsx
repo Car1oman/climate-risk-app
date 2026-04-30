@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useAssets } from "@/hooks/useAssets";
 import { MapContainer, TileLayer, CircleMarker, Popup } from "react-leaflet";
 import { getRiskColor, formatCurrency } from "@/lib/riskEngine";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
 import { ExternalLink } from "lucide-react";

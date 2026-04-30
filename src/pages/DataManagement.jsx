@@ -10,10 +10,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Upload, Download, Plus, Edit, Trash2, FileText, Database } from "lucide-react";
-import { formatCurrency, getRiskColor } from "@/lib/riskEngine";
+import { Plus, Edit, Trash2, FileText, Database } from "lucide-react";
+import { formatCurrency } from "@/lib/riskEngine";
 import BulkAssetUpload from "@/components/BulkAssetUpload";
 import BulkClimateUpload from "@/components/BulkClimateUpload";
 

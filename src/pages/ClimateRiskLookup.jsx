@@ -8,10 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { API_URL } from "@/lib/api";
+import { API_URL, fetchExternalRisks } from "@/lib/api";
 import {
   Search, MapPin, Loader2, AlertTriangle, Info,
-  Sparkles, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Minus,
+  Sparkles, ChevronDown, ChevronUp, TrendingUp, TrendingDown,
   Building2, Plus,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -574,6 +574,115 @@ function HorizonSection({ horizon, records, baseline }) {
   );
 }
 
+function ExternalRiskPanel({ data, loading, error }) {
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="py-4 flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Consultando riesgos complementarios GRI...
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/30">
+        <AlertTriangle className="w-4 h-4 text-amber-600" />
+        <AlertDescription className="text-xs text-amber-900 dark:text-amber-200">
+          No se pudo consultar la capa complementaria GRI: {error}
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (!data) return null;
+
+  const hazards = Array.isArray(data.hazards) ? data.hazards : [];
+
+  return (
+    <Card>
+      <CardHeader className="pb-2 pt-4">
+        <CardTitle className="text-sm flex items-center justify-between gap-2">
+          <span>Riesgos complementarios GRI</span>
+          <Badge variant="outline" className="text-[10px]">
+            {data.overall_score || "sin data"}
+          </Badge>
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Fuente en vivo: Infrastructure Resilience. No modifica el score principal.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-3 pb-4">
+        {hazards.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Sin datos complementarios para esta ubicacion.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {hazards.map((hazard) => {
+              const periods = [
+                { label: "Actual", data: hazard.baseline },
+                { label: "Futuro moderado", data: hazard.future_moderate_emissions },
+                { label: "Futuro alto", data: hazard.future_high_emissions },
+              ].filter((period) => period.data?.records_used > 0);
+
+              return (
+                <div key={hazard.hazard} className="border border-border rounded-xl p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold">{hazard.hazard_name}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {hazard.total_records_for_hazard} registros · {hazard.method === "probabilidad_occurrence" ? "probabilidad" : "valor directo"}
+                      </p>
+                    </div>
+                    <Badge className={`${getLevelCfg(
+                      periods.reduce((max, period) => {
+                        const score = getLevelCfg(period.data.score).score;
+                        return score > getLevelCfg(max).score ? period.data.score : max;
+                      }, "sin data")
+                    ).color} border-0`}>
+                      {periods.length > 0
+                        ? periods.reduce((max, period) => {
+                            const score = getLevelCfg(period.data.score).score;
+                            return score > getLevelCfg(max).score ? period.data.score : max;
+                          }, "sin data")
+                        : "sin data"}
+                    </Badge>
+                  </div>
+                  {periods.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Sin datos resumibles para mostrar.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {periods.map((period) => {
+                        const levelCfg = getLevelCfg(period.data.score);
+                        return (
+                          <div key={period.label} className="rounded-lg bg-muted/30 px-2.5 py-2">
+                            <p className="text-[10px] text-muted-foreground">{period.label}</p>
+                            <p className="text-xs font-medium mt-0.5">{period.data.value_label}</p>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <span className={`w-1.5 h-1.5 rounded-full ${levelCfg.dot}`} />
+                              <span className="text-[10px] text-muted-foreground">{period.data.score}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <p className="text-[10px] text-muted-foreground">
+          Usados: {data.metadata?.relevant_results_used ?? 0} de {data.metadata?.total_api_results ?? 0} registros devueltos por la API.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 function AIPanel({ results }) {
   const [loading, setLoading] = useState(false);
   const [text, setText] = useState(null);
@@ -670,12 +779,17 @@ export default function ClimateRiskLookup() {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [noData, setNoData] = useState(false);
+  const [externalRisks, setExternalRisks] = useState(null);
+  const [externalLoading, setExternalLoading] = useState(false);
+  const [externalError, setExternalError] = useState(null);
 
   const handleMapClick = useCallback((clickLat, clickLng) => {
     setLat(String(clickLat));
     setLng(String(clickLng));
     setMarkerPos([clickLat, clickLng]);
     setResults(null);
+    setExternalRisks(null);
+    setExternalError(null);
     setNoData(false);
   }, []);
 
@@ -687,15 +801,31 @@ export default function ClimateRiskLookup() {
 
     const useScenario = overrideScenario || scenario;
     setLoading(true);
+    setExternalLoading(true);
     setResults(null);
+    setExternalRisks(null);
+    setExternalError(null);
     setNoData(false);
     setMarkerPos([latNum, lngNum]);
     setFlyTarget({ pos: [latNum, lngNum], zoom: 14 });
 
     try {
-      const res = await fetch(
-        `${API_URL}/api/climate-risks/lookup?lat=${latNum}&lng=${lngNum}&scenario=${useScenario}`
-      );
+      const [primaryResult, externalResult] = await Promise.allSettled([
+        fetch(`${API_URL}/api/climate-risks/lookup?lat=${latNum}&lng=${lngNum}&scenario=${useScenario}`),
+        fetchExternalRisks(latNum, lngNum),
+      ]);
+
+      if (externalResult.status === "fulfilled") {
+        setExternalRisks(externalResult.value);
+      } else {
+        setExternalError(externalResult.reason?.message || "Servicio externo no disponible");
+      }
+
+      if (primaryResult.status === "rejected") {
+        throw primaryResult.reason;
+      }
+
+      const res = primaryResult.value;
       if (!res.ok) throw new Error((await res.json()).error || "Error al consultar");
       const data = await res.json();
       if (!data.found) { setNoData(true); }
@@ -704,6 +834,7 @@ export default function ClimateRiskLookup() {
       toast.error(err.message || "Error al consultar riesgos");
     } finally {
       setLoading(false);
+      setExternalLoading(false);
     }
   };
 
@@ -792,6 +923,8 @@ export default function ClimateRiskLookup() {
                   setMarkerPos([newLat, newLng]);
                   setFlyTarget({ pos: [newLat, newLng], zoom: 16 });
                   setResults(null);
+                  setExternalRisks(null);
+                  setExternalError(null);
                   setNoData(false);
                 }}
               />
@@ -838,6 +971,12 @@ export default function ClimateRiskLookup() {
               </AlertDescription>
             </Alert>
           )}
+
+          <ExternalRiskPanel
+            data={externalRisks}
+            loading={externalLoading}
+            error={externalError}
+          />
 
           {/* Resultados */}
           {results && (

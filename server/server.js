@@ -19,6 +19,7 @@ import {
   deleteDocumento,
   CATEGORIAS,
 } from './services/documentosService.js';
+import { getGriRiskByLocation } from './services/griRiskService.js';
 import { supabase } from "./supabaseClient.js";
 
 dotenv.config();
@@ -1012,6 +1013,55 @@ app.get('/api/climate-risks/lookup', async (req, res) => {
   } catch (error) {
     console.error('Error en /api/climate-risks/lookup:', error.message);
     return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Consulta complementaria en vivo: GRI / Infrastructure Resilience.
+// No reemplaza climate_cells ni modifica el score principal de la plataforma.
+app.get('/api/external-risks/lookup', async (req, res) => {
+  try {
+    const { lat, lng, lon } = req.query;
+    const longitude = lng ?? lon;
+
+    if (!lat || !longitude) {
+      return res.status(400).json({ error: 'lat y lng/lon son requeridos' });
+    }
+
+    const latNum = parseFloat(lat);
+    const lngNum = parseFloat(longitude);
+
+    if (isNaN(latNum) || latNum < -90 || latNum > 90) {
+      return res.status(400).json({ error: 'lat invalido (rango: -90 a 90)' });
+    }
+    if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) {
+      return res.status(400).json({ error: 'lng/lon invalido (rango: -180 a 180)' });
+    }
+
+    const cacheKey = `external-risks-${latNum.toFixed(5)}-${lngNum.toFixed(5)}`;
+    const now = Date.now();
+
+    if (climateCache[cacheKey] && now - climateCache[cacheKey].timestamp < CACHE_TTL) {
+      return res.json({
+        ...climateCache[cacheKey].data,
+        cached: true,
+        cacheAge: Math.floor((now - climateCache[cacheKey].timestamp) / 1000) + 's',
+      });
+    }
+
+    const externalRisks = await getGriRiskByLocation(latNum, lngNum);
+
+    climateCache[cacheKey] = {
+      data: externalRisks,
+      timestamp: now,
+    };
+
+    return res.json(externalRisks);
+  } catch (error) {
+    console.error('Error en /api/external-risks/lookup:', error.message);
+    return res.status(500).json({
+      error: 'Error consultando riesgos externos',
+      message: error.message,
+    });
   }
 });
 

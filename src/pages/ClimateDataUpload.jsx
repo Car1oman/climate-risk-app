@@ -21,7 +21,6 @@ import {
   Info,
   Database,
   Layers,
-  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 

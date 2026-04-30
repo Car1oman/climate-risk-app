@@ -4,7 +4,7 @@ import { getRiskColor, formatCurrency } from "@/lib/riskEngine";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
-import { Building2, MapPin, ChevronRight, Search, Filter } from "lucide-react";
+import { Building2, MapPin, ChevronRight, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
