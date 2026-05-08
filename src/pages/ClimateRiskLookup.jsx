@@ -456,6 +456,90 @@ function TerritorialContextPanel({ data }) {
   );
 }
 
+function getTopHazard(externalRisks) {
+  const hazards = Array.isArray(externalRisks?.hazards) ? externalRisks.hazards : [];
+  return hazards
+    .filter((h) => h.baseline?.score != null)
+    .sort((a, b) => (b.baseline.score || 0) - (a.baseline.score || 0))[0];
+}
+
+function getTrendHeadline(climateTrends) {
+  const item = climateTrends?.narrative?.[0];
+  if (!item) return null;
+  const message = item.messages?.[0];
+  return message ? `${item.period}: ${message}` : null;
+}
+
+function getTerritorialHeadline(territorialCtx) {
+  return territorialCtx?.narrative?.[0] || null;
+}
+
+function InsightSummaryPanel({ externalRisks, climateTrends, territorialCtx, loading, error }) {
+  const riskCfg = getLevelCfg(externalRisks?.overall_score);
+  const topHazard = getTopHazard(externalRisks);
+  const trend = getTrendHeadline(climateTrends);
+  const context = getTerritorialHeadline(territorialCtx);
+
+  return (
+    <Card>
+      <CardHeader className="pb-2 pt-4">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-primary" />
+          Resumen ejecutivo
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">Visión rápida de los riesgos y tendencias clave</p>
+      </CardHeader>
+      <CardContent className="space-y-3 pb-4">
+        {loading ? (
+          <div className="py-4 text-sm text-muted-foreground flex items-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Analizando ubicación...
+          </div>
+        ) : error ? (
+          <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/30">
+            <AlertTriangle className="w-4 h-4 text-amber-600" />
+            <AlertDescription className="text-xs text-amber-900 dark:text-amber-200">
+              No se puede generar resumen: {error}
+            </AlertDescription>
+          </Alert>
+        ) : (!externalRisks && !climateTrends) ? (
+          <p className="text-sm text-muted-foreground">Selecciona un punto en el mapa para ver el resumen ejecutivo del riesgo climático.</p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl border border-border p-4 bg-muted/50">
+              <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Nivel de riesgo</p>
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold">{riskCfg.label}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Evaluación general de exposición</p>
+                </div>
+                <Badge className={`${riskCfg.color} border-0`}>{riskCfg.label}</Badge>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-border p-4 bg-muted/50">
+              <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Riesgo principal</p>
+              <p className="mt-2 text-sm font-semibold">{topHazard?.hazard_name || "No identificado"}</p>
+              <p className="text-xs text-muted-foreground mt-1">Basado en la amenaza con mayor exposición en la ubicación.</p>
+            </div>
+            <div className="rounded-2xl border border-border p-4 bg-muted/50 sm:col-span-2">
+              <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Qué está cambiando</p>
+              <p className="mt-2 text-sm leading-relaxed text-foreground/85">
+                {trend || "No hay proyecciones suficientes para generar una tendencia clara."}
+              </p>
+            </div>
+            {context && (
+              <div className="rounded-2xl border border-border p-4 bg-muted/50 sm:col-span-2">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Contexto local</p>
+                <p className="mt-2 text-sm leading-relaxed text-foreground/85">{context}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function AIPanel({ externalRisks, climateTrends, docContext }) {
   const [loading, setLoading] = useState(false);
   const [text, setText]       = useState(null);
@@ -733,6 +817,14 @@ export default function ClimateRiskLookup() {
               </Button>
             </CardContent>
           </Card>
+
+          <InsightSummaryPanel
+            externalRisks={externalRisks}
+            climateTrends={climateTrends}
+            territorialCtx={territorialCtx}
+            loading={externalLoading || trendsLoading}
+            error={externalError}
+          />
 
           {/* 1. Amenazas GRI (tiempo real) */}
           <HazardNarrativePanel
