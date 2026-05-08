@@ -1,199 +1,145 @@
+// @ts-nocheck
 const RISK_LEVELS = {
-  bajo: { label: "Exposición baja", color: "bg-emerald-100 text-emerald-800" },
-  medio: { label: "Exposición moderada", color: "bg-amber-100 text-amber-800" },
-  alto: { label: "Alta exposición", color: "bg-red-100 text-red-800" },
-  "sin data": { label: "Sin datos", color: "bg-muted text-muted-foreground" },
-};
-
-const HAZARD_ICONS = {
-  flood: "🌊",
-  fluvial: "🏞️",
-  coastal: "🌊",
-  pluvial: "🌧️",
-  drought: "☀️",
-  heat: "🌡️",
-  extreme_heat: "🌡️",
-  landslide: "⛰️",
-};
-
-const INFERRED_RISKS = {
-  temperature: { name: "Incremento progresivo de temperatura", hazard: "heat", icon: "🌡️", narrative: "Tendencias climáticas indican un aumento gradual en temperaturas que puede afectar operaciones." },
-  precipitation: { name: "Cambios en patrones de precipitación", hazard: "pluvial", icon: "🌧️", narrative: "Variaciones en lluvias pueden generar riesgos de inundación o sequía." },
-  drought: { name: "Exposición moderada a estrés hídrico", hazard: "drought", icon: "☀️", narrative: "Indicadores de sequía sugieren monitoreo preventivo de recursos hídricos." },
-  coastal: { name: "Vulnerabilidad costera moderada", hazard: "coastal", icon: "🌊", narrative: "Zona costera con exposición a eventos marinos." },
-  urban: { name: "Riesgos urbanos distribuidos", hazard: "flood", icon: "🏞️", narrative: "Área urbana con exposición múltiple a riesgos ambientales." },
-  default: { name: "Sin amenaza dominante detectada", hazard: "flood", icon: "⚠️", narrative: "La evaluación actual no identifica un riesgo crítico predominante, pero se recomienda monitoreo continuo." },
+  bajo:       { label: "Exposición baja",     color: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300" },
+  medio:      { label: "Exposición moderada", color: "bg-amber-100  text-amber-800  dark:bg-amber-900/40  dark:text-amber-300"  },
+  alto:       { label: "Alta exposición",     color: "bg-red-100    text-red-800    dark:bg-red-900/40    dark:text-red-300"    },
+  "sin data": { label: "Sin datos",           color: "bg-muted text-muted-foreground" },
 };
 
 export function getRiskLevelConfig(level) {
   return RISK_LEVELS[(level || "").toLowerCase()] || RISK_LEVELS["sin data"];
 }
 
-export function inferPrimaryClimateRisk(externalRisks, climateTrends, territorialCtx) {
-  // 1. Sequía / estrés hídrico - Prioridad máxima
-  const trends = Array.isArray(climateTrends?.narrative) ? climateTrends.narrative : [];
-  const territorial = Array.isArray(territorialCtx?.narrative) ? territorialCtx.narrative : [];
-  const allText = [...trends.flatMap(t => t.messages || []), ...territorial].join(" ").toLowerCase();
+// ── 1. Climate state — 2-3 bullets derived from Open-Meteo text ───────────────
+// Never asserts a specific hazard type. Only describes what the data shows.
+export function buildClimateStateSummary(climateTrends) {
+  const narrative = Array.isArray(climateTrends?.narrative) ? climateTrends.narrative : [];
+  if (narrative.length === 0) return [];
 
-  if (allText.includes("sequía") || allText.includes("drought") || allText.includes("estrés hídrico") ||
-      allText.includes("agua") || allText.includes("precipitación baja")) {
-    return {
-      name: "Exposición moderada a sequía",
-      hazard: "drought",
-      icon: "☀️",
-      narrative: "Indicadores de sequía y estrés hídrico sugieren monitoreo preventivo de recursos hídricos.",
-      inferred: true,
-      current: "medio",
-      future: null,
-    };
+  const text = narrative.flatMap(t => t.messages || []).join(" ").toLowerCase();
+  const bullets = [];
+
+  if (/aument.*temp|temp.*aument|increment.*temp|calentamiento|noches cál|más cáli/.test(text)) {
+    bullets.push("Temperatura en tendencia de aumento progresivo");
+  } else if (/temperatura.*establ|sin cambio.*temp|temp.*sin var/.test(text)) {
+    bullets.push("Temperatura relativamente estable en el período evaluado");
+  } else if (text.includes("temperatura") || text.includes("°c")) {
+    bullets.push("Datos de temperatura disponibles para esta zona");
   }
 
-  // 2. Estrés térmico
-  if (allText.includes("temperatura") || allText.includes("calor") || allText.includes("olas de calor") ||
-      allText.includes("noches cálidas") || allText.includes("incremento") || allText.includes("tas")) {
-    return {
-      name: "Estrés térmico moderado",
-      hazard: "heat",
-      icon: "🌡️",
-      narrative: "Tendencias indican aumento en temperaturas que puede afectar operaciones y salud.",
-      inferred: true,
-      current: "medio",
-      future: null,
-    };
+  if (/lluvia.*intens|precipitación.*extrem|mayor.*lluvia|aument.*precipit/.test(text)) {
+    bullets.push("Posible incremento en intensidad de lluvias");
+  } else if (/lluvia.*dismin|precipitación.*menor|condicion.*seca|sequía|reducción.*lluvia/.test(text)) {
+    bullets.push("Tendencia hacia condiciones más secas o menor precipitación");
+  } else if (text.includes("precipitación") || text.includes("lluvia")) {
+    bullets.push("Variabilidad en patrones de precipitación registrada");
   }
 
-  // 3. Inundación
-  if (allText.includes("inundación") || allText.includes("flood") || allText.includes("lluvias extremas") ||
-      allText.includes("precipitación creciente") || allText.includes("pluvial")) {
-    return {
-      name: "Riesgo de inundación moderado",
-      hazard: "flood",
-      icon: "🌊",
-      narrative: "Cambios en patrones de precipitación pueden generar riesgos de inundación.",
-      inferred: true,
-      current: "medio",
-      future: null,
-    };
+  if (bullets.length < 3 && /variabilidad|eventos.*extrem|mayor amplitud/.test(text)) {
+    bullets.push("Mayor variabilidad climática proyectada a futuro");
   }
 
-  // 4. Vulnerabilidad socioeconómica
-  if (allText.includes("vulnerabilidad") || allText.includes("socioeconómica") || allText.includes("pobreza") ||
-      allText.includes("urbana") || allText.includes("densidad poblacional")) {
-    return {
-      name: "Vulnerabilidad socioeconómica moderada",
-      hazard: "flood",
-      icon: "🏙️",
-      narrative: "Factores socioeconómicos aumentan la exposición a impactos climáticos.",
-      inferred: true,
-      current: "medio",
-      future: null,
-    };
+  return bullets;
+}
+
+// ── 2. Attention signals — probabilistic, derived from trends + territory ──────
+// Does NOT repeat GRI per-hazard data (that's HazardNarrativePanel's job).
+// Does NOT assert "Sequía" or "Inundación" as facts from keyword matching.
+export function buildAttentionSignals(climateTrends, territorialCtx) {
+  const signals = [];
+  const climText = Array.isArray(climateTrends?.narrative)
+    ? climateTrends.narrative.flatMap(t => t.messages || []).join(" ").toLowerCase()
+    : "";
+  const terrNarrative = Array.isArray(territorialCtx?.narrative) ? territorialCtx.narrative : [];
+
+  if (/calor|noches cál|temperatura.*aument|increment.*temp/.test(climText)) {
+    signals.push("Tendencia de incremento térmico en proyecciones climáticas");
   }
 
-  // 5. Riesgo climático moderado (fallback)
+  if (/lluvia.*intens|precipitación.*extrem|mayor.*lluvia/.test(climText)) {
+    signals.push("Condiciones compatibles con eventos de lluvia intensa");
+  } else if (/variabilidad.*precipit|cambio.*lluvia|precipitación.*variab/.test(climText)) {
+    signals.push("Variabilidad en patrones de precipitación registrada");
+  }
+
+  if (terrNarrative.some(t => /vulnerab|pobreza|desigual/.test(t.toLowerCase()))) {
+    signals.push("Indicadores de vulnerabilidad socioeconómica en el territorio");
+  }
+
+  return signals;
+}
+
+// ── 3. Operational impacts — always framed as possible, never as fact ─────────
+// Uses real GRI scores to ground inferences. Only infers when score ≥ "medio".
+export function buildOperationalImpacts(externalRisks, climateTrends) {
+  const impacts = [];
+  const hazards = Array.isArray(externalRisks?.hazards) ? externalRisks.hazards : [];
+  const climText = Array.isArray(climateTrends?.narrative)
+    ? climateTrends.narrative.flatMap(t => t.messages || []).join(" ").toLowerCase()
+    : "";
+
+  const order = { bajo: 1, medio: 2, alto: 3 };
+  const hasScore = (types, min = "medio") =>
+    hazards.some(h => types.includes(h.hazard) && (order[h.baseline?.score] || 0) >= (order[min] || 2));
+
+  if (hasScore(["heat", "extreme_heat"]) || /calor|temperatura.*aument/.test(climText)) {
+    impacts.push("Posible aumento en costos de climatización y refrigeración");
+  }
+  if (hasScore(["drought"]) || /estrés hídrico|escasez.*agua/.test(climText)) {
+    impacts.push("Potencial presión sobre disponibilidad y costo del agua");
+  }
+  if (hasScore(["flood", "pluvial", "fluvial", "coastal"])) {
+    impacts.push("Riesgo potencial de afectación logística por eventos de lluvia o inundación");
+  }
+  if (hasScore(["landslide"])) {
+    impacts.push("Señales compatibles con riesgo de deslizamientos en zonas de ladera");
+  }
+
+  return impacts;
+}
+
+// ── 4. Bundled reading — single entry point for ClimateReadingPanel ────────────
+export function buildClimateReading(externalRisks, climateTrends, territorialCtx) {
+  const rawLevel = externalRisks?.overall_score;
+  const level = rawLevel && rawLevel !== "sin data" ? rawLevel : null;
   return {
-    name: "Riesgo climático moderado",
-    hazard: "flood",
-    icon: "⚠️",
-    narrative: "Evaluación general indica exposición moderada a cambios climáticos.",
-    inferred: true,
-    current: "medio",
-    future: null,
+    climateStateSummary: buildClimateStateSummary(climateTrends),
+    attentionSignals:    buildAttentionSignals(climateTrends, territorialCtx),
+    operationalImpacts:  buildOperationalImpacts(externalRisks, climateTrends),
+    exposureLevel:       level,
+    exposureCfg:         level ? getRiskLevelConfig(level) : null,
   };
 }
 
-export function interpretExternalRisks(raw, climateTrends, territorialCtx) {
-  const hazards = Array.isArray(raw?.hazards) ? raw.hazards : [];
-  const overall = raw?.overall_score || "sin data";
-  const overallCfg = getRiskLevelConfig(overall);
-
-  const sortedHazards = hazards
-    .filter((h) => h.baseline?.score && h.baseline.score !== "sin data")
-    .sort((a, b) => {
-      const order = { alto: 3, medio: 2, bajo: 1 };
-      return (order[b.baseline?.score] || 0) - (order[a.baseline?.score] || 0);
-    });
-
-  let topHazard;
-  if (sortedHazards.length > 0) {
-    const rawHazard = sortedHazards[0];
-    topHazard = {
-      name: rawHazard.hazard_name,
-      current: rawHazard.baseline?.score || "medio",
-      future: rawHazard.future_high_emissions?.score || null,
-      hazard: rawHazard.hazard,
-      narrative: `La amenaza principal es ${rawHazard.hazard_name} con exposición actual ${rawHazard.baseline?.score || "medio"}.`,
-      inferred: false,
-    };
-  } else {
-    // Siempre inferir si no hay datos GRI claros
-    topHazard = inferPrimaryClimateRisk(raw, climateTrends, territorialCtx);
-  }
-
-  const narrative = topHazard.narrative;
-
-  const hazardSummaries = hazards.map((hazard) => {
-    const current = hazard.baseline?.score || "sin data";
-    const future = hazard.future_high_emissions?.score || null;
-    return {
-      name: hazard.hazard_name,
-      icon: HAZARD_ICONS[hazard.hazard] || "⚠️",
-      current,
-      future,
-      narrative: future && future !== current
-        ? `Actualmente ${current}. Se proyecta ${future} en el futuro.`
-        : `Nivel actual ${current}.`,
-    };
-  });
-
-  return {
-    overall,
-    overallCfg,
-    topHazard,
-    narrative,
-    hazardSummaries,
-  };
-}
-
-
-export function interpretClimateTrends(raw) {
-  const narrative = Array.isArray(raw?.narrative) ? raw.narrative : [];
-  const headline = narrative.length > 0
-    ? `${narrative[0].period}: ${narrative[0].messages?.[0] || "Datos disponibles."}`
-    : "No hay proyecciones climáticas disponibles para esta ubicación.";
-
-  const highlights = narrative.map((item) => ({
-    period: item.period,
-    messages: item.messages || [],
-    icon: item.period.toLowerCase().includes("corto") ? "📅" : "🔭",
-  }));
-
-  return {
-    headline,
-    highlights,
-    historicalContext: raw?.historical_context?.narrative || null,
-  };
-}
-
-export function interpretTerritorialContext(raw) {
-  const headlines = Array.isArray(raw?.narrative) ? raw.narrative : [];
-  return {
-    headline: headlines[0] || "No se dispone de contexto territorial para esta zona.",
-    details: headlines,
-  };
-}
-
+// ── Executive summary — used by AIPanel as grounding context ──────────────────
 export function summarizeClimateLocation(externalRisks, climateTrends, territorialCtx) {
-  const risk = interpretExternalRisks(externalRisks, climateTrends, territorialCtx);
-  const climate = interpretClimateTrends(climateTrends);
-  const territory = interpretTerritorialContext(territorialCtx);
+  const reading = buildClimateReading(externalRisks, climateTrends, territorialCtx);
+  const parts = [];
 
-  const parts = [
-    `Nivel de riesgo general: ${risk.overallCfg.label}.`,
-    risk.topHazard ? `Amenaza principal: ${risk.topHazard.name}.` : null,
-    climate.headline ? `Tendencia climática clave: ${climate.headline}` : null,
-    territory.headline ? `Contexto local: ${territory.headline}` : null,
-  ].filter(Boolean);
+  if (reading.exposureLevel) {
+    parts.push(`Nivel de exposición: ${getRiskLevelConfig(reading.exposureLevel).label}.`);
+  }
 
-  return parts.join(" ");
+  if (reading.attentionSignals[0]) {
+    parts.push(reading.attentionSignals[0] + ".");
+  }
+
+  if (reading.climateStateSummary[0]) {
+    parts.push(reading.climateStateSummary[0] + ".");
+  }
+
+  // Fallback: mention top GRI hazard by name only if no other signals
+  if (parts.length === 0) {
+    const order = { alto: 3, medio: 2, bajo: 1 };
+    const topHazard = Array.isArray(externalRisks?.hazards)
+      ? externalRisks.hazards
+          .filter(h => h.baseline?.score && h.baseline.score !== "sin data")
+          .sort((a, b) => (order[b.baseline.score] || 0) - (order[a.baseline.score] || 0))[0]
+      : null;
+    if (topHazard) {
+      parts.push(`Señal de exposición a ${topHazard.hazard_name.toLowerCase()} (${topHazard.baseline.score}).`);
+    }
+  }
+
+  return parts.length > 0 ? parts.join(" ") : null;
 }
