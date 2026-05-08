@@ -91,3 +91,13 @@ export const fetchDocumentContext = async () => {
   }
   return res.json();
 };
+
+// Returns quantitative climate data from the DB grid (CMIP6 ensemble, SSP5-8.5).
+// Includes p10/p90 percentiles per indicator and nearestPoint.distanceKm.
+export const fetchClimateDB = async (lat, lng) => {
+  const res = await fetch(
+    `${API_URL}/api/climate-risks/lookup?lat=${lat}&lng=${lng}&scenario=pesimista`
+  );
+  if (!res.ok) return null;
+  return res.json();
+};
