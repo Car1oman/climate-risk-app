@@ -293,11 +293,11 @@ function ExecutiveSummaryPanel({ engineResult }) {
   const overallLabel = getExecutiveSeverityLabel(overallSev);
 
   const severityColors = {
-    none: "bg-muted/20 text-muted-foreground",
-    low: "bg-sky-50 dark:bg-sky-950/30 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800",
-    moderate: "bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800",
-    high: "bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800",
-    critical: "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800",
+    none: "bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800",
+    low: "bg-sky-50 dark:bg-sky-950/40 border-sky-200 dark:border-sky-800",
+    moderate: "bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800",
+    high: "bg-orange-50 dark:bg-orange-950/40 border-orange-200 dark:border-orange-800",
+    critical: "bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800",
   };
 
   const containerColor = severityColors[overallSev] || severityColors.none;
@@ -317,19 +317,19 @@ function ExecutiveSummaryPanel({ engineResult }) {
           {cards.map(card => (
             <div
               key={card.id}
-              className="rounded-lg border border-border/50 p-3 bg-background/50 space-y-2"
+              className="rounded-lg border border-border/60 dark:border-border/40 p-3 bg-card/40 dark:bg-slate-900/20 space-y-2"
             >
               <div className="flex items-start gap-2">
                 <span className="text-lg leading-none flex-shrink-0">{card.icon}</span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-tight">{card.label}</p>
+                  <p className="text-xs font-semibold text-foreground/70 dark:text-foreground/60 uppercase tracking-tight">{card.label}</p>
                 </div>
               </div>
 
               {card.isGRI ? (
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold">{card.currentScore}</span>
+                    <span className="text-sm font-semibold text-foreground">{card.currentScore}</span>
                     {card.showFutureChange && card.futureScore !== card.currentScore && (
                       <span className="text-xs text-muted-foreground">→ {card.futureScore}</span>
                     )}
@@ -337,7 +337,7 @@ function ExecutiveSummaryPanel({ engineResult }) {
                 </div>
               ) : (
                 <div className="space-y-1">
-                  <div className="text-sm font-bold tabular-nums">
+                  <div className="text-sm font-bold tabular-nums text-foreground">
                     {card.historical} → {card.projected} {card.unit}
                   </div>
                   <div className="text-xs font-semibold text-muted-foreground">
@@ -346,7 +346,7 @@ function ExecutiveSummaryPanel({ engineResult }) {
                 </div>
               )}
 
-              <Badge className="text-[10px] py-0 px-2" variant="outline">
+              <Badge className="text-[10px] py-0 px-2 bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary/90 border-primary/30 dark:border-primary/40" variant="outline">
                 {card.severityLabel}
               </Badge>
             </div>
