@@ -107,7 +107,7 @@ export function formatSignalForExecutive(signal) {
     delta: signal.delta != null ? `${sign}${signal.delta.toFixed(1)}` : "—",
     unit: signal.unit || "",
     direction: dirArrow,
-    severity,
+    severity: signal.severity,
     severityLabel: sev,
     // Remove: p10, p90, projP10, projP90, source, thresholdRef, detail
     // Keep: what's needed for card display
