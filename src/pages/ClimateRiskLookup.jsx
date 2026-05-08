@@ -530,7 +530,7 @@ function InsightSummaryPanel({ externalInsights, climateInsights, territorialIns
             </div>
             <div className="rounded-2xl border border-border p-4 bg-muted/50">
               <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Riesgo principal</p>
-              <p className="mt-2 text-sm font-semibold">{topHazard?.name || "Evaluación en proceso"}</p>
+              <p className="mt-2 text-sm font-semibold">{topHazard?.name || "Riesgo climático moderado"}</p>
               <p className="text-xs text-muted-foreground mt-1">Basado en la amenaza con mayor exposición en la ubicación.</p>
             </div>
             <div className="rounded-2xl border border-border p-4 bg-muted/50 sm:col-span-2">
