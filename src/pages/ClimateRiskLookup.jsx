@@ -10,9 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { API_URL, fetchExternalRisks } from "@/lib/api";
 import {
-  Search, MapPin, Loader2, AlertTriangle, Info,
-  Sparkles, ChevronDown, ChevronUp, TrendingUp, TrendingDown,
-  Building2, Plus,
+  Search, MapPin, Loader2, AlertTriangle,
+  Sparkles, Building2, Plus, ThermometerSun, Globe2, BookOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -20,226 +19,128 @@ import { toast } from "sonner";
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+  iconUrl:       "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+  shadowUrl:     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
 });
 
-// ── Constantes de dominio ────────────────────────────────────────────────────
-
-// Variables de calor y precipitación del CCKP / CMIP6
-const RISK_GROUPS = {
-  calor: {
-    id: "calor",
-    label: "Riesgo de Calor",
-    emoji: "🌡️",
-    // txx, hd35, hd30, tasmax, tr, tas, tx84rr
-    variables: ["txx", "hd35", "hd30", "tasmax", "tr", "tas", "tx84rr"],
-    impacts: [
-      "Mayor consumo energético para climatización (+20–35%), impacto directo en costos operativos del local",
-      "Riesgo de salud laboral para empleados en zonas sin climatización adecuada (merma de productividad 8–12%)",
-      "Deterioro acelerado de productos perecederos y sensibles al calor (aumento de mermas 3–7%)",
-      "Posible reducción de tráfico de clientes durante olas de calor extremo (hasta –10% en ventas diarias)",
-    ],
-  },
-  hidrico: {
-    id: "hidrico",
-    label: "Riesgo Hídrico",
-    emoji: "🌧️",
-    // rx1day, rx5day, r20mm, r50mm, pr, prpercnt
-    variables: ["rx1day", "rx5day", "r20mm", "r50mm", "pr", "prpercnt"],
-    impacts: [
-      "Inundaciones que interrumpen operaciones por 7–45 días según severidad (daños estructurales S/ 80–200/m²)",
-      "Corte de acceso logístico (proveedores, distribución) ante lluvias extremas o desborde de ríos",
-      "Pérdida de inventario por daños por agua en almacenes y pisos de venta bajos",
-      "Mayor variabilidad en cadena de suministro por disrupciones en zonas proveedoras",
-    ],
-  },
-};
-
-// Metadatos de cada variable climática (CMIP6 · CCKP)
-const VARIABLE_META = {
-  // Calor
-  txx:      { label: "Temp. máx. extrema",      desc: "Temperatura máxima diaria más alta del año (°C)" },
-  hd35:     { label: "Días calurosos (>35 °C)",  desc: "Días al año con temperatura máxima superior a 35 °C" },
-  hd30:     { label: "Días cálidos (>30 °C)",    desc: "Días al año con temperatura máxima superior a 30 °C" },
-  tasmax:   { label: "Temp. máx. media anual",   desc: "Promedio anual de temperaturas máximas diarias (°C)" },
-  tr:       { label: "Noches tropicales",        desc: "Noches al año con temperatura mínima superior a 20 °C" },
-  tas:      { label: "Temperatura media",        desc: "Temperatura media superficial del aire (°C)" },
-  tx84rr:   { label: "Índice mortalidad calor",  desc: "Exceso de mortalidad estimada por calor extremo (índice)" },
-  // Precipitación
-  rx1day:   { label: "Lluvia extrema (1 día)",   desc: "Mayor precipitación acumulada en un solo día del año (mm)" },
-  rx5day:   { label: "Lluvia extrema (5 días)",  desc: "Mayor precipitación en 5 días consecutivos (mm)" },
-  r20mm:    { label: "Días lluvia intensa",       desc: "Días al año con precipitación superior a 20 mm" },
-  r50mm:    { label: "Días lluvia severa",        desc: "Días al año con precipitación superior a 50 mm" },
-  pr:       { label: "Precipitación media",       desc: "Precipitación total media acumulada del período (mm)" },
-  prpercnt: { label: "Cambio precipitación",      desc: "Porcentaje relativo al histórico (100% = sin cambio)" },
-};
-
-// Etiquetas de horizonte temporal
-const HORIZON_INFO = {
-  historico: { label: "¿Cómo fue?",                  period: "1995–2014", ringColor: "ring-slate-400/40",  textColor: "text-slate-500",  bg: "bg-slate-500/10" },
-  corto:     { label: "Corto plazo",                  period: "2020–2039", ringColor: "ring-blue-400/40",   textColor: "text-blue-500",   bg: "bg-blue-500/10"  },
-  mediano:   { label: "Mediano plazo",                period: "2040–2059", ringColor: "ring-amber-400/40",  textColor: "text-amber-600",  bg: "bg-amber-500/10" },
-};
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 const TILE_LAYERS = {
   osm: {
-    label: "Calles",
-    icon: "🗺️",
+    label: "Calles", icon: "🗺️",
     url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   },
   topo: {
-    label: "Topográfico",
-    icon: "🌄",
+    label: "Topográfico", icon: "🌄",
     url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
     attribution: '&copy; <a href="https://opentopomap.org">OpenTopoMap</a> contributors',
   },
   satellite: {
-    label: "Satélite",
-    icon: "🛰️",
+    label: "Satélite", icon: "🛰️",
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     attribution: '&copy; <a href="https://www.esri.com">Esri</a>',
   },
 };
 
 const LEVEL_CONFIG = {
-  bajo:  { label: "Baja exposición",     color: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300", dot: "bg-emerald-500", score: 1 },
-  medio: { label: "Exposición moderada", color: "bg-amber-100  text-amber-800  dark:bg-amber-900/40  dark:text-amber-300",  dot: "bg-amber-500",   score: 2 },
-  alto:  { label: "Alta exposición",     color: "bg-red-100    text-red-800    dark:bg-red-900/40    dark:text-red-300",    dot: "bg-red-500",     score: 3 },
+  bajo:       { label: "Exposición baja",     color: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300", dot: "bg-emerald-500" },
+  medio:      { label: "Exposición moderada", color: "bg-amber-100  text-amber-800  dark:bg-amber-900/40  dark:text-amber-300",  dot: "bg-amber-500"   },
+  alto:       { label: "Alta exposición",     color: "bg-red-100    text-red-800    dark:bg-red-900/40    dark:text-red-300",    dot: "bg-red-500"     },
+  "sin data": { label: "Sin datos",           color: "bg-muted text-muted-foreground",                                            dot: "bg-muted-foreground" },
+};
+
+const HAZARD_ICONS = {
+  flood: "🌊", fluvial: "🏞️", coastal: "🌊", pluvial: "🌧️",
+  drought: "☀️", heat: "🌡️", extreme_heat: "🌡️", landslide: "⛰️",
 };
 
 function getLevelCfg(level) {
-  return LEVEL_CONFIG[(level || "").toLowerCase()] || {
-    label: level, color: "bg-muted text-muted-foreground", dot: "bg-muted-foreground", score: 0,
-  };
+  return LEVEL_CONFIG[(level || "").toLowerCase()] || LEVEL_CONFIG["sin data"];
 }
 
-function getGroupForVariable(riskType) {
-  for (const [key, g] of Object.entries(RISK_GROUPS)) {
-    if (g.variables.includes(riskType)) return key;
-  }
-  return null;
+function getHazardNarrative(hazardName, currentScore, futureHighScore) {
+  const order = { alto: 3, medio: 2, bajo: 1, "sin data": 0 };
+  const curr   = order[currentScore]    || 0;
+  const future = order[futureHighScore] || 0;
+
+  const base = {
+    0: `Sin datos disponibles para ${hazardName.toLowerCase()} en esta ubicación.`,
+    1: `La exposición a ${hazardName.toLowerCase()} es baja en esta zona. El riesgo histórico es reducido.`,
+    2: `Se detecta un nivel moderado de exposición a ${hazardName.toLowerCase()}. Se recomienda monitoreo preventivo.`,
+    3: `Alta exposición a ${hazardName.toLowerCase()} detectada. Esta amenaza puede generar impactos operacionales significativos.`,
+  }[curr] || `Datos disponibles para ${hazardName.toLowerCase()}.`;
+
+  return future > curr && future >= 2
+    ? base + " Las proyecciones futuras muestran un posible incremento del riesgo."
+    : base;
 }
 
-// Calcula tendencia respecto al histórico (para valores numéricos)
-function trend(current, base) {
-  if (base == null || current == null || base === 0) return null;
-  const delta = current - base;
-  const pct = ((delta / Math.abs(base)) * 100).toFixed(1);
-  return { delta: parseFloat(delta.toFixed(3)), pct: parseFloat(pct) };
-}
-
-// Agrupa registros de un horizonte en los 2 grupos temáticos con nivel headline
-function buildGroups(horizonRecords, baseline) {
-  const grouped = { calor: [], hidrico: [] };
-  for (const r of horizonRecords) {
-    const g = getGroupForVariable(r.risk_type);
-    if (g) grouped[g].push(r);
-  }
-
-  return Object.entries(grouped).map(([groupId, records]) => {
-    const group = RISK_GROUPS[groupId];
-    // Headline = nivel más alto del grupo
-    const headlineScore = records.reduce((m, r) => Math.max(m, getLevelCfg(r.level).score), 0);
-    const headlineLevel = Object.keys(LEVEL_CONFIG).find(
-      (k) => LEVEL_CONFIG[k].score === headlineScore
-    ) || "bajo";
-
-    // Enriquecer con baseline
-    const enriched = records.map((r) => ({
-      ...r,
-      baseline: baseline[r.risk_type] || null,
-      varMeta: VARIABLE_META[r.risk_type] || { label: r.risk_type, desc: "" },
-    }));
-
-    return { groupId, group, headlineLevel, records: enriched };
-  }).filter((g) => g.records.length > 0);
-}
-
-// ── Subcomponentes ────────────────────────────────────────────────────────────
+// ── Map sub-components ─────────────────────────────────────────────────────────
 
 function SearchPanel({ onLocationSelect }) {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState([]);
-  const [searching, setSearching] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-  const [selectedPlace, setSelectedPlace] = useState(null);
-  const [registerForm, setRegisterForm] = useState({ name: '', unidad_negocio: '' });
-  const [registering, setRegistering] = useState(false);
+  const [query, setQuery]               = useState("");
+  const [results, setResults]           = useState([]);
+  const [searching, setSearching]       = useState(false);
+  const [showResults, setShowResults]   = useState(false);
+  const [selectedPlace, setSelectedPlace]   = useState(null);
+  const [registerForm, setRegisterForm] = useState({ name: "", unidad_negocio: "" });
+  const [registering, setRegistering]   = useState(false);
   const debounceRef = useRef(null);
-  const panelRef = useRef(null);
+  const panelRef    = useRef(null);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (query.trim().length < 2) {
-      setResults([]);
-      setShowResults(false);
-      return;
-    }
+    if (query.trim().length < 2) { setResults([]); setShowResults(false); return; }
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       try {
         const res = await fetch(`${API_URL}/api/search?q=${encodeURIComponent(query)}`);
-        if (res.ok) {
-          const data = await res.json();
-          setResults(data);
-          setShowResults(true);
-        }
-      } catch (e) {
-        console.error('Search error:', e);
-      } finally {
-        setSearching(false);
-      }
+        if (res.ok) { setResults(await res.json()); setShowResults(true); }
+      } catch (e) { console.error("Search error:", e); }
+      finally { setSearching(false); }
     }, 300);
     return () => clearTimeout(debounceRef.current);
   }, [query]);
 
-  // Cerrar dropdown al hacer click fuera
   useEffect(() => {
     const handler = (e) => {
-      if (panelRef.current && !panelRef.current.contains(e.target)) {
-        setShowResults(false);
-      }
+      if (panelRef.current && !panelRef.current.contains(e.target)) setShowResults(false);
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
   const handleSelectResult = (r) => {
     onLocationSelect(r.lat, r.lng);
-    setQuery(r.tipo === 'asset' ? r.name : r.direccion);
+    setQuery(r.tipo === "asset" ? r.name : r.direccion);
     setShowResults(false);
-    setSelectedPlace(r.tipo === 'place' ? r : null);
-    setRegisterForm({ name: '', unidad_negocio: '' });
+    setSelectedPlace(r.tipo === "place" ? r : null);
+    setRegisterForm({ name: "", unidad_negocio: "" });
   };
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    if (!registerForm.name.trim()) { toast.error('El nombre del activo es requerido'); return; }
+    if (!registerForm.name.trim()) { toast.error("El nombre del activo es requerido"); return; }
     setRegistering(true);
     try {
       const res = await fetch(`${API_URL}/api/places/assets`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           place_id: selectedPlace.id,
           name: registerForm.name,
           unidad_negocio: registerForm.unidad_negocio,
         }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error);
-      }
-      toast.success('Activo registrado correctamente');
-      setRegisterForm({ name: '', unidad_negocio: '' });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error); }
+      toast.success("Activo registrado correctamente");
+      setRegisterForm({ name: "", unidad_negocio: "" });
       setSelectedPlace(null);
-      // Refrescar resultados
       const fresh = await fetch(`${API_URL}/api/search?q=${encodeURIComponent(query)}`);
       if (fresh.ok) { setResults(await fresh.json()); setShowResults(true); }
     } catch (err) {
-      toast.error(err.message || 'Error al registrar el activo');
+      toast.error(err.message || "Error al registrar el activo");
     } finally {
       setRegistering(false);
     }
@@ -250,11 +151,9 @@ function SearchPanel({ onLocationSelect }) {
       <div className="relative">
         <Label className="text-xs text-muted-foreground">Buscar por nombre o dirección</Label>
         <div className="relative mt-1.5">
-          {searching ? (
-            <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground animate-spin" />
-          ) : (
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          )}
+          {searching
+            ? <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground animate-spin" />
+            : <Search  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />}
           <Input
             className="pl-9"
             placeholder="Ej. Plaza Vea San Isidro o Av. Javier Prado..."
@@ -264,7 +163,6 @@ function SearchPanel({ onLocationSelect }) {
           />
         </div>
 
-        {/* Dropdown de resultados */}
         {showResults && (
           <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-xl shadow-lg overflow-hidden max-h-64 overflow-y-auto">
             {results.length === 0 && !searching && (
@@ -279,12 +177,12 @@ function SearchPanel({ onLocationSelect }) {
                 className="w-full flex items-start gap-2.5 px-3 py-2.5 text-left hover:bg-muted/50 transition-colors border-b border-border/40 last:border-0"
               >
                 <span className="flex-shrink-0 mt-0.5">
-                  {r.tipo === 'asset'
+                  {r.tipo === "asset"
                     ? <Building2 className="w-4 h-4 text-blue-500" />
-                    : <MapPin className="w-4 h-4 text-amber-500" />}
+                    : <MapPin    className="w-4 h-4 text-amber-500" />}
                 </span>
                 <div className="flex-1 min-w-0">
-                  {r.tipo === 'asset' ? (
+                  {r.tipo === "asset" ? (
                     <>
                       <p className="text-sm font-medium truncate">{r.name}</p>
                       <p className="text-xs text-muted-foreground truncate">{r.direccion}</p>
@@ -309,21 +207,15 @@ function SearchPanel({ onLocationSelect }) {
         )}
       </div>
 
-      {/* Formulario de registro de activo */}
       {selectedPlace && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-900/50 dark:border-amber-600 p-3 space-y-3">
           <div className="flex items-start gap-2">
             <MapPin className="w-4 h-4 text-amber-600 dark:text-amber-300 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-xs font-semibold text-amber-900 dark:text-amber-200">
-                No hay activos registrados aquí
-              </p>
-              <p className="text-[11px] text-amber-800 dark:text-amber-300 mt-0.5 leading-snug">
-                {selectedPlace.direccion}
-              </p>
+              <p className="text-xs font-semibold text-amber-900 dark:text-amber-200">No hay activos registrados aquí</p>
+              <p className="text-[11px] text-amber-800 dark:text-amber-300 mt-0.5 leading-snug">{selectedPlace.direccion}</p>
             </div>
           </div>
-
           <form onSubmit={handleRegister} className="space-y-2">
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Nombre del activo *</Label>
@@ -347,7 +239,7 @@ function SearchPanel({ onLocationSelect }) {
               <Button type="submit" size="sm" className="flex-1 h-8 text-xs gap-1.5" disabled={registering}>
                 {registering
                   ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Registrando...</>
-                  : <><Plus className="w-3.5 h-3.5" />Registrar activo</>}
+                  : <><Plus    className="w-3.5 h-3.5" />Registrar activo</>}
               </Button>
               <Button
                 type="button" size="sm" variant="ghost"
@@ -376,11 +268,10 @@ function MapClickHandler({ onMapClick }) {
   return null;
 }
 
-// Mueve el mapa animadamente cuando cambia el target (sólo desde búsqueda o botón)
 function MapFlyTo({ target }) {
   const map = useMap();
   useEffect(() => {
-    if (!target || !target.pos) return;
+    if (!target?.pos) return;
     const [lat, lng] = target.pos;
     if (!isFinite(lat) || !isFinite(lng)) return;
     map.flyTo(target.pos, target.zoom, { animate: true, duration: 1.2 });
@@ -388,199 +279,15 @@ function MapFlyTo({ target }) {
   return null;
 }
 
-function ScenarioSelector({ value, onChange, disabled }) {
-  const opts = [
-    { id: "actual",    icon: "📍", label: "Actual",    sub: "Histórico 1995–2014" },
-    { id: "moderado",  icon: "🟡", label: "Moderado",  sub: "SSP2-4.5 · emisiones mod." },
-    { id: "pesimista", icon: "🔴", label: "Pesimista", sub: "SSP5-8.5 · altas emisiones" },
-  ];
-  return (
-    <div className="space-y-1.5">
-      <Label className="text-xs text-muted-foreground">Escenario climático</Label>
-      <div className="grid grid-cols-3 gap-1.5">
-        {opts.map((o) => (
-          <button
-            key={o.id}
-            disabled={disabled}
-            onClick={() => onChange(o.id)}
-            className={`rounded-xl border px-2 py-2.5 text-left transition-all ${
-              value === o.id
-                ? "border-primary bg-primary/10 ring-1 ring-primary/40"
-                : "border-border hover:bg-muted/40"
-            } disabled:opacity-40`}
-          >
-            <div className="flex items-center gap-1 text-xs font-medium">
-              <span>{o.icon}</span>
-              <span>{o.label}</span>
-            </div>
-            <p className="text-[9px] text-muted-foreground mt-0.5 leading-tight">{o.sub}</p>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
+// ── Result panels ─────────────────────────────────────────────────────────────
 
-// Formatear número: entero si no tiene decimales, 2 dec. si los tiene
-const fmtVal = (v) =>
-  v == null ? "—" : v % 1 === 0 ? String(v) : v.toFixed(2);
-
-function VariableRow({ record }) {
-  const levelCfg = getLevelCfg(record.level);
-  const t = record.baseline ? trend(record.value, record.baseline.value) : null;
-
-  // Solo mostrar delta si hay cambio real (evita Minus 0.00 en histórico)
-  const showTrend = t != null && Math.abs(t.delta) > 0.001;
-  const TrendIcon = !showTrend ? null : t.delta > 0 ? TrendingUp : TrendingDown;
-  const trendColor = !showTrend ? "" : t.delta > 0 ? "text-red-400" : "text-emerald-400";
-
-  // Mostrar rango p10–p90 solo si difieren del valor mediano
-  const hasRange = record.p10 != null && record.p90 != null
-    && !(record.p10 === record.value && record.p90 === record.value);
-
-  return (
-    <div className="flex items-start gap-2 py-2 border-b border-border/40 last:border-0">
-      <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${levelCfg.dot}`} />
-
-      {/* Etiqueta y descripción */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-xs font-medium">{record.varMeta.label}</span>
-          <Badge className={`text-[10px] px-1.5 py-0 ${levelCfg.color}`}>{levelCfg.label}</Badge>
-        </div>
-        <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{record.varMeta.desc}</p>
-      </div>
-
-      {/* Valores */}
-      <div className="text-right flex-shrink-0 space-y-0.5 min-w-[80px]">
-        {/* Mediana */}
-        {record.value != null && (
-          <div className="text-xs font-mono font-semibold text-foreground/85">
-            {fmtVal(record.value)} <span className="font-normal text-muted-foreground">{record.unit}</span>
-          </div>
-        )}
-
-        {/* Rango p10–p90 (incertidumbre del ensemble) */}
-        {hasRange && (
-          <div className="text-[10px] text-muted-foreground/65 font-mono">
-            {fmtVal(record.p10)} – {fmtVal(record.p90)}
-          </div>
-        )}
-
-        {/* Delta vs histórico */}
-        {showTrend && TrendIcon && (
-          <div className={`flex items-center justify-end gap-0.5 text-[10px] ${trendColor}`}>
-            <TrendIcon className="w-2.5 h-2.5" />
-            {t.delta > 0 ? "+" : ""}{fmtVal(t.delta)} {record.unit} vs. hist.
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function GroupCard({ groupData }) {
-  const [open, setOpen] = useState(false);
-  const { group, headlineLevel, records } = groupData;
-  const levelCfg = getLevelCfg(headlineLevel);
-
-  return (
-    <div className="border border-border rounded-xl overflow-hidden transition-shadow hover:shadow-sm">
-      <button
-        className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-muted/20 transition-colors"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-      >
-        <span className="text-xl flex-shrink-0">{group.emoji}</span>
-        <span className="flex-1 text-sm font-semibold">{group.label}</span>
-        <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full ${levelCfg.dot}`} />
-          <Badge className={`text-xs font-medium px-2.5 py-0.5 border-0 ${levelCfg.color}`}>
-            {levelCfg.label}
-          </Badge>
-        </div>
-        {open ? (
-          <ChevronUp className="w-4 h-4 text-muted-foreground ml-1 flex-shrink-0" />
-        ) : (
-          <ChevronDown className="w-4 h-4 text-muted-foreground ml-1 flex-shrink-0" />
-        )}
-      </button>
-
-      {open && (
-        <div className="border-t border-border bg-muted/5 px-4 py-3 space-y-4">
-          {/* Indicadores técnicos */}
-          <div>
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-              Indicadores técnicos
-            </p>
-            <div className="space-y-0">
-              {records.map((r) => (
-                <VariableRow key={r.risk_type} record={r} />
-              ))}
-            </div>
-          </div>
-
-          {/* Impactos */}
-          <div>
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-              Impactos operacionales en retail
-            </p>
-            <ul className="space-y-1.5">
-              {group.impacts.map((imp, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-foreground/75">
-                  <span className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${levelCfg.dot}`} />
-                  {imp}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function HorizonSection({ horizon, records, baseline }) {
-  const hInfo = HORIZON_INFO[horizon] || {
-    label: horizon, period: "", ringColor: "ring-border", textColor: "text-muted-foreground", bg: "bg-muted/10",
-  };
-  const groups = buildGroups(records, baseline);
-
-  // Ícono de reloj por horizonte
-  const horizonIcon = { historico: "📋", corto: "📅", mediano: "🔭" }[horizon] ?? "📊";
-
-  return (
-    <div className={`rounded-xl ring-1 ${hInfo.ringColor} overflow-hidden`}>
-      <div className={`${hInfo.bg} px-4 py-3 flex items-center gap-2.5`}>
-        <span className="text-base">{horizonIcon}</span>
-        <div>
-          <span className={`text-sm font-bold ${hInfo.textColor}`}>{hInfo.label}</span>
-          {hInfo.period && (
-            <span className="text-xs text-muted-foreground ml-2">{hInfo.period}</span>
-          )}
-          {horizon !== "historico" && (
-            <p className="text-[10px] text-muted-foreground/70 mt-0.5">
-              Los valores muestran la mediana del ensemble · el rango (p10–p90) indica la incertidumbre proyectada
-            </p>
-          )}
-        </div>
-      </div>
-      <div className="p-3 space-y-2 bg-card">
-        {groups.map((g) => (
-          <GroupCard key={g.groupId} groupData={g} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ExternalRiskPanel({ data, loading, error }) {
+function HazardNarrativePanel({ data, loading, error }) {
   if (loading) {
     return (
       <Card>
         <CardContent className="py-4 flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="w-4 h-4 animate-spin" />
-          Consultando riesgos complementarios GRI...
+          Consultando amenazas climáticas...
         </CardContent>
       </Card>
     );
@@ -591,7 +298,7 @@ function ExternalRiskPanel({ data, loading, error }) {
       <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/30">
         <AlertTriangle className="w-4 h-4 text-amber-600" />
         <AlertDescription className="text-xs text-amber-900 dark:text-amber-200">
-          No se pudo consultar la capa complementaria GRI: {error}
+          No se pudo consultar las amenazas externas: {error}
         </AlertDescription>
       </Alert>
     );
@@ -599,127 +306,198 @@ function ExternalRiskPanel({ data, loading, error }) {
 
   if (!data) return null;
 
-  const hazards = Array.isArray(data.hazards) ? data.hazards : [];
+  const hazards    = Array.isArray(data.hazards) ? data.hazards : [];
+  const overallCfg = getLevelCfg(data.overall_score);
 
   return (
     <Card>
       <CardHeader className="pb-2 pt-4">
-        <CardTitle className="text-sm flex items-center justify-between gap-2">
-          <span>Riesgos complementarios GRI</span>
-          <Badge variant="outline" className="text-[10px]">
-            {data.overall_score || "sin data"}
-          </Badge>
+        <CardTitle className="text-sm flex items-center justify-between">
+          <span>Amenazas climáticas detectadas</span>
+          <Badge className={`${overallCfg.color} border-0`}>{overallCfg.label}</Badge>
         </CardTitle>
-        <p className="text-xs text-muted-foreground">
-          Fuente en vivo: Infrastructure Resilience. No modifica el score principal.
-        </p>
+        <p className="text-xs text-muted-foreground">Fuente en tiempo real: GRI Infrastructure Resilience</p>
       </CardHeader>
       <CardContent className="space-y-3 pb-4">
         {hazards.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Sin datos complementarios para esta ubicacion.
-          </p>
+          <p className="text-sm text-muted-foreground">Sin amenazas identificadas para esta ubicación.</p>
         ) : (
-          <div className="space-y-2">
-            {hazards.map((hazard) => {
-              const periods = [
-                { label: "Actual", data: hazard.baseline },
-                { label: "Futuro moderado", data: hazard.future_moderate_emissions },
-                { label: "Futuro alto", data: hazard.future_high_emissions },
-              ].filter((period) => period.data?.records_used > 0);
+          hazards.map((hazard) => {
+            const currentScore    = hazard.baseline?.score              || "sin data";
+            const futureHighScore = hazard.future_high_emissions?.score || "sin data";
+            const levelCfg = getLevelCfg(currentScore);
+            const icon     = HAZARD_ICONS[hazard.hazard] || "⚠️";
 
-              return (
-                <div key={hazard.hazard} className="border border-border rounded-xl p-3 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold">{hazard.hazard_name}</p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {hazard.total_records_for_hazard} registros · {hazard.method === "probabilidad_occurrence" ? "probabilidad" : "valor directo"}
-                      </p>
-                    </div>
-                    <Badge className={`${getLevelCfg(
-                      periods.reduce((max, period) => {
-                        const score = getLevelCfg(period.data.score).score;
-                        return score > getLevelCfg(max).score ? period.data.score : max;
-                      }, "sin data")
-                    ).color} border-0`}>
-                      {periods.length > 0
-                        ? periods.reduce((max, period) => {
-                            const score = getLevelCfg(period.data.score).score;
-                            return score > getLevelCfg(max).score ? period.data.score : max;
-                          }, "sin data")
-                        : "sin data"}
+            return (
+              <div key={hazard.hazard} className="rounded-xl border border-border p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{icon}</span>
+                    <span className="text-sm font-semibold">{hazard.hazard_name}</span>
+                  </div>
+                  <Badge className={`${levelCfg.color} border-0`}>{levelCfg.label}</Badge>
+                </div>
+
+                <p className="text-sm text-foreground/75 leading-snug">
+                  {getHazardNarrative(hazard.hazard_name, currentScore, futureHighScore)}
+                </p>
+
+                {futureHighScore !== "sin data" && futureHighScore !== currentScore && (
+                  <div className="flex items-center gap-2 pt-0.5">
+                    <span className="text-[11px] text-muted-foreground">Proyección a futuro:</span>
+                    <Badge className={`${getLevelCfg(futureHighScore).color} border-0 text-[10px] py-0`}>
+                      {getLevelCfg(futureHighScore).label}
                     </Badge>
                   </div>
-                  {periods.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">Sin datos resumibles para mostrar.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      {periods.map((period) => {
-                        const levelCfg = getLevelCfg(period.data.score);
-                        return (
-                          <div key={period.label} className="rounded-lg bg-muted/30 px-2.5 py-2">
-                            <p className="text-[10px] text-muted-foreground">{period.label}</p>
-                            <p className="text-xs font-medium mt-0.5">{period.data.value_label}</p>
-                            <div className="flex items-center gap-1.5 mt-1">
-                              <span className={`w-1.5 h-1.5 rounded-full ${levelCfg.dot}`} />
-                              <span className="text-[10px] text-muted-foreground">{period.data.score}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                )}
+              </div>
+            );
+          })
         )}
-        <p className="text-[10px] text-muted-foreground">
-          Usados: {data.metadata?.relevant_results_used ?? 0} de {data.metadata?.total_api_results ?? 0} registros devueltos por la API.
+        <p className="text-[10px] text-muted-foreground/60">
+          Basado en modelos ISIMIP, Aqueduct y JRC Flood.
         </p>
       </CardContent>
     </Card>
   );
 }
 
-function AIPanel({ results }) {
+function ClimateProjectionsPanel({ data, loading }) {
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="py-4 flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Consultando proyecciones climáticas...
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!data?.narrative?.length) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2 pt-4">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <ThermometerSun className="w-4 h-4 text-amber-500" />
+          ¿Cómo cambiará el clima aquí?
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">Fuente: Open-Meteo · proyecciones históricas y futuras (1980–2050)</p>
+      </CardHeader>
+      <CardContent className="space-y-3 pb-4">
+        {data.narrative.map((item, i) => (
+          <div
+            key={i}
+            className={`rounded-xl p-3 space-y-1.5 ${
+              i === 0
+                ? "bg-blue-500/5 ring-1 ring-blue-500/20"
+                : "bg-amber-500/5 ring-1 ring-amber-500/20"
+            }`}
+          >
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm">{i === 0 ? "📅" : "🔭"}</span>
+              <span className="text-xs font-semibold">{item.period}</span>
+            </div>
+            <ul className="space-y-1">
+              {item.messages.map((msg, j) => (
+                <li key={j} className="flex items-start gap-2 text-sm text-foreground/80">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/50 flex-shrink-0 mt-1.5" />
+                  {msg}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+        {/* Complemento narrativo desde BD histórica — solo si aporta contexto */}
+        {data.historical_context?.narrative && (
+          <div className="rounded-xl bg-slate-500/5 ring-1 ring-slate-400/20 p-3 space-y-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm">📋</span>
+              <span className="text-xs font-semibold text-muted-foreground">Registros históricos locales</span>
+            </div>
+            <p className="text-sm text-foreground/65 leading-snug">
+              {data.historical_context.narrative}
+            </p>
+          </div>
+        )}
+
+        <p className="text-[10px] text-muted-foreground/60">
+          Modelos climáticos: CMCC, FGOALS, HiRAM, MRI · temperatura y precipitación media diaria.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TerritorialContextPanel({ data }) {
+  if (!data?.narrative?.length) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2 pt-4">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Globe2 className="w-4 h-4 text-blue-500" />
+          Contexto del territorio
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">Fuente: Banco Mundial · indicadores socioeconómicos de Perú</p>
+      </CardHeader>
+      <CardContent className="pb-4">
+        <ul className="space-y-2">
+          {data.narrative.map((msg, i) => (
+            <li key={i} className="flex items-start gap-2 text-sm text-foreground/75">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0 mt-1.5" />
+              {msg}
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AIPanel({ externalRisks, climateTrends, docContext }) {
   const [loading, setLoading] = useState(false);
-  const [text, setText] = useState(null);
+  const [text, setText]       = useState(null);
+
+  const docCount = docContext?.total || 0;
 
   const handleGenerate = async () => {
     setLoading(true);
     setText(null);
     try {
-      const lines = results.horizons.flatMap((h) => {
-        const hInfo = HORIZON_INFO[h] || { label: h, period: "" };
-        return results.byHorizon[h].map(
-          (r) => `  - ${VARIABLE_META[r.risk_type]?.label || r.risk_type}: ${r.value} ${r.unit} [${r.level}]`
-        ).concat([`  Horizonte: ${hInfo.label} ${hInfo.period}`]);
-      });
+      const hazardLines = externalRisks?.hazards?.map(h =>
+        `- ${h.hazard_name}: ${h.baseline?.score || "sin data"}`
+      ).join("\n") || "Sin datos GRI";
 
-      const prompt = `Eres asesor experto en riesgos climáticos para Intercorp Retail (SPSA) en Perú.
+      const trendLines = climateTrends?.narrative?.map(p =>
+        `${p.period}:\n${p.messages.map(m => `  - ${m}`).join("\n")}`
+      ).join("\n") || "Sin proyecciones disponibles";
 
-Ubicación consultada: lat ${results.queried.lat}, lng ${results.queried.lng}
-Punto de datos (Banco Mundial CCKP): ${results.nearestPoint.lat}, ${results.nearestPoint.lng} (${results.nearestPoint.distanceKm} km)
-Escenario: ${results.scenarioMeta?.label} — ${results.scenarioMeta?.sublabel}
+      // Contexto de documentos: se inyecta en el prompt si existen archivos de referencia
+      const docSection = docContext?.ai_context
+        ? `\n${docContext.ai_context}\n`
+        : "";
 
-Indicadores climáticos proyectados:
-${lines.join("\n")}
+      const prompt = `Eres asesor experto en riesgos climáticos para operaciones de retail en Perú.
+${docSection}
+Amenazas climáticas detectadas (GRI):
+${hazardLines}
 
-Elabora un análisis ejecutivo estructurado en 4 secciones, breve y accionable para gestores de riesgo de retail:
+Proyecciones climáticas (Open-Meteo):
+${trendLines}
 
-1. **Perfil de riesgo** (2–3 oraciones: ¿cuál es el riesgo principal y su magnitud?)
-2. **Impactos operacionales** (máx. 4 puntos con cifras estimadas — inventario, personal, energía, logística)
-3. **Acciones inmediatas (0–2 años)** (máx. 4 puntos específicos y aplicables)
-4. **Inversiones en resiliencia (2–10 años)** (máx. 4 puntos con foco en infraestructura y cadena de suministro)
+Elabora un análisis ejecutivo breve y accionable con:
+1. Perfil de riesgo (2–3 oraciones)
+2. Impactos operacionales más probables (máx. 4 puntos)
+3. Acciones recomendadas${docCount > 0 ? " — cuando sea pertinente, menciona los documentos de referencia disponibles" : ""} (máx. 3 puntos)
 
-Responde en español. Sé directo y específico para operaciones de supermercados y retail en Perú.`;
+Responde en español. Usa lenguaje claro y directo, sin términos técnicos científicos.`;
 
       const res = await fetch(`${API_URL}/api/ai`, {
-        method: "POST",
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
+        body:    JSON.stringify({ prompt }),
       });
       if (!res.ok) throw new Error("Error al generar recomendaciones");
       const data = await res.json();
@@ -732,24 +510,29 @@ Responde en español. Sé directo y específico para operaciones de supermercado
   };
 
   return (
-    <div className="space-y-3 pt-1">
-      <div className="border-t border-border" />
+    <div className="space-y-3">
       <div>
         <p className="text-sm font-semibold flex items-center gap-1.5">
           <Sparkles className="w-4 h-4 text-primary" />
           Recomendaciones con IA
         </p>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Estrategias de mitigación generadas con Gemini AI
+          Análisis generado a partir de los datos de riesgo detectados
         </p>
+        {docCount > 0 && (
+          <div className="flex items-center gap-1.5 mt-1.5 text-xs text-muted-foreground">
+            <BookOpen className="w-3.5 h-3.5 flex-shrink-0" />
+            <span>
+              {docCount} documento{docCount !== 1 ? "s" : ""} de referencia disponible{docCount !== 1 ? "s" : ""} como contexto
+            </span>
+          </div>
+        )}
       </div>
       {!text ? (
         <Button className="w-full gap-2" size="sm" onClick={handleGenerate} disabled={loading}>
-          {loading ? (
-            <><Loader2 className="w-4 h-4 animate-spin" />Analizando con IA...</>
-          ) : (
-            <><Sparkles className="w-4 h-4" />Generar recomendaciones</>
-          )}
+          {loading
+            ? <><Loader2 className="w-4 h-4 animate-spin" />Analizando con IA...</>
+            : <><Sparkles className="w-4 h-4" />Generar recomendaciones</>}
         </Button>
       ) : (
         <div className="space-y-2">
@@ -765,107 +548,111 @@ Responde en español. Sé directo y específico para operaciones de supermercado
   );
 }
 
-// ── Página principal ──────────────────────────────────────────────────────────
+// ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function ClimateRiskLookup() {
   const DEFAULT_CENTER = [-12.0464, -77.0428];
 
-  const [lat, setLat] = useState("");
-  const [lng, setLng] = useState("");
-  const [scenario, setScenario] = useState("pesimista");
+  const [lat, setLat]             = useState("");
+  const [lng, setLng]             = useState("");
   const [tileLayer, setTileLayer] = useState("osm");
   const [markerPos, setMarkerPos] = useState(null);
-  const [flyTarget, setFlyTarget] = useState(null); // { pos: [lat, lng], zoom: number }
-  const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState(null);
-  const [noData, setNoData] = useState(false);
-  const [externalRisks, setExternalRisks] = useState(null);
+  const [flyTarget, setFlyTarget] = useState(null);
+  const [loading, setLoading]     = useState(false);
+
+  const [externalRisks, setExternalRisks]   = useState(null);
   const [externalLoading, setExternalLoading] = useState(false);
-  const [externalError, setExternalError] = useState(null);
+  const [externalError, setExternalError]   = useState(null);
+
+  const [climateTrends, setClimateTrends]   = useState(null);
+  const [trendsLoading, setTrendsLoading]   = useState(false);
+
+  const [territorialCtx, setTerritorialCtx] = useState(null);
+  const [docContext, setDocContext]         = useState(null);
+
+  // Contexto Banco Mundial + catálogo de documentos: se cargan una sola vez al iniciar
+  useEffect(() => {
+    Promise.allSettled([
+      fetch(`${API_URL}/api/territorial-context`).then(r => r.ok ? r.json() : null),
+      fetch(`${API_URL}/api/documentos/context`).then(r => r.ok ? r.json() : null),
+    ]).then(([terrResult, docResult]) => {
+      if (terrResult.status === "fulfilled" && terrResult.value) setTerritorialCtx(terrResult.value);
+      if (docResult.status === "fulfilled"  && docResult.value?.total > 0) setDocContext(docResult.value);
+    });
+  }, []);
 
   const handleMapClick = useCallback((clickLat, clickLng) => {
     setLat(String(clickLat));
     setLng(String(clickLng));
     setMarkerPos([clickLat, clickLng]);
-    setResults(null);
     setExternalRisks(null);
+    setClimateTrends(null);
     setExternalError(null);
-    setNoData(false);
   }, []);
 
-  const handleSearch = async (overrideScenario) => {
+  const handleSearch = async () => {
     const latNum = parseFloat(lat);
     const lngNum = parseFloat(lng);
-    if (isNaN(latNum) || latNum < -90 || latNum > 90) { toast.error("Latitud inválida"); return; }
+    if (isNaN(latNum) || latNum < -90  || latNum > 90)  { toast.error("Latitud inválida");  return; }
     if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) { toast.error("Longitud inválida"); return; }
 
-    const useScenario = overrideScenario || scenario;
     setLoading(true);
     setExternalLoading(true);
-    setResults(null);
+    setTrendsLoading(true);
     setExternalRisks(null);
+    setClimateTrends(null);
     setExternalError(null);
-    setNoData(false);
     setMarkerPos([latNum, lngNum]);
     setFlyTarget({ pos: [latNum, lngNum], zoom: 14 });
 
     try {
-      const [primaryResult, externalResult] = await Promise.allSettled([
-        fetch(`${API_URL}/api/climate-risks/lookup?lat=${latNum}&lng=${lngNum}&scenario=${useScenario}`),
+      const [griResult, trendsResult] = await Promise.allSettled([
         fetchExternalRisks(latNum, lngNum),
+        fetch(`${API_URL}/api/climate-trends?lat=${latNum}&lng=${lngNum}`)
+          .then(r => r.ok ? r.json() : Promise.reject(new Error("Error en proyecciones"))),
       ]);
 
-      if (externalResult.status === "fulfilled") {
-        setExternalRisks(externalResult.value);
+      if (griResult.status === "fulfilled") {
+        setExternalRisks(griResult.value);
       } else {
-        setExternalError(externalResult.reason?.message || "Servicio externo no disponible");
+        setExternalError(griResult.reason?.message || "Servicio GRI no disponible");
       }
 
-      if (primaryResult.status === "rejected") {
-        throw primaryResult.reason;
+      if (trendsResult.status === "fulfilled") {
+        setClimateTrends(trendsResult.value);
       }
-
-      const res = primaryResult.value;
-      if (!res.ok) throw new Error((await res.json()).error || "Error al consultar");
-      const data = await res.json();
-      if (!data.found) { setNoData(true); }
-      else { setResults(data); }
-    } catch (err) {
-      toast.error(err.message || "Error al consultar riesgos");
     } finally {
       setLoading(false);
       setExternalLoading(false);
+      setTrendsLoading(false);
     }
   };
 
-  // Re-fetch cuando cambia escenario y ya hay resultados
-  const handleScenarioChange = (s) => {
-    setScenario(s);
-    if (lat && lng && (results || noData)) {
-      setNoData(false);
-      handleSearch(s);
-    }
-  };
+  const hasResults = !!(externalRisks || climateTrends);
 
   return (
     <div className="p-6 max-w-[1400px] mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Consulta de Riesgos Climáticos</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Análisis de Riesgos Climáticos</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Selecciona un punto en el mapa o ingresa coordenadas · datos del Banco Mundial (CCKP · CMIP6)
+          Selecciona un punto en el mapa para analizar las amenazas y tendencias climáticas de esa zona
         </p>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
 
-        {/* ── Mapa ────────────────────────────── */}
+        {/* ── Mapa ─────────────────────────────────── */}
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground flex items-center gap-1.5">
             <MapPin className="w-3.5 h-3.5" />
             Haz clic en el mapa para seleccionar una ubicación
           </p>
           <div className="rounded-xl border border-border shadow-sm relative" style={{ height: "480px" }}>
-            <MapContainer center={DEFAULT_CENTER} zoom={7} style={{ height: "100%", width: "100%", borderRadius: "0.75rem" }} className="z-0">
+            <MapContainer
+              center={DEFAULT_CENTER} zoom={7}
+              style={{ height: "100%", width: "100%", borderRadius: "0.75rem" }}
+              className="z-0"
+            >
               <TileLayer
                 key={tileLayer}
                 url={TILE_LAYERS[tileLayer].url}
@@ -874,18 +661,8 @@ export default function ClimateRiskLookup() {
               <MapClickHandler onMapClick={handleMapClick} />
               <MapFlyTo target={flyTarget} />
               {markerPos && <Marker position={markerPos} />}
-              {results?.nearestPoint && (
-                <Marker
-                  position={[results.nearestPoint.lat, results.nearestPoint.lng]}
-                  icon={L.icon({
-                    iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
-                    iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
-                    shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
-                    iconSize: [16, 26], iconAnchor: [8, 26], className: "opacity-50",
-                  })}
-                />
-              )}
             </MapContainer>
+
             {/* Selector de capa flotante */}
             <div className="absolute bottom-3 left-3 z-[1000] flex gap-1 bg-card/90 backdrop-blur-sm rounded-lg border border-border p-1 shadow-md">
               {Object.entries(TILE_LAYERS).map(([key, t]) => (
@@ -905,134 +682,91 @@ export default function ClimateRiskLookup() {
           </div>
         </div>
 
-        {/* ── Panel derecho ─────────────────── */}
+        {/* ── Panel derecho ─────────────────────────── */}
         <div className="space-y-4 overflow-y-auto" style={{ maxHeight: "82vh" }}>
 
-          {/* Formulario */}
+          {/* Búsqueda y coordenadas */}
           <Card>
             <CardContent className="pt-4 space-y-4">
-              {/* Búsqueda híbrida */}
               <SearchPanel
                 onLocationSelect={(newLat, newLng) => {
-                  if (!isFinite(newLat) || !isFinite(newLng)) {
-                    console.warn("Coordenadas inválidas recibidas de búsqueda", newLat, newLng);
-                    return;
-                  }
+                  if (!isFinite(newLat) || !isFinite(newLng)) return;
                   setLat(String(newLat));
                   setLng(String(newLng));
                   setMarkerPos([newLat, newLng]);
                   setFlyTarget({ pos: [newLat, newLng], zoom: 16 });
-                  setResults(null);
                   setExternalRisks(null);
+                  setClimateTrends(null);
                   setExternalError(null);
-                  setNoData(false);
                 }}
               />
 
               <div className="border-t border-border/50" />
 
-              {/* Coordenadas */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="lat" className="text-xs text-muted-foreground">Latitud</Label>
-                  <Input id="lat" type="number" step="any" placeholder="-12.0464" value={lat}
+                  <Input
+                    id="lat" type="number" step="any" placeholder="-12.0464" value={lat}
                     onChange={(e) => setLat(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSearch()} />
+                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="lng" className="text-xs text-muted-foreground">Longitud</Label>
-                  <Input id="lng" type="number" step="any" placeholder="-77.0428" value={lng}
+                  <Input
+                    id="lng" type="number" step="any" placeholder="-77.0428" value={lng}
                     onChange={(e) => setLng(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSearch()} />
+                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                  />
                 </div>
               </div>
 
-              {/* Escenario */}
-              <ScenarioSelector value={scenario} onChange={handleScenarioChange} disabled={loading} />
-
-              {/* Botón buscar */}
-              <Button className="w-full gap-2" onClick={() => handleSearch()} disabled={loading || (!lat && !lng)}>
-                {loading ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" />Consultando...</>
-                ) : (
-                  <><Search className="w-4 h-4" />Consultar riesgos</>
-                )}
+              <Button
+                className="w-full gap-2"
+                onClick={handleSearch}
+                disabled={loading || (!lat && !lng)}
+              >
+                {loading
+                  ? <><Loader2 className="w-4 h-4 animate-spin" />Analizando...</>
+                  : <><Search  className="w-4 h-4" />Analizar riesgos</>}
               </Button>
             </CardContent>
           </Card>
 
-          {/* Sin datos */}
-          {noData && (
-            <Alert variant="destructive">
-              <AlertTriangle className="w-4 h-4" />
-              <AlertDescription>
-                No se encontraron datos para esta ubicación. Asegúrate de haber cargado un dataset en{" "}
-                <a href="/climate-upload" className="underline">Datos Climáticos</a>.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <ExternalRiskPanel
+          {/* 1. Amenazas GRI (tiempo real) */}
+          <HazardNarrativePanel
             data={externalRisks}
             loading={externalLoading}
             error={externalError}
           />
 
-          {/* Resultados */}
-          {results && (
+          {/* 2. Proyecciones Open-Meteo */}
+          <ClimateProjectionsPanel
+            data={climateTrends}
+            loading={trendsLoading}
+          />
+
+          {/* 3. Contexto territorial Banco Mundial */}
+          <TerritorialContextPanel data={territorialCtx} />
+
+          {/* 4. Recomendaciones IA */}
+          {hasResults && (
             <Card>
-              <CardHeader className="pb-2 pt-4">
-                <Alert className="border-primary/20 bg-primary/5 p-3">
-                  <Info className="w-4 h-4 flex-shrink-0" />
-                  <AlertDescription className="text-xs space-y-1">
-                    <div>
-                      <span className="font-semibold">
-                        {results.horizons.length} período{results.horizons.length !== 1 ? "s" : ""},&nbsp;
-                        {Object.values(results.byHorizon).flat().length} indicadores
-                      </span>
-                      {" "}para ({results.queried.lat}, {results.queried.lng})
-                    </div>
-                    <div className="text-muted-foreground">
-                      Celda CMIP6 más cercana:{" "}
-                      <span className="font-mono">{results.nearestPoint.lat}, {results.nearestPoint.lng}</span>
-                      {" "}· <span className="font-semibold text-foreground">{results.nearestPoint.distanceKm} km</span>
-                    </div>
-                    <div className="text-muted-foreground">
-                      Escenario:{" "}
-                      <span className="font-medium text-foreground">{results.scenarioMeta?.label}</span>
-                      {" "}— {results.scenarioMeta?.sublabel}
-                    </div>
-                    <div className="text-muted-foreground/70 text-[10px]">
-                      Fuente: World Bank CCKP · CMIP6 ensemble-all · resolución 0.25°
-                    </div>
-                  </AlertDescription>
-                </Alert>
-
-                <CardTitle className="text-xs text-muted-foreground font-normal mt-2 px-0.5">
-                  Haz clic en cada grupo de riesgo para ver indicadores e impactos
-                </CardTitle>
-              </CardHeader>
-
-              <CardContent className="space-y-4 pb-4">
-                {results.horizons.map((h) => (
-                  <HorizonSection
-                    key={h}
-                    horizon={h}
-                    records={results.byHorizon[h]}
-                    baseline={results.baseline}
-                  />
-                ))}
-                <AIPanel results={results} />
+              <CardContent className="pt-4 pb-4">
+                <AIPanel externalRisks={externalRisks} climateTrends={climateTrends} docContext={docContext} />
               </CardContent>
             </Card>
           )}
 
           {/* Estado vacío */}
-          {!results && !noData && !loading && (
+          {!hasResults && !loading && !externalLoading && !trendsLoading && !territorialCtx && (
             <div className="text-center py-16 text-muted-foreground">
               <MapPin className="w-10 h-10 mx-auto mb-3 opacity-20" />
               <p className="text-sm font-medium">Selecciona un punto en el mapa</p>
-              <p className="text-xs mt-1 opacity-60">o ingresa coordenadas manualmente</p>
+              <p className="text-xs mt-1 opacity-60">
+                o ingresa coordenadas para analizar los riesgos climáticos
+              </p>
             </div>
           )}
         </div>

@@ -20,6 +20,10 @@ import {
   CATEGORIAS,
 } from './services/documentosService.js';
 import { getGriRiskByLocation } from './services/griRiskService.js';
+import { getClimateTrends } from './services/openMeteoService.js';
+import { getTerritorialContext } from './services/worldBankService.js';
+import { getHistoricalEnrichment } from './services/historicalEnrichmentService.js';
+import { getDocumentosEnrichment } from './services/documentosEnrichmentService.js';
 import { supabase } from "./supabaseClient.js";
 
 dotenv.config();
@@ -1472,6 +1476,91 @@ app.get('/api/place/:id/assets', async (req, res) => {
 
 // ============================================
 // FIN ENDPOINTS BÚSQUEDA GEOGRÁFICA HÍBRIDA
+// ============================================
+
+// ============================================
+// ENDPOINTS — APIS EXTERNAS NARRATIVAS
+// ============================================
+
+// GET /api/climate-trends?lat=X&lng=Y
+// Proyecciones climáticas en lenguaje humano (Open-Meteo)
+app.get('/api/climate-trends', async (req, res) => {
+  const { lat, lng } = req.query;
+  const latNum = parseFloat(lat);
+  const lngNum = parseFloat(lng);
+
+  if (isNaN(latNum) || isNaN(lngNum)) {
+    return res.status(400).json({ error: 'lat y lng son requeridos' });
+  }
+
+  const cacheKey = `climate-trends-${latNum.toFixed(3)}-${lngNum.toFixed(3)}`;
+  const now = Date.now();
+
+  if (climateCache[cacheKey] && now - climateCache[cacheKey].timestamp < CACHE_TTL) {
+    return res.json(climateCache[cacheKey].data);
+  }
+
+  try {
+    // Open-Meteo (primario) + enriquecimiento histórico BD (complemento) en paralelo
+    const [trendsResult, enrichmentResult] = await Promise.allSettled([
+      getClimateTrends(latNum, lngNum),
+      getHistoricalEnrichment(latNum, lngNum),
+    ]);
+
+    if (trendsResult.status === 'rejected') throw trendsResult.reason;
+
+    const data = {
+      ...trendsResult.value,
+      historical_context: enrichmentResult.status === 'fulfilled' ? enrichmentResult.value : null,
+    };
+
+    climateCache[cacheKey] = { data, timestamp: now };
+    return res.json(data);
+  } catch (err) {
+    console.error('Error en /api/climate-trends:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/territorial-context
+// Contexto socioeconómico de Perú (Banco Mundial) — cacheable 24h
+app.get('/api/territorial-context', async (req, res) => {
+  const cacheKey = 'territorial-context-PE';
+  const now = Date.now();
+  const TTL_24H = 1000 * 60 * 60 * 24;
+
+  if (climateCache[cacheKey] && now - climateCache[cacheKey].timestamp < TTL_24H) {
+    return res.json(climateCache[cacheKey].data);
+  }
+
+  try {
+    const data = await getTerritorialContext();
+    climateCache[cacheKey] = { data, timestamp: now };
+    return res.json(data);
+  } catch (err) {
+    console.error('Error en /api/territorial-context:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/documentos/context
+// Catálogo de documentos subidos para enriquecer prompts de IA — caché 30 min
+app.get('/api/documentos/context', async (req, res) => {
+  const cacheKey = 'documentos-context';
+  const now = Date.now();
+  const TTL_30MIN = 1000 * 60 * 30;
+
+  if (climateCache[cacheKey] && now - climateCache[cacheKey].timestamp < TTL_30MIN) {
+    return res.json(climateCache[cacheKey].data);
+  }
+
+  const data = await getDocumentosEnrichment();
+  if (data.total > 0) climateCache[cacheKey] = { data, timestamp: now };
+  return res.json(data); // nunca retorna 500 — los documentos son enriquecimiento opcional
+});
+
+// ============================================
+// FIN ENDPOINTS APIS EXTERNAS NARRATIVAS
 // ============================================
 
 const PORT = process.env.PORT || 3001;
