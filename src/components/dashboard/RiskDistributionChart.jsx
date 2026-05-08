@@ -32,6 +32,21 @@ export default function RiskDistributionChart({ assets }) {
   if (data.length === 0) return null;
 
   const total = data.reduce((s, d) => s + d.value, 0);
+  const criticalPercent = ((distribution.critico / total) * 100).toFixed(0);
+  const highPercent = ((distribution.alto / total) * 100).toFixed(0);
+
+  // Narrativa basada en la distribución
+  const getNarrative = () => {
+    if (distribution.critico > 0) {
+      return `Se han identificado ${distribution.critico} activo${distribution.critico > 1 ? 's' : ''} en riesgo crítico (${criticalPercent}%), lo que requiere atención inmediata para prevenir interrupciones operativas graves.`;
+    } else if (distribution.alto > 0) {
+      return `Hay ${distribution.alto} activo${distribution.alto > 1 ? 's' : ''} con alto riesgo (${highPercent}%). Se recomienda implementar medidas preventivas prioritarias.`;
+    } else if (distribution.medio > 0) {
+      return `La mayoría de los activos están en riesgo moderado. Mantener monitoreo continuo y prepararse para posibles eventos climáticos.`;
+    } else {
+      return `Buena distribución de riesgos. La mayoría de los activos tienen exposición baja, pero se deben mantener las precauciones básicas.`;
+    }
+  };
 
   return (
     <div className="bg-card border border-border rounded-xl p-5">
@@ -84,6 +99,11 @@ export default function RiskDistributionChart({ assets }) {
             </div>
           ))}
         </div>
+      </div>
+      <div className="mt-4 pt-4 border-t border-border">
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          {getNarrative()}
+        </p>
       </div>
     </div>
   );

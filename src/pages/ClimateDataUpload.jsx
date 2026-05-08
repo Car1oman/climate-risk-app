@@ -203,11 +203,10 @@ export default function ClimateDataUpload() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight">
-          Carga de Datos Climáticos (ETL)
+          Importar Datos Climáticos
         </h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Importa archivos JSONL generados por el ETL hacia la tabla{" "}
-          <code className="text-xs bg-muted px-1 rounded">climate_cells</code>
+          Carga información climática procesada para enriquecer el análisis de riesgos
         </p>
       </div>
 
@@ -219,11 +218,7 @@ export default function ClimateDataUpload() {
             Formato esperado (JSONL — una línea por celda)
           </CardTitle>
           <CardDescription>
-            Cada línea es un objeto JSON independiente con{" "}
-            <code className="text-xs bg-muted px-1 rounded">lat</code>,{" "}
-            <code className="text-xs bg-muted px-1 rounded">lon</code>,{" "}
-            <code className="text-xs bg-muted px-1 rounded">geom</code> (opcional) y{" "}
-            <code className="text-xs bg-muted px-1 rounded">data</code>.
+          Los datos climáticos deben estar en formato estructurado con coordenadas geográficas y variables climáticas
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -234,15 +229,14 @@ export default function ClimateDataUpload() {
 
           <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
             <div className="space-y-1">
-              <p className="font-semibold text-foreground">Campos requeridos</p>
-              <p><code className="bg-muted px-1 rounded">lat</code> — número, rango [-90, 90]</p>
-              <p><code className="bg-muted px-1 rounded">lon</code> — número, rango [-180, 180]</p>
-              <p><code className="bg-muted px-1 rounded">data</code> — objeto JSON (cualquier profundidad)</p>
+              <p className="font-semibold text-foreground">Información requerida</p>
+              <p>Coordenadas geográficas (latitud y longitud)</p>
+              <p>Datos climáticos históricos y proyectados</p>
             </div>
             <div className="space-y-1">
-              <p className="font-semibold text-foreground">Campos opcionales</p>
-              <p><code className="bg-muted px-1 rounded">geom</code> — POINT(lon lat); se genera si falta</p>
-              <p className="pt-1 text-muted-foreground">También se acepta <code className="bg-muted px-1 rounded">lng</code> como alias de <code className="bg-muted px-1 rounded">lon</code></p>
+              <p className="font-semibold text-foreground">Formatos soportados</p>
+              <p>Archivos JSONL o JSON con estructura de datos</p>
+              <p>Máximo 50 MB por archivo</p>
             </div>
           </div>
 
@@ -345,14 +339,13 @@ export default function ClimateDataUpload() {
             </div>
           )}
 
-          {/* Upload button */}
           <Button
             className="w-full gap-2"
             disabled={!fileText || !!fileError || uploading}
             onClick={handleUpload}
           >
             <Upload className="w-4 h-4" />
-            {uploading ? "Cargando..." : "Cargar en climate_cells"}
+            {uploading ? "Importando datos..." : "Importar datos climáticos"}
           </Button>
         </CardContent>
       </Card>
@@ -384,68 +377,27 @@ export default function ClimateDataUpload() {
           {/* KPI grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatBox
-              label="Registros recibidos"
-              value={result.summary?.total_input_records ?? "—"}
+              label="Registros procesados"
+              value={result.summary?.successfully_processed ?? "—"}
             />
             <StatBox
-              label="Procesados"
-              value={result.summary?.successfully_processed ?? "—"}
+              label="Datos importados"
+              value={result.summary?.total_input_records ?? "—"}
               color="green"
             />
             <StatBox
-              label="Omitidos (inválidos)"
-              value={result.summary?.skipped_invalid ?? "—"}
-              color="yellow"
+              label="Errores encontrados"
+              value={(result.summary?.skipped_invalid ?? 0) + (result.summary?.database_errors ?? 0)}
+              color={((result.summary?.skipped_invalid ?? 0) + (result.summary?.database_errors ?? 0)) > 0 ? "red" : "green"}
             />
             <StatBox
-              label="Errores BD"
-              value={result.summary?.database_errors ?? "—"}
-              color="red"
-            />
-          </div>
-
-          {/* Phase details */}
-          <div className="space-y-3">
-            {/* Phase 1 — Parse */}
-            <PhaseCard
-              icon={<FileText className="w-4 h-4" />}
-              title="Fase 1 — Parseo"
-              items={[
-                ["Formato detectado", result.phases?.parse?.detected_format?.toUpperCase() ?? "—"],
-                ["Registros parseados", result.phases?.parse?.total_records_parsed?.toLocaleString() ?? "—"],
-                ["Errores de parseo", result.phases?.parse?.parse_errors ?? 0],
-              ]}
-              errors={result.phases?.parse?.errors}
-            />
-
-            {/* Phase 2 — Validation */}
-            <PhaseCard
-              icon={<Layers className="w-4 h-4" />}
-              title="Fase 2 — Validación y normalización"
-              items={[
-                ["Registros válidos", result.phases?.process?.valid_records?.toLocaleString() ?? "—"],
-                ["Registros inválidos", result.phases?.process?.invalid_records ?? 0],
-              ]}
-              errors={result.phases?.process?.validation_errors}
-            />
-
-            {/* Phase 3 — Upsert */}
-            <PhaseCard
-              icon={<Database className="w-4 h-4" />}
-              title="Fase 3 — UPSERT en Supabase"
-              items={[
-                ["Total procesados", result.phases?.upsert?.total_processed?.toLocaleString() ?? "—"],
-                ["Lotes ejecutados", result.phases?.upsert?.batches_processed ?? "—"],
-                ["Duración", result.phases?.upsert?.duration_ms != null ? `${result.phases.upsert.duration_ms} ms` : "—"],
-                ["Velocidad", result.phases?.upsert?.records_per_second != null ? `${result.phases.upsert.records_per_second?.toLocaleString()} reg/s` : "—"],
-              ]}
-              errors={result.phases?.upsert?.upsert_errors}
-              highlight
+              label="Tiempo de proceso"
+              value={result.phases?.upsert?.duration_ms != null ? `${(result.phases.upsert.duration_ms / 1000).toFixed(1)}s` : "—"}
             />
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Completado: {new Date(result.timestamp).toLocaleString("es-PE")}
+            Importación completada el {new Date(result.timestamp).toLocaleString("es-PE")}
           </p>
         </div>
       )}

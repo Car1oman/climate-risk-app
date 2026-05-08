@@ -13,6 +13,18 @@ export default function FinancialImpactChart({ assets }) {
     .slice(0, 8)
     .map(([name, value]) => ({ name, value }));
 
+  const totalImpact = data.reduce((s, d) => s + d.value, 0);
+  const topDistrict = data[0]?.name || "N/A";
+  const topImpact = data[0]?.value || 0;
+
+  // Narrativa
+  const getNarrative = () => {
+    if (totalImpact === 0) {
+      return "No se han identificado impactos financieros significativos en el portafolio actual.";
+    }
+    return `${topDistrict} concentra el mayor riesgo financiero con ${formatCurrency(topImpact)} en pérdidas potenciales. El impacto total estimado del portafolio es de ${formatCurrency(totalImpact)}.`;
+  };
+
   return (
     <div className="bg-card border border-border rounded-xl p-5">
       <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-4">
@@ -50,6 +62,11 @@ export default function FinancialImpactChart({ assets }) {
             <Bar dataKey="value" fill="hsl(213 94% 55%)" radius={[0, 4, 4, 0]} barSize={18} />
           </BarChart>
         </ResponsiveContainer>
+      </div>
+      <div className="mt-4 pt-4 border-t border-border">
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          {getNarrative()}
+        </p>
       </div>
     </div>
   );
