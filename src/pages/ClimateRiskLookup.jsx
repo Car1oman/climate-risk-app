@@ -8,11 +8,17 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { API_URL, fetchExternalRisks } from "@/lib/api";
+import { API_URL, fetchExternalRisks, fetchClimateTrends, fetchTerritorialContext, fetchDocumentContext } from "@/lib/api";
 import {
   Search, MapPin, Loader2, AlertTriangle,
   Sparkles, Building2, Plus, ThermometerSun, Globe2, BookOpen,
 } from "lucide-react";
+import {
+  interpretExternalRisks,
+  interpretClimateTrends,
+  interpretTerritorialContext,
+  summarizeClimateLocation,
+} from "@/lib/climateInterpretation";
 import { toast } from "sonner";
 
 // ── Leaflet icon fix ──────────────────────────────────────────────────────────
@@ -474,11 +480,11 @@ function getTerritorialHeadline(territorialCtx) {
   return territorialCtx?.narrative?.[0] || null;
 }
 
-function InsightSummaryPanel({ externalRisks, climateTrends, territorialCtx, loading, error }) {
-  const riskCfg = getLevelCfg(externalRisks?.overall_score);
-  const topHazard = getTopHazard(externalRisks);
-  const trend = getTrendHeadline(climateTrends);
-  const context = getTerritorialHeadline(territorialCtx);
+function InsightSummaryPanel({ externalInsights, climateInsights, territorialInsights, summary, loading, error }) {
+  const riskCfg = externalInsights?.overallCfg || getLevelCfg();
+  const topHazard = externalInsights?.topHazard;
+  const trend = climateInsights?.headline;
+  const context = territorialInsights?.headline;
 
   return (
     <Card>
@@ -502,10 +508,16 @@ function InsightSummaryPanel({ externalRisks, climateTrends, territorialCtx, loa
               No se puede generar resumen: {error}
             </AlertDescription>
           </Alert>
-        ) : (!externalRisks && !climateTrends) ? (
+        ) : (!externalInsights?.hazardSummaries?.length && !climateInsights?.highlights?.length) ? (
           <p className="text-sm text-muted-foreground">Selecciona un punto en el mapa para ver el resumen ejecutivo del riesgo climático.</p>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <>
+            {summary && (
+              <div className="rounded-2xl border border-border p-4 bg-muted/50 text-sm leading-relaxed text-foreground/85">
+                {summary}
+              </div>
+            )}
+            <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-2xl border border-border p-4 bg-muted/50">
               <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Nivel de riesgo</p>
               <div className="mt-2 flex items-center justify-between gap-3">
@@ -534,13 +546,14 @@ function InsightSummaryPanel({ externalRisks, climateTrends, territorialCtx, loa
               </div>
             )}
           </div>
+        </>
         )}
       </CardContent>
     </Card>
   );
 }
 
-function AIPanel({ externalRisks, climateTrends, docContext }) {
+function AIPanel({ externalRisks, climateTrends, docContext, executiveSummary }) {
   const [loading, setLoading] = useState(false);
   const [text, setText]       = useState(null);
 
@@ -564,7 +577,10 @@ function AIPanel({ externalRisks, climateTrends, docContext }) {
         : "";
 
       const prompt = `Eres asesor experto en riesgos climáticos para operaciones de retail en Perú.
-${docSection}
+${executiveSummary ? `Resumen ejecutivo observado:
+${executiveSummary}
+
+` : ""}${docSection}
 Amenazas climáticas detectadas (GRI):
 ${hazardLines}
 
@@ -594,24 +610,25 @@ Responde en español. Usa lenguaje claro y directo, sin términos técnicos cien
   };
 
   return (
-    <div className="space-y-3">
-      <div>
-        <p className="text-sm font-semibold flex items-center gap-1.5">
-          <Sparkles className="w-4 h-4 text-primary" />
-          Recomendaciones con IA
-        </p>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Análisis generado a partir de los datos de riesgo detectados
-        </p>
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-[1fr_auto] items-start">
+        <div>
+          <p className="text-sm font-semibold flex items-center gap-1.5">
+            <Sparkles className="w-4 h-4 text-primary" />
+            Recomendaciones con IA
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Análisis generado a partir de los datos de riesgo detectados.
+          </p>
+        </div>
         {docCount > 0 && (
-          <div className="flex items-center gap-1.5 mt-1.5 text-xs text-muted-foreground">
-            <BookOpen className="w-3.5 h-3.5 flex-shrink-0" />
-            <span>
-              {docCount} documento{docCount !== 1 ? "s" : ""} de referencia disponible{docCount !== 1 ? "s" : ""} como contexto
-            </span>
-          </div>
+          <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+            <BookOpen className="w-3.5 h-3.5" />
+            {docCount} documento{docCount !== 1 ? "s" : ""}
+          </span>
         )}
       </div>
+
       {!text ? (
         <Button className="w-full gap-2" size="sm" onClick={handleGenerate} disabled={loading}>
           {loading
@@ -619,13 +636,36 @@ Responde en español. Usa lenguaje claro y directo, sin términos técnicos cien
             : <><Sparkles className="w-4 h-4" />Generar recomendaciones</>}
         </Button>
       ) : (
-        <div className="space-y-2">
-          <div className="rounded-xl border border-border bg-muted/10 p-4 text-sm leading-relaxed whitespace-pre-wrap text-foreground/85">
-            {text}
+        <div className="space-y-3">
+          {executiveSummary && (
+            <div className="rounded-2xl border border-border bg-primary/5 p-4 text-sm text-slate-800 dark:text-slate-100 dark:bg-primary/10">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Resumen base</p>
+              <p className="mt-2 leading-relaxed text-foreground/75">{executiveSummary}</p>
+            </div>
+          )}
+
+          <div className="rounded-3xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm dark:border-slate-800 dark:from-slate-950 dark:to-slate-900">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold">Resultado de IA</p>
+                <p className="text-xs text-muted-foreground mt-1">Lenguaje claro, accionable y enfocado en el riesgo operacional</p>
+              </div>
+              <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">IA</span>
+            </div>
+
+            <div className="mt-4 space-y-4 text-sm leading-6 text-foreground/85 whitespace-pre-wrap">
+              {text}
+            </div>
           </div>
-          <Button size="sm" variant="ghost" className="text-xs h-7 text-muted-foreground" onClick={() => setText(null)}>
-            Regenerar
-          </Button>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <Button size="sm" variant="secondary" className="w-full sm:w-auto" onClick={() => setText(null)}>
+              Regenerar
+            </Button>
+            <p className="text-[11px] text-muted-foreground">
+              El resultado es una interpretación automática. Valida las acciones con tu equipo técnico.
+            </p>
+          </div>
         </div>
       )}
     </div>
@@ -657,11 +697,11 @@ export default function ClimateRiskLookup() {
   // Contexto Banco Mundial + catálogo de documentos: se cargan una sola vez al iniciar
   useEffect(() => {
     Promise.allSettled([
-      fetch(`${API_URL}/api/territorial-context`).then(r => r.ok ? r.json() : null),
-      fetch(`${API_URL}/api/documentos/context`).then(r => r.ok ? r.json() : null),
+      fetchTerritorialContext(),
+      fetchDocumentContext(),
     ]).then(([terrResult, docResult]) => {
       if (terrResult.status === "fulfilled" && terrResult.value) setTerritorialCtx(terrResult.value);
-      if (docResult.status === "fulfilled"  && docResult.value?.total > 0) setDocContext(docResult.value);
+      if (docResult.status === "fulfilled" && docResult.value?.total > 0) setDocContext(docResult.value);
     });
   }, []);
 
@@ -692,8 +732,7 @@ export default function ClimateRiskLookup() {
     try {
       const [griResult, trendsResult] = await Promise.allSettled([
         fetchExternalRisks(latNum, lngNum),
-        fetch(`${API_URL}/api/climate-trends?lat=${latNum}&lng=${lngNum}`)
-          .then(r => r.ok ? r.json() : Promise.reject(new Error("Error en proyecciones"))),
+        fetchClimateTrends(latNum, lngNum),
       ]);
 
       if (griResult.status === "fulfilled") {
@@ -712,6 +751,10 @@ export default function ClimateRiskLookup() {
     }
   };
 
+  const externalInsights = interpretExternalRisks(externalRisks);
+  const climateInsights = interpretClimateTrends(climateTrends);
+  const territorialInsights = interpretTerritorialContext(territorialCtx);
+  const executiveSummary = summarizeClimateLocation(externalRisks, climateTrends, territorialCtx);
   const hasResults = !!(externalRisks || climateTrends);
 
   return (
@@ -819,9 +862,10 @@ export default function ClimateRiskLookup() {
           </Card>
 
           <InsightSummaryPanel
-            externalRisks={externalRisks}
-            climateTrends={climateTrends}
-            territorialCtx={territorialCtx}
+            externalInsights={externalInsights}
+            climateInsights={climateInsights}
+            territorialInsights={territorialInsights}
+            summary={executiveSummary}
             loading={externalLoading || trendsLoading}
             error={externalError}
           />
@@ -846,7 +890,12 @@ export default function ClimateRiskLookup() {
           {hasResults && (
             <Card>
               <CardContent className="pt-4 pb-4">
-                <AIPanel externalRisks={externalRisks} climateTrends={climateTrends} docContext={docContext} />
+                <AIPanel
+                  externalRisks={externalRisks}
+                  climateTrends={climateTrends}
+                  docContext={docContext}
+                  executiveSummary={executiveSummary}
+                />
               </CardContent>
             </Card>
           )}

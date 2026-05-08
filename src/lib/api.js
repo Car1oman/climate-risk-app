@@ -66,3 +66,28 @@ export const fetchExternalRisks = async (lat, lng) => {
   }
   return res.json();
 };
+
+export const fetchClimateTrends = async (lat, lng) => {
+  const res = await fetch(`${API_URL}/api/climate-trends?lat=${lat}&lng=${lng}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || err.error || `Error ${res.status}`);
+  }
+  return res.json();
+};
+
+export const fetchTerritorialContext = async () => {
+  const res = await fetch(`${API_URL}/api/territorial-context`);
+  if (!res.ok) {
+    return null;
+  }
+  return res.json();
+};
+
+export const fetchDocumentContext = async () => {
+  const res = await fetch(`${API_URL}/api/documentos/context`);
+  if (!res.ok) {
+    return null;
+  }
+  return res.json();
+};
