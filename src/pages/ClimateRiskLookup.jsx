@@ -12,10 +12,11 @@ import { Label } from "@/components/ui/label";
 import { API_URL, fetchExternalRisks, fetchClimateTrends, fetchTerritorialContext, fetchDocumentContext, fetchClimateDB } from "@/lib/api";
 import {
   Search, MapPin, Loader2, AlertTriangle,
-  Sparkles, Building2, Plus, ThermometerSun, Globe2, BookOpen, TrendingUp,
+  Sparkles, Building2, Plus, ThermometerSun, Globe2, BookOpen, TrendingUp, ChevronDown,
 } from "lucide-react";
 import { summarizeClimateLocation } from "@/lib/climateInterpretation";
 import { runClimateEngine } from "@/lib/climateEngine";
+import { buildExecutiveSummaryCards, formatThreatsForExecutive, buildTechnicalDetailsContent, getExecutiveSeverityLabel } from "@/lib/executiveFormatter";
 import { toast } from "sonner";
 
 // ── Leaflet icon fix ──────────────────────────────────────────────────────────
@@ -282,86 +283,251 @@ function MapFlyTo({ target }) {
   return null;
 }
 
-// ── Result panels ─────────────────────────────────────────────────────────────
+// ── Executive Summary Panel (NEW) ─────────────────────────────────────────────
 
-function HazardNarrativePanel({ data, loading, error }) {
-  if (loading) {
+function ExecutiveSummaryPanel({ engineResult }) {
+  const cards = buildExecutiveSummaryCards(engineResult);
+  if (!cards.length) return null;
+
+  const overallSev = engineResult.overallSeverity || "none";
+  const overallLabel = getExecutiveSeverityLabel(overallSev);
+
+  const severityColors = {
+    none: "bg-muted/20 text-muted-foreground",
+    low: "bg-sky-50 dark:bg-sky-950/30 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800",
+    moderate: "bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800",
+    high: "bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800",
+    critical: "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800",
+  };
+
+  const containerColor = severityColors[overallSev] || severityColors.none;
+
+  return (
+    <Card className={`border ${containerColor}`}>
+      <CardHeader className="pb-3 pt-4">
+        <CardTitle className="text-sm flex items-center justify-between">
+          <span>Resumen ejecutivo</span>
+          <Badge className="text-[10px] py-0.5 font-semibold" variant="outline">
+            {overallLabel}
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 pb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {cards.map(card => (
+            <div
+              key={card.id}
+              className="rounded-lg border border-border/50 p-3 bg-background/50 space-y-2"
+            >
+              <div className="flex items-start gap-2">
+                <span className="text-lg leading-none flex-shrink-0">{card.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-tight">{card.label}</p>
+                </div>
+              </div>
+
+              {card.isGRI ? (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold">{card.currentScore}</span>
+                    {card.showFutureChange && card.futureScore !== card.currentScore && (
+                      <span className="text-xs text-muted-foreground">→ {card.futureScore}</span>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <div className="text-sm font-bold tabular-nums">
+                    {card.historical} → {card.projected} {card.unit}
+                  </div>
+                  <div className="text-xs font-semibold text-muted-foreground">
+                    {card.direction} {card.delta}
+                  </div>
+                </div>
+              )}
+
+              <Badge className="text-[10px] py-0 px-2" variant="outline">
+                {card.severityLabel}
+              </Badge>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Climate Changes Panel (SIMPLIFIED) ─────────────────────────────────────────
+
+function ClimateChangesPanel({ engineResult }) {
+  if (!engineResult?.signals?.length) {
+    if (engineResult?.hasDBData === false) {
+      return (
+        <div className="rounded-xl border border-dashed border-border p-4 text-center space-y-1">
+          <p className="text-sm text-muted-foreground">Sin datos de proyecciones en la base de datos CMIP6 para esta ubicación.</p>
+          <p className="text-xs text-muted-foreground/60">Los cambios climáticos detectados requieren cobertura en la grilla histórica.</p>
+        </div>
+      );
+    }
+    return null;
+  }
+
+  const signals = engineResult.signals.slice(0, 4);
+
+  return (
+    <Card>
+      <CardHeader className="pb-3 pt-4">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <ThermometerSun className="w-4 h-4 text-amber-500" />
+          Cambios climáticos detectados
+        </CardTitle>
+        <p className="text-xs text-muted-foreground mt-1">Comparación: histórico (1995–2014) vs. proyectado (2040–2059)</p>
+      </CardHeader>
+      <CardContent className="space-y-3 pb-4">
+        {signals.map(signal => {
+          const sign = signal.delta >= 0 ? "+" : "";
+          const dirArrow = signal.direction === "up" ? "↑" : signal.direction === "down" ? "↓" : "→";
+
+          const severityColors = {
+            none: "bg-muted/10",
+            low: "bg-sky-50 dark:bg-sky-950/20",
+            moderate: "bg-amber-50 dark:bg-amber-950/20",
+            high: "bg-orange-50 dark:bg-orange-950/20",
+            critical: "bg-red-50 dark:bg-red-950/20",
+          };
+
+          return (
+            <div key={signal.id} className={`rounded-lg border border-border/50 p-3 ${severityColors[signal.severity]}`}>
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">{signal.icon}</span>
+                  <span className="text-sm font-semibold">{signal.label}</span>
+                </div>
+                <Badge className="text-[10px] py-0 px-2" variant="outline">
+                  {signal.severity === "none" ? "Sin cambio" : signal.severity === "low" ? "Leve" : signal.severity === "moderate" ? "Moderado" : signal.severity === "high" ? "Elevado" : "Crítico"}
+                </Badge>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 text-sm">
+                <div className="flex items-center gap-1">
+                  <span className="font-semibold tabular-nums">{signal.historical.toFixed(1)}</span>
+                  <span className="text-muted-foreground/50">→</span>
+                  <span className="font-semibold tabular-nums">{signal.projected.toFixed(1)}</span>
+                  <span className="text-xs text-muted-foreground">{signal.unit}</span>
+                </div>
+                <div className="text-xs font-semibold text-right">
+                  {dirArrow} {sign}{signal.delta?.toFixed(1) || "—"}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Threats Panel (CONSOLIDATED GRI) ──────────────────────────────────────────
+
+function ThreatsPanel({ engineResult, externalRisks }) {
+  const griSignals = engineResult?.griSignals || [];
+  const threats = formatThreatsForExecutive(griSignals);
+
+  if (!threats.length) {
     return (
       <Card>
-        <CardContent className="py-4 flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          Consultando amenazas climáticas...
+        <CardHeader className="pb-3 pt-4">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-500" />
+            Exposición a amenazas
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pb-4">
+          <p className="text-sm text-muted-foreground">Información insuficiente sobre amenazas climáticas en esta ubicación.</p>
         </CardContent>
       </Card>
     );
   }
 
-  if (error) {
-    return (
-      <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/30">
-        <AlertTriangle className="w-4 h-4 text-amber-600" />
-        <AlertDescription className="text-xs text-amber-900 dark:text-amber-200">
-          No se pudo consultar las amenazas externas: {error}
-        </AlertDescription>
-      </Alert>
-    );
-  }
-
-  if (!data) return null;
-
-  const hazards    = Array.isArray(data.hazards) ? data.hazards : [];
-  const overallCfg = getLevelCfg(data.overall_score);
-
   return (
     <Card>
-      <CardHeader className="pb-2 pt-4">
-        <CardTitle className="text-sm flex items-center justify-between">
-          <span>Amenazas climáticas detectadas</span>
-          <Badge className={`${overallCfg.color} border-0`}>{overallCfg.label}</Badge>
+      <CardHeader className="pb-3 pt-4">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-amber-500" />
+          Exposición a amenazas
         </CardTitle>
-        <p className="text-xs text-muted-foreground">Fuente en tiempo real: GRI Infrastructure Resilience</p>
+        <p className="text-xs text-muted-foreground mt-1">Fuente: GRI Infrastructure Resilience</p>
       </CardHeader>
-      <CardContent className="space-y-3 pb-4">
-        {hazards.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Sin amenazas identificadas para esta ubicación.</p>
-        ) : (
-          hazards.map((hazard) => {
-            const currentScore    = hazard.baseline?.score              || "sin data";
-            const futureHighScore = hazard.future_high_emissions?.score || "sin data";
-            const levelCfg = getLevelCfg(currentScore);
-            const icon     = HAZARD_ICONS[hazard.hazard] || "⚠️";
-
-            return (
-              <div key={hazard.hazard} className="rounded-xl border border-border p-3 space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">{icon}</span>
-                    <span className="text-sm font-semibold">{hazard.hazard_name}</span>
-                  </div>
-                  <Badge className={`${levelCfg.color} border-0`}>{levelCfg.label}</Badge>
-                </div>
-
-                <p className="text-sm text-foreground/75 leading-snug">
-                  {getHazardNarrative(hazard.hazard_name, currentScore, futureHighScore)}
+      <CardContent className="space-y-2.5 pb-4">
+        {threats.map(threat => (
+          <div
+            key={threat.hazard}
+            className="rounded-lg border border-border/50 p-3 flex items-start justify-between gap-2 bg-background/50"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-lg">{threat.icon}</span>
+              <div>
+                <p className="text-sm font-semibold">{threat.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {threat.currentScore}
+                  {threat.hasChange && (
+                    <span className="ml-1">→ {threat.futureScore}</span>
+                  )}
                 </p>
-
-                {futureHighScore !== "sin data" && futureHighScore !== currentScore && (
-                  <div className="flex items-center gap-2 pt-0.5">
-                    <span className="text-[11px] text-muted-foreground">Proyección a futuro:</span>
-                    <Badge className={`${getLevelCfg(futureHighScore).color} border-0 text-[10px] py-0`}>
-                      {getLevelCfg(futureHighScore).label}
-                    </Badge>
-                  </div>
-                )}
               </div>
-            );
-          })
-        )}
-        <p className="text-[10px] text-muted-foreground/60">
-          Basado en modelos ISIMIP, Aqueduct y JRC Flood.
-        </p>
+            </div>
+            <Badge className="text-[10px] py-0 px-2 flex-shrink-0" variant="outline">
+              {threat.severityLabel}
+            </Badge>
+          </div>
+        ))}
       </CardContent>
     </Card>
+  );
+}
+
+// ── Technical Details Panel (COLLAPSIBLE) ──────────────────────────────────────
+
+function TechnicalDetailsPanel({ engineResult }) {
+  const [expanded, setExpanded] = React.useState(false);
+  const sections = buildTechnicalDetailsContent(
+    engineResult?.signals || [],
+    engineResult?.distanceKm
+  );
+
+  if (!sections.length) return null;
+
+  return (
+    <div className="space-y-2">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full rounded-lg border border-border/50 p-3 flex items-center justify-between gap-2 bg-background/50 hover:bg-muted/30 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-base">📊</span>
+          <span className="text-sm font-semibold">Detalles técnicos</span>
+        </div>
+        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? "rotate-180" : ""}`} />
+      </button>
+
+      {expanded && (
+        <Card>
+          <CardContent className="pt-4 space-y-4 pb-4">
+            {sections.map((section, idx) => (
+              <div key={idx} className="space-y-1.5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{section.title}</p>
+                <p className="text-sm text-foreground/75 leading-relaxed whitespace-pre-wrap text-[13px]">{section.content}</p>
+              </div>
+            ))}
+            <div className="border-t border-border/50 pt-3">
+              <p className="text-[11px] text-muted-foreground/60 italic">
+                Datos exploratorios. Validar las acciones y decisiones con tu equipo técnico.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }
 
@@ -371,63 +537,22 @@ function ClimateProjectionsPanel({ data, loading }) {
       <Card>
         <CardContent className="py-4 flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="w-4 h-4 animate-spin" />
-          Consultando proyecciones climáticas...
+          Consultando contexto climático...
         </CardContent>
       </Card>
     );
   }
 
-  if (!data?.narrative?.length) return null;
+  if (!data?.historical_context?.narrative) return null;
 
   return (
     <Card>
       <CardHeader className="pb-2 pt-4">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <ThermometerSun className="w-4 h-4 text-amber-500" />
-          ¿Cómo cambiará el clima aquí?
-        </CardTitle>
-        <p className="text-xs text-muted-foreground">Fuente: Open-Meteo · proyecciones históricas y futuras (1980–2050)</p>
+        <CardTitle className="text-xs text-muted-foreground">Contexto climático local</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3 pb-4">
-        {data.narrative.map((item, i) => (
-          <div
-            key={i}
-            className={`rounded-xl p-3 space-y-1.5 ${
-              i === 0
-                ? "bg-blue-500/5 ring-1 ring-blue-500/20"
-                : "bg-amber-500/5 ring-1 ring-amber-500/20"
-            }`}
-          >
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm">{i === 0 ? "📅" : "🔭"}</span>
-              <span className="text-xs font-semibold">{item.period}</span>
-            </div>
-            <ul className="space-y-1">
-              {item.messages.map((msg, j) => (
-                <li key={j} className="flex items-start gap-2 text-sm text-foreground/80">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary/50 flex-shrink-0 mt-1.5" />
-                  {msg}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-        {/* Complemento narrativo desde BD histórica — solo si aporta contexto */}
-        {data.historical_context?.narrative && (
-          <div className="rounded-xl bg-slate-500/5 ring-1 ring-slate-400/20 p-3 space-y-1">
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm">📋</span>
-              <span className="text-xs font-semibold text-muted-foreground">Registros históricos locales</span>
-            </div>
-            <p className="text-sm text-foreground/65 leading-snug">
-              {data.historical_context.narrative}
-            </p>
-          </div>
-        )}
-
-        <p className="text-[10px] text-muted-foreground/60">
-          Modelos climáticos: CMCC, FGOALS, HiRAM, MRI · temperatura y precipitación media diaria.
-        </p>
+      <CardContent className="pb-4">
+        <p className="text-sm text-foreground/75 leading-relaxed">{data.historical_context.narrative}</p>
+        <p className="text-[10px] text-muted-foreground/60 mt-2">Fuente: registros históricos locales</p>
       </CardContent>
     </Card>
   );
@@ -489,227 +614,8 @@ const HAZARD_ICONS_MAP = {
   drought: "☀️", heat: "🌡️", extreme_heat: "🌡️", landslide: "⛰️",
 };
 
-// ── SeverityBar ───────────────────────────────────────────────────────────────
-
-function SeverityBar({ level }) {
-  const cfg = SEV_CFG[level] || SEV_CFG.none;
-  return (
-    <div className="flex items-center gap-0.5">
-      {[1, 2, 3, 4].map(i => (
-        <div key={i} className={`h-1.5 w-3.5 rounded-full ${i <= cfg.bars ? cfg.barColor : "bg-muted-foreground/15"}`} />
-      ))}
-    </div>
-  );
-}
-
-// ── SignalCard ────────────────────────────────────────────────────────────────
-
-function SignalCard({ signal }) {
-  const [expanded, setExpanded] = useState(false);
-  const cfg = SEV_CFG[signal.severity] || SEV_CFG.none;
-  const fmtVal = (v) => v == null ? "—" : (Number.isInteger(v) ? v : v.toFixed(1));
-  const sign = signal.delta != null ? (signal.delta >= 0 ? "+" : "") : "";
-  const deltaStr = signal.delta != null
-    ? `${sign}${fmtVal(signal.delta)} ${signal.unit}`
-    : "—";
-  const dirArrow = signal.direction === "up" ? "↑" : signal.direction === "down" ? "↓" : "→";
-
-  return (
-    <div className={`rounded-xl border ${cfg.border} ${cfg.bg} p-3.5 flex flex-col gap-2.5`}>
-      {/* Header */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-base leading-none flex-shrink-0">{signal.icon}</span>
-          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.1em] leading-tight">{signal.label}</span>
-        </div>
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <SeverityBar level={signal.severity} />
-          <span className={`text-[10px] font-bold ${cfg.color}`}>{cfg.label}</span>
-        </div>
-      </div>
-
-      {/* Values row */}
-      <div className="flex items-end gap-2.5">
-        <div className="text-center">
-          <p className="text-[9px] text-muted-foreground/70 mb-0.5">Histórico</p>
-          <p className="text-sm font-bold tabular-nums">{fmtVal(signal.historical)}</p>
-        </div>
-        <span className="text-muted-foreground/40 text-sm pb-0.5">→</span>
-        <div className="text-center">
-          <p className="text-[9px] text-muted-foreground/70 mb-0.5">{signal.period}</p>
-          <p className={`text-sm font-bold tabular-nums ${cfg.color}`}>{fmtVal(signal.projected)}</p>
-        </div>
-        <span className="text-[10px] text-muted-foreground/50 pb-0.5 ml-auto">{signal.unit}</span>
-      </div>
-
-      {/* Delta + range */}
-      <div className="flex items-center justify-between gap-2">
-        <span className={`text-xs font-mono font-bold ${cfg.color}`}>{dirArrow} {deltaStr}</span>
-        {signal.projP10 != null && (
-          <span className="text-[9px] text-muted-foreground/60 tabular-nums">
-            {signal.projP10.toFixed(1)}–{signal.projP90.toFixed(1)} {signal.unit}
-          </span>
-        )}
-      </div>
-
-      {/* Evidence toggle */}
-      <button
-        onClick={() => setExpanded(e => !e)}
-        className="flex items-center gap-1 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors text-left"
-      >
-        <span>{expanded ? "▲" : "▼"}</span>
-        <span>Fuente · umbral de referencia</span>
-      </button>
-
-      {expanded && (
-        <div className="space-y-1.5 pt-1.5 border-t border-border/40">
-          <p className="text-[11px] text-foreground/75 leading-snug">{signal.detail}</p>
-          <p className="text-[10px] text-muted-foreground/60 italic leading-snug">{signal.thresholdRef}</p>
-          <p className="text-[10px] text-muted-foreground/50">Fuente: {signal.source}</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── GRIExposureGrid ───────────────────────────────────────────────────────────
-
-function GRIExposureGrid({ signals }) {
-  if (!signals.length) return null;
-  return (
-    <div className="space-y-2">
-      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground font-semibold">
-        Exposición GRI · Infraestructura
-      </p>
-      <div className="flex flex-wrap gap-2">
-        {signals.map(s => {
-          const cfg = GRI_SCORE_CFG[s.currentScore] || GRI_SCORE_CFG["sin data"];
-          const icon = HAZARD_ICONS_MAP[s.hazard] || "⚠️";
-          return (
-            <div key={s.hazard} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${cfg.color}`}>
-              <span>{icon}</span>
-              <span>{s.name}</span>
-              {s.futureScore && s.futureScore !== s.currentScore && (
-                <span className="opacity-60 text-[10px]">→ {s.futureScore}</span>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      <p className="text-[10px] text-muted-foreground/60">
-        ISIMIP · Aqueduct · JRC Flood — probabilidad de ocurrencia histórica y escenarios futuros.
-      </p>
-    </div>
-  );
-}
-
-// ── ClimateEnginePanel ────────────────────────────────────────────────────────
-
-function ClimateEnginePanel({ result, loading, error }) {
-  if (loading) {
-    return (
-      <Card>
-        <CardContent className="py-4 flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          Consultando base de datos climática...
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/30">
-        <AlertTriangle className="w-4 h-4 text-amber-600" />
-        <AlertDescription className="text-xs text-amber-900 dark:text-amber-200">{error}</AlertDescription>
-      </Alert>
-    );
-  }
-
-  if (!result || (!result.signals.length && !result.griSignals.length)) return null;
-
-  const overallCfg = OVERALL_CFG[result.overallSeverity] || OVERALL_CFG.none;
-
-  return (
-    <Card>
-      <CardHeader className="pb-3 pt-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardTitle className="text-sm flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-primary" />
-              Análisis climático cuantitativo
-            </CardTitle>
-            <p className="text-xs text-muted-foreground mt-1">
-              Señales derivadas de evidencia numérica · deltas histórico → proyectado
-            </p>
-          </div>
-          <Badge className={`${overallCfg.badge} border-0 text-[10px] py-0.5 flex-shrink-0 whitespace-nowrap`}>
-            {overallCfg.label}
-          </Badge>
-        </div>
-
-        {(result.scenario || result.distanceKm != null) && (
-          <div className="flex flex-wrap items-center gap-3 mt-2 pt-2 border-t border-border/40">
-            {result.scenario && (
-              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary/50" />
-                {result.scenario}
-              </span>
-            )}
-            {result.distanceKm != null && (
-              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                <MapPin className="w-3 h-3" />
-                Punto DB más cercano: {result.distanceKm.toFixed(1)} km
-              </span>
-            )}
-          </div>
-        )}
-      </CardHeader>
-
-      <CardContent className="space-y-5 pb-4">
-        {/* Signal grid */}
-        {result.signals.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {result.signals.map(signal => (
-              <SignalCard key={signal.id} signal={signal} />
-            ))}
-          </div>
-        ) : result.hasDBData ? (
-          <p className="text-sm text-muted-foreground">
-            No se detectaron cambios por encima de los umbrales de referencia para esta ubicación.
-          </p>
-        ) : (
-          <div className="rounded-xl border border-dashed border-border p-4 text-center space-y-1">
-            <p className="text-sm text-muted-foreground">Sin datos en la grilla climática CMIP6 para esta ubicación.</p>
-            <p className="text-xs text-muted-foreground/60">Las señales cuantitativas requieren cobertura en la base de datos histórica.</p>
-          </div>
-        )}
-
-        {/* GRI exposure */}
-        {result.griSignals.length > 0 && (
-          <>
-            {result.signals.length > 0 && <div className="border-t border-border/50" />}
-            <GRIExposureGrid signals={result.griSignals} />
-          </>
-        )}
-
-        {/* Distance warning */}
-        {result.hasDBData && result.distanceKm != null && result.distanceKm > 30 && (
-          <Alert className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20">
-            <AlertTriangle className="w-4 h-4 text-blue-500" />
-            <AlertDescription className="text-xs text-blue-900 dark:text-blue-200">
-              El punto de datos más cercano está a {result.distanceKm.toFixed(0)} km. Las señales son orientativas para esta ubicación específica.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <p className="text-[10px] text-muted-foreground/50">
-          {result.signals.length} indicadores evaluados · ensemble CMIP6 · umbrales IPCC AR6 / WRI / World Bank CKP.
-        </p>
-      </CardContent>
-    </Card>
-  );
-}
+// Note: SignalCard, SeverityBar, GRIExposureGrid removed — functionality moved to new panels
+// ClimateEnginePanel functionality distributed across: ExecutiveSummaryPanel, ClimateChangesPanel, ThreatsPanel, TechnicalDetailsPanel
 
 function AIPanel({ externalRisks, climateTrends, docContext, executiveSummary }) {
   const [loading, setLoading] = useState(false);
