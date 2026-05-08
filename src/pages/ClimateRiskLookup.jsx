@@ -489,7 +489,7 @@ function ThreatsPanel({ engineResult, externalRisks }) {
 // ── Technical Details Panel (COLLAPSIBLE) ──────────────────────────────────────
 
 function TechnicalDetailsPanel({ engineResult }) {
-  const [expanded, setExpanded] = React.useState(false);
+  const [expanded, setExpanded] = useState(false);
   const sections = buildTechnicalDetailsContent(
     engineResult?.signals || [],
     engineResult?.distanceKm
@@ -614,8 +614,227 @@ const HAZARD_ICONS_MAP = {
   drought: "☀️", heat: "🌡️", extreme_heat: "🌡️", landslide: "⛰️",
 };
 
-// Note: SignalCard, SeverityBar, GRIExposureGrid removed — functionality moved to new panels
-// ClimateEnginePanel functionality distributed across: ExecutiveSummaryPanel, ClimateChangesPanel, ThreatsPanel, TechnicalDetailsPanel
+// ── SeverityBar ───────────────────────────────────────────────────────────────
+
+function SeverityBar({ level }) {
+  const cfg = SEV_CFG[level] || SEV_CFG.none;
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4].map(i => (
+        <div key={i} className={`h-1.5 w-3.5 rounded-full ${i <= cfg.bars ? cfg.barColor : "bg-muted-foreground/15"}`} />
+      ))}
+    </div>
+  );
+}
+
+// ── SignalCard ────────────────────────────────────────────────────────────────
+
+function SignalCard({ signal }) {
+  const [expanded, setExpanded] = useState(false);
+  const cfg = SEV_CFG[signal.severity] || SEV_CFG.none;
+  const fmtVal = (v) => v == null ? "—" : (Number.isInteger(v) ? v : v.toFixed(1));
+  const sign = signal.delta != null ? (signal.delta >= 0 ? "+" : "") : "";
+  const deltaStr = signal.delta != null
+    ? `${sign}${fmtVal(signal.delta)} ${signal.unit}`
+    : "—";
+  const dirArrow = signal.direction === "up" ? "↑" : signal.direction === "down" ? "↓" : "→";
+
+  return (
+    <div className={`rounded-xl border ${cfg.border} ${cfg.bg} p-3.5 flex flex-col gap-2.5`}>
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-base leading-none flex-shrink-0">{signal.icon}</span>
+          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.1em] leading-tight">{signal.label}</span>
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <SeverityBar level={signal.severity} />
+          <span className={`text-[10px] font-bold ${cfg.color}`}>{cfg.label}</span>
+        </div>
+      </div>
+
+      {/* Values row */}
+      <div className="flex items-end gap-2.5">
+        <div className="text-center">
+          <p className="text-[9px] text-muted-foreground/70 mb-0.5">Histórico</p>
+          <p className="text-sm font-bold tabular-nums">{fmtVal(signal.historical)}</p>
+        </div>
+        <span className="text-muted-foreground/40 text-sm pb-0.5">→</span>
+        <div className="text-center">
+          <p className="text-[9px] text-muted-foreground/70 mb-0.5">{signal.period}</p>
+          <p className={`text-sm font-bold tabular-nums ${cfg.color}`}>{fmtVal(signal.projected)}</p>
+        </div>
+        <span className="text-[10px] text-muted-foreground/50 pb-0.5 ml-auto">{signal.unit}</span>
+      </div>
+
+      {/* Delta + range */}
+      <div className="flex items-center justify-between gap-2">
+        <span className={`text-xs font-mono font-bold ${cfg.color}`}>{dirArrow} {deltaStr}</span>
+        {signal.projP10 != null && (
+          <span className="text-[9px] text-muted-foreground/60 tabular-nums">
+            {signal.projP10.toFixed(1)}–{signal.projP90.toFixed(1)} {signal.unit}
+          </span>
+        )}
+      </div>
+
+      {/* Evidence toggle */}
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="flex items-center gap-1 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors text-left"
+      >
+        <span>{expanded ? "▲" : "▼"}</span>
+        <span>Fuente · umbral de referencia</span>
+      </button>
+
+      {expanded && (
+        <div className="space-y-1.5 pt-1.5 border-t border-border/40">
+          <p className="text-[11px] text-foreground/75 leading-snug">{signal.detail}</p>
+          <p className="text-[10px] text-muted-foreground/60 italic leading-snug">{signal.thresholdRef}</p>
+          <p className="text-[10px] text-muted-foreground/50">Fuente: {signal.source}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── GRIExposureGrid ───────────────────────────────────────────────────────────
+
+function GRIExposureGrid({ signals }) {
+  if (!signals.length) return null;
+  return (
+    <div className="space-y-2">
+      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground font-semibold">
+        Exposición GRI · Infraestructura
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {signals.map(s => {
+          const cfg = GRI_SCORE_CFG[s.currentScore] || GRI_SCORE_CFG["sin data"];
+          const icon = HAZARD_ICONS_MAP[s.hazard] || "⚠️";
+          return (
+            <div key={s.hazard} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${cfg.color}`}>
+              <span>{icon}</span>
+              <span>{s.name}</span>
+              {s.futureScore && s.futureScore !== s.currentScore && (
+                <span className="opacity-60 text-[10px]">→ {s.futureScore}</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-[10px] text-muted-foreground/60">
+        ISIMIP · Aqueduct · JRC Flood — probabilidad de ocurrencia histórica y escenarios futuros.
+      </p>
+    </div>
+  );
+}
+
+// ── ClimateEnginePanel ────────────────────────────────────────────────────────
+
+function ClimateEnginePanel({ result, loading, error }) {
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="py-4 flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Consultando base de datos climática...
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/30">
+        <AlertTriangle className="w-4 h-4 text-amber-600" />
+        <AlertDescription className="text-xs text-amber-900 dark:text-amber-200">{error}</AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (!result || (!result.signals.length && !result.griSignals.length)) return null;
+
+  const overallCfg = OVERALL_CFG[result.overallSeverity] || OVERALL_CFG.none;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3 pt-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-primary" />
+              Análisis climático cuantitativo
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Señales derivadas de evidencia numérica · deltas histórico → proyectado
+            </p>
+          </div>
+          <Badge className={`${overallCfg.badge} border-0 text-[10px] py-0.5 flex-shrink-0 whitespace-nowrap`}>
+            {overallCfg.label}
+          </Badge>
+        </div>
+
+        {(result.scenario || result.distanceKm != null) && (
+          <div className="flex flex-wrap items-center gap-3 mt-2 pt-2 border-t border-border/40">
+            {result.scenario && (
+              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary/50" />
+                {result.scenario}
+              </span>
+            )}
+            {result.distanceKm != null && (
+              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <MapPin className="w-3 h-3" />
+                Punto DB más cercano: {result.distanceKm.toFixed(1)} km
+              </span>
+            )}
+          </div>
+        )}
+      </CardHeader>
+
+      <CardContent className="space-y-5 pb-4">
+        {/* Signal grid */}
+        {result.signals.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {result.signals.map(signal => (
+              <SignalCard key={signal.id} signal={signal} />
+            ))}
+          </div>
+        ) : result.hasDBData ? (
+          <p className="text-sm text-muted-foreground">
+            No se detectaron cambios por encima de los umbrales de referencia para esta ubicación.
+          </p>
+        ) : (
+          <div className="rounded-xl border border-dashed border-border p-4 text-center space-y-1">
+            <p className="text-sm text-muted-foreground">Sin datos en la grilla climática CMIP6 para esta ubicación.</p>
+            <p className="text-xs text-muted-foreground/60">Las señales cuantitativas requieren cobertura en la base de datos histórica.</p>
+          </div>
+        )}
+
+        {/* GRI exposure */}
+        {result.griSignals.length > 0 && (
+          <>
+            {result.signals.length > 0 && <div className="border-t border-border/50" />}
+            <GRIExposureGrid signals={result.griSignals} />
+          </>
+        )}
+
+        {/* Distance warning */}
+        {result.hasDBData && result.distanceKm != null && result.distanceKm > 30 && (
+          <Alert className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20">
+            <AlertTriangle className="w-4 h-4 text-blue-500" />
+            <AlertDescription className="text-xs text-blue-900 dark:text-blue-200">
+              El punto de datos más cercano está a {result.distanceKm.toFixed(0)} km. Las señales son orientativas para esta ubicación específica.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <p className="text-[10px] text-muted-foreground/50">
+          {result.signals.length} indicadores evaluados · ensemble CMIP6 · umbrales IPCC AR6 / WRI / World Bank CKP.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
 
 function AIPanel({ externalRisks, climateTrends, docContext, executiveSummary }) {
   const [loading, setLoading] = useState(false);
@@ -938,20 +1157,17 @@ export default function ClimateRiskLookup() {
             </CardContent>
           </Card>
 
-          {/* Motor de análisis cuantitativo: DB (CMIP6) + GRI */}
-          <ClimateEnginePanel
-            result={engineResult}
-            loading={externalLoading || dbLoading}
-            error={externalError}
-          />
+          {/* Motor de análisis: paneles ejecutivos */}
+          {hasResults && (
+            <>
+              <ExecutiveSummaryPanel engineResult={engineResult} />
+              <ClimateChangesPanel engineResult={engineResult} />
+              <ThreatsPanel engineResult={engineResult} externalRisks={externalRisks} />
+              <TechnicalDetailsPanel engineResult={engineResult} />
+            </>
+          )}
 
-          {/* Proyecciones narrativas Open-Meteo (complemento) */}
-          <ClimateProjectionsPanel
-            data={climateTrends}
-            loading={trendsLoading}
-          />
-
-          {/* 3. Contexto territorial Banco Mundial */}
+          {/* Contexto territorial Banco Mundial */}
           <TerritorialContextPanel data={territorialCtx} />
 
           {/* 4. Recomendaciones IA */}
