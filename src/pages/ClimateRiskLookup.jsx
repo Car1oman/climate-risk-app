@@ -293,11 +293,11 @@ function ExecutiveSummaryPanel({ engineResult }) {
   const overallLabel = getExecutiveSeverityLabel(overallSev);
 
   const severityColors = {
-    none: "bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800",
-    low: "bg-sky-50 dark:bg-sky-950/40 border-sky-200 dark:border-sky-800",
-    moderate: "bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800",
-    high: "bg-orange-50 dark:bg-orange-950/40 border-orange-200 dark:border-orange-800",
-    critical: "bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800",
+    none: "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700",
+    low: "bg-sky-50 dark:bg-sky-900/30 border-sky-200 dark:border-sky-700",
+    moderate: "bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700",
+    high: "bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-700",
+    critical: "bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700",
   };
 
   const containerColor = severityColors[overallSev] || severityColors.none;
@@ -317,12 +317,12 @@ function ExecutiveSummaryPanel({ engineResult }) {
           {cards.map(card => (
             <div
               key={card.id}
-              className="rounded-lg border border-border/60 dark:border-border/40 p-3 bg-card/40 dark:bg-slate-900/20 space-y-2"
+              className="rounded-lg border border-border/60 dark:border-white/10 p-3 bg-card/60 dark:bg-slate-800/50 space-y-2"
             >
               <div className="flex items-start gap-2">
                 <span className="text-lg leading-none flex-shrink-0">{card.icon}</span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-foreground/70 dark:text-foreground/60 uppercase tracking-tight">{card.label}</p>
+                  <p className="text-xs font-semibold text-foreground/70 dark:text-foreground/80 uppercase tracking-tight">{card.label}</p>
                 </div>
               </div>
 
@@ -346,7 +346,7 @@ function ExecutiveSummaryPanel({ engineResult }) {
                 </div>
               )}
 
-              <Badge className="text-[10px] py-0 px-2 bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary/90 border-primary/30 dark:border-primary/40" variant="outline">
+              <Badge className="text-[10px] py-0 px-2 bg-primary/10 dark:bg-primary/25 text-primary border-primary/30 dark:border-primary/50" variant="outline">
                 {card.severityLabel}
               </Badge>
             </div>
@@ -389,11 +389,11 @@ function ClimateChangesPanel({ engineResult }) {
           const dirArrow = signal.direction === "up" ? "↑" : signal.direction === "down" ? "↓" : "→";
 
           const severityColors = {
-            none: "bg-muted/10",
-            low: "bg-sky-50 dark:bg-sky-950/20",
-            moderate: "bg-amber-50 dark:bg-amber-950/20",
-            high: "bg-orange-50 dark:bg-orange-950/20",
-            critical: "bg-red-50 dark:bg-red-950/20",
+            none: "bg-muted/30 dark:bg-muted/20",
+            low: "bg-sky-50 dark:bg-sky-900/30",
+            moderate: "bg-amber-50 dark:bg-amber-900/30",
+            high: "bg-orange-50 dark:bg-orange-900/30",
+            critical: "bg-red-50 dark:bg-red-900/30",
           };
 
           return (
@@ -462,7 +462,7 @@ function ThreatsPanel({ engineResult, externalRisks }) {
         {threats.map(threat => (
           <div
             key={threat.hazard}
-            className="rounded-lg border border-border/50 p-3 flex items-start justify-between gap-2 bg-background/50"
+            className="rounded-lg border border-border/50 p-3 flex items-start justify-between gap-2 bg-card dark:bg-slate-800/60"
           >
             <div className="flex items-center gap-2">
               <span className="text-lg">{threat.icon}</span>
@@ -501,7 +501,7 @@ function TechnicalDetailsPanel({ engineResult }) {
     <div className="space-y-2">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full rounded-lg border border-border/50 p-3 flex items-center justify-between gap-2 bg-background/50 hover:bg-muted/30 transition-colors"
+        className="w-full rounded-lg border border-border/50 p-3 flex items-center justify-between gap-2 bg-card dark:bg-slate-800/60 hover:bg-muted/50 transition-colors"
       >
         <div className="flex items-center gap-2">
           <span className="text-base">📊</span>
@@ -516,11 +516,11 @@ function TechnicalDetailsPanel({ engineResult }) {
             {sections.map((section, idx) => (
               <div key={idx} className="space-y-1.5">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{section.title}</p>
-                <p className="text-sm text-foreground/75 leading-relaxed whitespace-pre-wrap text-[13px]">{section.content}</p>
+                <p className="text-sm text-foreground/85 dark:text-foreground/80 leading-relaxed whitespace-pre-wrap text-[13px]">{section.content}</p>
               </div>
             ))}
             <div className="border-t border-border/50 pt-3">
-              <p className="text-[11px] text-muted-foreground/60 italic">
+              <p className="text-[11px] text-muted-foreground/75 italic">
                 Datos exploratorios. Validar las acciones y decisiones con tu equipo técnico.
               </p>
             </div>
