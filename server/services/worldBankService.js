@@ -40,28 +40,40 @@ async function getWorldBankData() {
   return Object.fromEntries(entries);
 }
 
-function buildNarrative(wb) {
+function buildContextMessages(wb) {
   const messages = [];
   const poverty = wb.poverty?.value;
   const urban   = wb.urban_population?.value;
   const agri    = wb.agriculture_gdp?.value;
   const water   = wb.water_access?.value;
 
-  if (poverty != null && poverty >= 20) {
-    messages.push('La vulnerabilidad socioeconómica puede dificultar la recuperación ante eventos climáticos extremos.');
-  }
-  if (urban != null && urban >= 80) {
-    messages.push('La alta urbanización incrementa la exposición de población e infraestructura ante eventos extremos.');
-  }
-  if (agri != null && agri >= 5) {
-    messages.push('La dependencia del sector agrícola incrementa la vulnerabilidad ante sequías prolongadas.');
-  }
-  if (water != null && water < 90) {
-    messages.push('El acceso limitado al agua potable puede amplificar los impactos del estrés hídrico.');
+  if (poverty != null) {
+    const yr  = wb.poverty?.year ? ` (${wb.poverty.year})` : '';
+    const ctx = poverty >= 20
+      ? 'Contexto de vulnerabilidad que puede amplificar impactos climáticos y dificultar recuperación.'
+      : 'Nivel moderado; resiliencia económica relativa ante eventos climáticos.';
+    messages.push(`Pobreza nacional: ${poverty.toFixed(1)}%${yr}. ${ctx}`);
   }
 
-  if (!messages.length) {
-    messages.push('El contexto socioeconómico del territorio no muestra vulnerabilidades críticas adicionales.');
+  if (urban != null) {
+    const yr  = wb.urban_population?.year ? ` (${wb.urban_population.year})` : '';
+    const ctx = urban >= 80
+      ? 'Alta concentración urbana incrementa exposición de infraestructura y población ante eventos extremos.'
+      : 'Distribución mixta urbano-rural; riesgo distribuido en distintos tipos de territorio.';
+    messages.push(`Población urbana: ${urban.toFixed(0)}%${yr}. ${ctx}`);
+  }
+
+  if (agri != null && agri >= 3) {
+    const yr = wb.agriculture_gdp?.year ? ` (${wb.agriculture_gdp.year})` : '';
+    messages.push(`Agricultura: ${agri.toFixed(1)}% del PBI${yr}. Sector sensible ante sequías y variabilidad de precipitaciones.`);
+  }
+
+  if (water != null) {
+    const yr  = wb.water_access?.year ? ` (${wb.water_access.year})` : '';
+    const ctx = water < 90
+      ? 'Acceso limitado puede amplificar el impacto de episodios de estrés hídrico.'
+      : 'Cobertura amplia; menor amplificación de impactos por estrés hídrico.';
+    messages.push(`Acceso a agua potable: ${water.toFixed(0)}%${yr}. ${ctx}`);
   }
 
   return messages;
@@ -71,6 +83,6 @@ export async function getTerritorialContext() {
   const wb = await getWorldBankData();
   return {
     indicators: wb,
-    narrative:  buildNarrative(wb),
+    narrative:  buildContextMessages(wb),
   };
 }

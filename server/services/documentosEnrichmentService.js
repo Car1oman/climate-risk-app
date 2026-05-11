@@ -7,14 +7,10 @@ const CATEGORY_LABELS = {
   informe:    'Informes y reportes',
 };
 
-// Inferir categoría desde nombre/descripción cuando la columna categoria está vacía
-function inferCategory(doc) {
-  if (doc.categoria) return doc.categoria;
-  const text = `${doc.nombre} ${doc.descripcion || ''}`.toLowerCase();
-  if (/riesgo|matriz|amenaza|catálog|catalog|peligro/.test(text)) return 'riesgo';
-  if (/adaptaci|medida|mitigac|resilien|estrategia/.test(text))  return 'adaptacion';
-  if (/impacto|pérdida|perdida|daño|consecuencia/.test(text))    return 'impacto';
-  return 'informe';
+const VALID_CATEGORIES = new Set(Object.keys(CATEGORY_LABELS));
+
+function resolveCategory(doc) {
+  return (doc.categoria && VALID_CATEGORIES.has(doc.categoria)) ? doc.categoria : 'informe';
 }
 
 // Nombre legible del documento (prioriza descripción, limpia el nombre técnico si no hay)
@@ -40,7 +36,7 @@ export async function getDocumentosEnrichment() {
     // Agrupar por categoría
     const byCategory = {};
     for (const doc of data) {
-      const cat = inferCategory(doc);
+      const cat = resolveCategory(doc);
       byCategory[cat] ??= [];
       byCategory[cat].push({
         nombre:      doc.nombre,

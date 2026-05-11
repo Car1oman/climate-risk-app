@@ -24,6 +24,7 @@ import { getClimateTrends } from './services/openMeteoService.js';
 import { getTerritorialContext } from './services/worldBankService.js';
 import { getHistoricalEnrichment } from './services/historicalEnrichmentService.js';
 import { getDocumentosEnrichment } from './services/documentosEnrichmentService.js';
+import { getCompleteRiskModel } from './services/riskModelService.js';
 import { supabase } from "./supabaseClient.js";
 
 dotenv.config();
@@ -373,6 +374,27 @@ app.get('/api/climate-cells/status', async (req, res) => {
 // FIN NUEVOS ENDPOINTS
 // ============================================
 
+// -----------------------------------------------
+// POST /api/risk-model
+// Calcula modelo de riesgo H×E×I en el backend.
+// Body: { asset: {...}, maxArea?: number, elNinoMultiplier?: number }
+// -----------------------------------------------
+app.post('/api/risk-model', (req, res) => {
+  try {
+    const { asset, maxArea, elNinoMultiplier } = req.body;
+    if (!asset || typeof asset !== 'object') {
+      return res.status(400).json({ error: 'Se requiere el objeto "asset" en el body.' });
+    }
+    const result = getCompleteRiskModel(asset, {
+      maxArea:         maxArea         ?? 5000,
+      elNinoMultiplier: elNinoMultiplier ?? 1.0,
+    });
+    return res.json(result);
+  } catch (err) {
+    console.error('Error en /api/risk-model:', err.message);
+    return res.status(500).json({ error: 'Error al calcular el modelo de riesgo.' });
+  }
+});
 
 app.post('/api/calculate-risk/:assetId', async (req, res) => {
   try {
