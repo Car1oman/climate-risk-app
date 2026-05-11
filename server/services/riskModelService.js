@@ -178,6 +178,26 @@ function generateRecommendations(asset, scores) {
   return recs.slice(0, 3);
 }
 
+function generateNarrative(asset, scores) {
+  const levelText = {
+    critico: 'crítico',
+    alto:    'alto',
+    medio:   'medio',
+    bajo:    'bajo',
+  }[scores.riskLevel] ?? 'bajo';
+
+  const topHazard = scores.topRisk ?? 'inundación';
+  const financial = formatCurrency(scores.financialImpact);
+  const district  = asset.district ? ` en ${asset.district}` : '';
+
+  return `Esta tienda${district} presenta un nivel de riesgo climático ${levelText}. ` +
+    `La amenaza principal identificada es ${topHazard.toLowerCase()}, con un impacto financiero ` +
+    `potencial estimado en ${financial} ante un evento climático grave. ` +
+    (scores.riskLevel === 'critico' || scores.riskLevel === 'alto'
+      ? 'Se recomienda implementar medidas de mitigación de forma prioritaria.'
+      : 'Se recomienda mantener un monitoreo preventivo y revisar los planes de contingencia.');
+}
+
 export function getCompleteRiskModel(asset, { maxArea = 5000, elNinoMultiplier = 1.0 } = {}) {
   const scores     = calculateRiskScore(asset, maxArea, elNinoMultiplier);
   const topHazards = getTopHazards(asset);
@@ -187,6 +207,7 @@ export function getCompleteRiskModel(asset, { maxArea = 5000, elNinoMultiplier =
     ...scores,
     topHazards,
     recommendations,
+    narrative: generateNarrative(asset, scores),
     formula: {
       H:       (scores.hazardScore   * 100).toFixed(1),
       E:       (scores.exposureScore * 100).toFixed(1),

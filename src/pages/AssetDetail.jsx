@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { API_URL, fetchAssetDetail } from "@/lib/api";
+import { API_URL, fetchAssetDetail, getRiskModelFromBackend } from "@/lib/api";
 import { formatCurrency, getRiskColor, getCompleteRiskModel } from "@/lib/riskEngine";
 import { Link } from "react-router-dom";
 import { ArrowLeft, MapPin, Sparkles, Loader2 } from "lucide-react";
@@ -33,6 +33,7 @@ export default function AssetDetail() {
   const [aiResponse, setAiResponse] = useState("");
   const [climate, setClimate] = useState(null);
   const [climateLoading, setClimateLoading] = useState(false);
+  const [backendRiskModel, setBackendRiskModel] = useState(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -45,6 +46,14 @@ export default function AssetDetail() {
 
     loadAsset();
   }, [assetId]);
+
+  // Llama al backend para el modelo H×E×I; si falla, el fallback frontend sigue activo
+  useEffect(() => {
+    if (!asset) return;
+    getRiskModelFromBackend(asset).then(result => {
+      if (result) setBackendRiskModel(result);
+    });
+  }, [asset?.id]);
 
   const fetchClimate = async () => {
     if (climateLoading) return;
@@ -233,9 +242,9 @@ Genera exactamente 3 recomendaciones de adaptación climática específicas para
         </div>
       </div>
 
-      {/* Risk Model Section */}
+      {/* Risk Model Section — usa backend si disponible, frontend como fallback */}
       <div className="bg-card border border-border rounded-xl p-6">
-        <RiskModel riskData={getCompleteRiskModel(asset)} asset={asset} />
+        <RiskModel riskData={backendRiskModel ?? getCompleteRiskModel(asset)} asset={asset} />
       </div>
 
       {/* AI Recommendations */}

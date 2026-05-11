@@ -101,3 +101,35 @@ export const fetchClimateDB = async (lat, lng) => {
   if (!res.ok) return null;
   return res.json();
 };
+
+// POST /api/v2/climate-risk-analysis — Layers 1-6 en secuencia
+// Retorna: { location, signals, risks, adaptations, narrative, metadata }
+export const analyzeClimateRisk = async ({ lat, lon, sector, asset_type }) => {
+  try {
+    const res = await fetch(`${API_URL}/api/v2/climate-risk-analysis`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat, lon, sector, asset_type }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+};
+
+// POST /api/risk-model — modelo H×E×I calculado en backend
+// Retorna el mismo shape que getCompleteRiskModel() del frontend
+export const getRiskModelFromBackend = async (asset) => {
+  try {
+    const res = await fetch(`${API_URL}/api/risk-model`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ asset }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+};

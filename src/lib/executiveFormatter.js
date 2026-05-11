@@ -257,3 +257,73 @@ export default {
   getExecutiveSeverityLabel,
   translateTechnicalTerm,
 };
+
+// ── Adaptador v2: convierte output de /api/v2/climate-risk-analysis al formato de cards ──
+
+const V2_SIGNAL_LABELS = {
+  extreme_heat:  'Calor extremo (hd35)',
+  severe_heat:   'Calor severo (hd40)',
+  drought:       'Sequía / estrés hídrico',
+  extreme_rain:  'Lluvia extrema',
+  temp_increase: 'Aumento temperatura media',
+  flood_risk:    'Riesgo de inundación',
+};
+
+// Mapea signalType de Layer2 al icon del HAZARD_ICON_MAP existente
+function v2SignalIcon(signalType) {
+  const map = {
+    extreme_heat:  '🌡️',
+    severe_heat:   '🔥',
+    drought:       '☀️',
+    extreme_rain:  '🌧️',
+    temp_increase: '📈',
+    flood_risk:    '🌊',
+  };
+  return map[signalType] ?? '⚠️';
+}
+
+// Mapea confidence de Layer2 a severity del formato ejecutivo existente
+function v2ConfidenceToSeverity(confidence, delta) {
+  if (confidence === 'high')   return Math.abs(delta ?? 0) > 20 ? 'critical' : 'high';
+  if (confidence === 'medium') return 'moderate';
+  return 'low';
+}
+
+/**
+ * Adapta el output de /api/v2/climate-risk-analysis al formato de cards del dashboard.
+ * Compatible con el render existente de ExecutiveSummaryPanel.
+ * @param {Object} v2Analysis - Output de POST /api/v2/climate-risk-analysis
+ * @returns {Array} Cards formateadas compatibles con formatSignalForExecutive
+ */
+export function buildCardsFromV2Analysis(v2Analysis) {
+  if (!v2Analysis?.signals?.signals?.length) return [];
+
+  return v2Analysis.signals.signals
+    .slice(0, 4)
+    .map(s => {
+      const severity = v2ConfidenceToSeverity(s.confidence, s.delta);
+      const sign     = (s.delta ?? 0) >= 0 ? '+' : '';
+      const dirArrow = (s.delta ?? 0) >= 0 ? 'up' : 'down';
+
+      return {
+        id:            `v2_${s.signalType}_${s.indicator}`,
+        icon:          v2SignalIcon(s.signalType),
+        label:         V2_SIGNAL_LABELS[s.signalType] ?? s.signalType,
+        historical:    s.historical,
+        projected:     s.projected,
+        delta:         s.delta,
+        unit:          s.indicator === 'tas' || s.indicator === 'txx' ? '°C' :
+                       ['hd35','hd40','cdd','cwd'].includes(s.indicator) ? 'días' :
+                       ['rx1day','rx5day','pr'].includes(s.indicator) ? 'mm' : '',
+        direction:     dirArrow,
+        severity,
+        severityLabel: { critical: 'Crítico', high: 'Elevado', moderate: 'Moderado', low: 'Leve' }[severity] ?? 'Leve',
+        // Campos adicionales para compatibilidad con SignalCard
+        period:        s.horizon === 'short_term' ? '2020–2039' : '2040–2059',
+        source:        s.confidence === 'high' ? 'climate_cells (CMIP6)' : s.confidence === 'medium' ? 'GRI / Open-Meteo' : 'inferido',
+        thresholdRef:  s.threshold_reference ?? '',
+        detail:        `Señal: ${s.signalType} · Indicador: ${s.indicator} · Delta: ${sign}${(s.delta ?? 0).toFixed(1)}`,
+      };
+    })
+    .filter(Boolean);
+}

@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { API_URL, fetchExternalRisks, fetchClimateTrends, fetchTerritorialContext, fetchDocumentContext, fetchClimateDB } from "@/lib/api";
+import { API_URL, fetchExternalRisks, fetchClimateTrends, fetchTerritorialContext, fetchDocumentContext, fetchClimateDB, analyzeClimateRisk } from "@/lib/api";
 import {
   Search, MapPin, Loader2, AlertTriangle,
   Sparkles, Building2, Plus, ThermometerSun, Globe2, BookOpen, TrendingUp, ChevronDown,
@@ -967,6 +967,221 @@ Responde en español. Usa lenguaje claro y directo, sin términos técnicos cien
   );
 }
 
+// ── V2AnalysisPanel — output de /api/v2/climate-risk-analysis (Layers 1-6) ────
+
+const URGENCY_STYLES = {
+  'crítica': 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900 dark:text-red-200 dark:border-red-700',
+  alta:       'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900 dark:text-orange-200 dark:border-orange-700',
+  media:      'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900 dark:text-yellow-200 dark:border-yellow-700',
+  baja:       'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900 dark:text-emerald-200 dark:border-emerald-700',
+};
+
+const SIGNAL_ICONS = {
+  extreme_heat:  '🌡️',
+  severe_heat:   '🔥',
+  drought:       '☀️',
+  extreme_rain:  '🌧️',
+  temp_increase: '📈',
+  flood_risk:    '🌊',
+};
+
+const HORIZON_LABELS_V2 = {
+  short_term: '2020–2039',
+  mid_term:   '2040–2059',
+  long_term:  '2060+',
+};
+
+function V2AnalysisPanel({ analysis }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!analysis) return null;
+
+  const { signals, risks, adaptations, narrative, metadata } = analysis;
+  const topSignals  = signals?.signals?.slice(0, 4)  ?? [];
+  const topRisks    = (risks ?? []).slice(0, 3);
+  const topAdapts   = adaptations?.adaptations?.slice(0, 2) ?? [];
+  const summary     = narrative?.executive_summary ?? null;
+  const sources     = metadata?.data_sources ?? [];
+
+  return (
+    <Card className="bg-white dark:bg-zinc-900 border-2 border-primary/30 shadow-sm">
+      <CardHeader className="pb-3 pt-4">
+        <CardTitle className="text-sm flex items-center justify-between gap-2">
+          <span className="flex items-center gap-2 font-semibold text-zinc-900 dark:text-zinc-100">
+            <TrendingUp className="w-4 h-4 text-primary" />
+            Análisis de Riesgo Climático Integrado
+          </span>
+          <Badge className="text-[10px] py-0.5 px-2.5 font-semibold bg-primary/10 text-primary border-primary/30">
+            v2 · Layers 1–6
+          </Badge>
+        </CardTitle>
+        <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-1">
+          Fusión de climate_cells + GRI + Open-Meteo + World Bank
+        </p>
+      </CardHeader>
+
+      <CardContent className="space-y-5 pb-4">
+
+        {/* Executive summary */}
+        {summary && (
+          <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-4">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-2">Resumen ejecutivo</p>
+            <p className="text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">{summary}</p>
+          </div>
+        )}
+
+        {/* Señales detectadas */}
+        {topSignals.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+              Señales detectadas ({signals.signals_count})
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {topSignals.map((s, i) => (
+                <div
+                  key={i}
+                  className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-3 space-y-1.5"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+                      <span>{SIGNAL_ICONS[s.signalType] ?? '⚠️'}</span>
+                      {s.signalType.replace(/_/g, ' ')}
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className={`text-[9px] py-0 px-1.5 font-semibold border ${
+                        s.confidence === 'high'   ? 'border-emerald-400 text-emerald-700 dark:text-emerald-300' :
+                        s.confidence === 'medium' ? 'border-amber-400 text-amber-700 dark:text-amber-300' :
+                                                    'border-zinc-400 text-zinc-500'
+                      }`}
+                    >
+                      {s.confidence}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2 font-mono text-xs text-zinc-600 dark:text-zinc-400">
+                    <span>{s.historical != null ? s.historical.toFixed(1) : '—'}</span>
+                    <span className="text-zinc-300 dark:text-zinc-600">→</span>
+                    <span className="font-bold text-zinc-900 dark:text-white">
+                      {s.projected != null ? s.projected.toFixed(1) : '—'}
+                    </span>
+                    {s.delta != null && (
+                      <span className="text-zinc-500">
+                        ({s.delta > 0 ? '+' : ''}{s.delta.toFixed(1)})
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[9px] text-zinc-400 dark:text-zinc-500">
+                    {HORIZON_LABELS_V2[s.horizon] ?? s.horizon} · {s.indicator}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Top 3 riesgos priorizados */}
+        {topRisks.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+              Riesgos priorizados
+            </p>
+            <div className="space-y-2">
+              {topRisks.map((risk, i) => (
+                <div
+                  key={i}
+                  className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-3 space-y-2"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+                      #{risk.rank} {risk.signal?.signalType?.replace(/_/g, ' ')}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        {risk.composite_score != null ? (risk.composite_score * 100).toFixed(0) : '—'}/100
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className={`text-[9px] py-0 px-1.5 font-semibold border ${
+                          URGENCY_STYLES[risk.urgency] ?? URGENCY_STYLES.baja
+                        }`}
+                      >
+                        {risk.urgency}
+                      </Badge>
+                    </div>
+                  </div>
+                  {risk.operational_impacts?.length > 0 && (
+                    <ul className="space-y-0.5">
+                      {risk.operational_impacts.slice(0, 3).map((imp, j) => (
+                        <li key={j} className="flex items-start gap-1.5 text-[11px] text-zinc-600 dark:text-zinc-400">
+                          <span className="w-1 h-1 rounded-full bg-zinc-400 flex-shrink-0 mt-1.5" />
+                          {imp}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {risk.financial_impact_range && (
+                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                      Impacto estimado: USD {(risk.financial_impact_range.min_usd / 1000).toFixed(0)}K–{(risk.financial_impact_range.max_usd / 1000).toFixed(0)}K/año
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Adaptaciones */}
+        {topAdapts.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+              Medidas de adaptación
+            </p>
+            <div className="space-y-2">
+              {topAdapts.map((adapt, i) => (
+                <div key={i} className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-3 space-y-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+                    {adapt.risk_type?.replace(/_/g, ' ')}
+                  </p>
+                  <div className="space-y-1.5">
+                    {adapt.measures?.slice(0, 3).map((m, j) => (
+                      <div key={j} className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-zinc-800 dark:text-zinc-200 truncate">{m.nombre}</p>
+                          <p className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                            {m.horizonte_implementacion} · USD {(m.costo_estimado_rango?.min_usd / 1000).toFixed(0)}K–{(m.costo_estimado_rango?.max_usd / 1000).toFixed(0)}K
+                          </p>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={`text-[9px] py-0 px-1.5 flex-shrink-0 ${
+                            m.efectividad === 'alta'  ? 'border-emerald-400 text-emerald-700 dark:text-emerald-300' :
+                            m.efectividad === 'media' ? 'border-amber-400 text-amber-700 dark:text-amber-300' :
+                                                        'border-zinc-400 text-zinc-500'
+                          }`}
+                        >
+                          {m.efectividad}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Footer: fuentes de datos */}
+        {sources.length > 0 && (
+          <p className="text-[10px] text-zinc-400 dark:text-zinc-500">
+            Fuentes: {sources.join(' · ')}
+            {metadata?.distance_km != null && ` · punto DB: ${metadata.distance_km} km`}
+          </p>
+        )}
+
+      </CardContent>
+    </Card>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function ClimateRiskLookup() {
@@ -991,6 +1206,10 @@ export default function ClimateRiskLookup() {
 
   const [territorialCtx, setTerritorialCtx] = useState(null);
   const [docContext, setDocContext]         = useState(null);
+
+  // Estado para el análisis integrado v2 (Layers 1-6)
+  const [v2Analysis, setV2Analysis]   = useState(null);
+  const [v2Loading, setV2Loading]     = useState(false);
 
   // Contexto Banco Mundial + catálogo de documentos: se cargan una sola vez al iniciar
   useEffect(() => {
@@ -1027,14 +1246,17 @@ export default function ClimateRiskLookup() {
     setClimateTrends(null);
     setDbClimate(null);
     setExternalError(null);
+    setV2Analysis(null);
+    setV2Loading(true);
     setMarkerPos([latNum, lngNum]);
     setFlyTarget({ pos: [latNum, lngNum], zoom: 14 });
 
     try {
-      const [griResult, trendsResult, dbResult] = await Promise.allSettled([
+      const [griResult, trendsResult, dbResult, v2Result] = await Promise.allSettled([
         fetchExternalRisks(latNum, lngNum),
         fetchClimateTrends(latNum, lngNum),
         fetchClimateDB(latNum, lngNum),
+        analyzeClimateRisk({ lat: latNum, lon: lngNum, sector: 'retail' }),
       ]);
 
       if (griResult.status === "fulfilled") {
@@ -1050,11 +1272,16 @@ export default function ClimateRiskLookup() {
       if (dbResult.status === "fulfilled" && dbResult.value) {
         setDbClimate(dbResult.value);
       }
+
+      if (v2Result.status === "fulfilled" && v2Result.value) {
+        setV2Analysis(v2Result.value);
+      }
     } finally {
       setLoading(false);
       setExternalLoading(false);
       setTrendsLoading(false);
       setDbLoading(false);
+      setV2Loading(false);
     }
   };
 
@@ -1177,6 +1404,19 @@ export default function ClimateRiskLookup() {
               <ThreatsPanel engineResult={engineResult} externalRisks={externalRisks} />
               <TechnicalDetailsPanel engineResult={engineResult} />
             </>
+          )}
+
+          {/* Panel Análisis Integrado v2 (Layers 1-6) */}
+          {v2Loading && (
+            <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800">
+              <CardContent className="py-4 flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Ejecutando análisis integrado...
+              </CardContent>
+            </Card>
+          )}
+          {!v2Loading && v2Analysis && (
+            <V2AnalysisPanel analysis={v2Analysis} />
           )}
 
           {/* Contexto territorial Banco Mundial */}
