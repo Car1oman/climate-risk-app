@@ -27,6 +27,14 @@ import { getDocumentosEnrichment } from './services/documentosEnrichmentService.
 import { getCompleteRiskModel } from './services/riskModelService.js';
 import { supabase } from "./supabaseClient.js";
 
+// ── Fase 2: Backend Layers ────────────────────────────────────────────────────
+import { fusionClimateData }  from './layers/Layer1_ClimateDataFusion.js';
+import { detectSignals }      from './layers/Layer2_SignalEngine.js';
+import { assessBusinessRisk } from './layers/Layer3_BusinessRiskEngine.js';
+import { prioritizeRisks }    from './layers/Layer4_PrioritizationEngine.js';
+import { getAdaptations }     from './layers/Layer5_AdaptationEngine.js';
+import { generateNarrative }  from './layers/Layer6_NarrativeEngine.js';
+
 dotenv.config();
 
 const app = express();
@@ -1583,6 +1591,142 @@ app.get('/api/documentos/context', async (req, res) => {
 
 // ============================================
 // FIN ENDPOINTS APIS EXTERNAS NARRATIVAS
+// ============================================
+
+// ============================================
+// FASE 2 — POST /api/v2/climate-risk-analysis
+// Ejecuta las 6 capas en secuencia y retorna
+// análisis completo de riesgo climático.
+// ============================================
+app.post('/api/v2/climate-risk-analysis', async (req, res) => {
+  const { lat, lon, sector, asset_type, scenario } = req.body;
+
+  if (!lat || !lon || !sector) {
+    return res.status(400).json({ error: 'lat, lon y sector son requeridos' });
+  }
+
+  const latNum = parseFloat(lat);
+  const lonNum = parseFloat(lon);
+
+  if (isNaN(latNum) || isNaN(lonNum)) {
+    return res.status(400).json({ error: 'lat y lon deben ser números válidos' });
+  }
+
+  const partialResult = {};
+  const errors = {};
+
+  try {
+    // ── Capa 1: Fusión de datos climáticos ──────────────────────────────────
+    let fusedData;
+    try {
+      fusedData = await fusionClimateData({ lat: latNum, lon: lonNum, scenario });
+      partialResult.layer1 = 'ok';
+    } catch (err) {
+      console.error('[v2] Layer1 falló:', err.message);
+      errors.layer1 = err.message;
+      return res.status(500).json({ error: 'Error en fusión de datos climáticos', details: err.message, partial: partialResult });
+    }
+
+    // ── Capa 2: Detección de señales ────────────────────────────────────────
+    let signalOutput;
+    try {
+      signalOutput = detectSignals(fusedData);
+      partialResult.layer2 = 'ok';
+    } catch (err) {
+      console.error('[v2] Layer2 falló:', err.message);
+      errors.layer2 = err.message;
+      signalOutput = { signals: [], signals_count: 0, dominant_signal: null };
+    }
+
+    // ── Capa 3: Evaluación de riesgo de negocio ─────────────────────────────
+    let businessRiskOutput;
+    try {
+      businessRiskOutput = assessBusinessRisk(signalOutput, { sector, asset_type });
+      partialResult.layer3 = 'ok';
+    } catch (err) {
+      console.error('[v2] Layer3 falló:', err.message);
+      errors.layer3 = err.message;
+      businessRiskOutput = { risks: [], overall_exposure: 'bajo', sector_key: 'otros' };
+    }
+
+    // ── Capa 4: Priorización ────────────────────────────────────────────────
+    let prioritizationOutput;
+    try {
+      prioritizationOutput = prioritizeRisks(businessRiskOutput, fusedData);
+      partialResult.layer4 = 'ok';
+    } catch (err) {
+      console.error('[v2] Layer4 falló:', err.message);
+      errors.layer4 = err.message;
+      prioritizationOutput = { prioritized_risks: [], top_risk: null };
+    }
+
+    // ── Capa 5: Adaptaciones ────────────────────────────────────────────────
+    let adaptationOutput;
+    try {
+      adaptationOutput = getAdaptations(prioritizationOutput, sector);
+      partialResult.layer5 = 'ok';
+    } catch (err) {
+      console.error('[v2] Layer5 falló:', err.message);
+      errors.layer5 = err.message;
+      adaptationOutput = { adaptations: [] };
+    }
+
+    // ── Capa 6: Narrativa ───────────────────────────────────────────────────
+    let narrativeOutput;
+    try {
+      narrativeOutput = generateNarrative({
+        fusedData,
+        signalOutput,
+        businessRiskOutput,
+        prioritizationOutput,
+        adaptationOutput,
+        sector,
+        lat: latNum,
+        lon: lonNum,
+      });
+      partialResult.layer6 = 'ok';
+    } catch (err) {
+      console.error('[v2] Layer6 falló:', err.message);
+      errors.layer6 = err.message;
+      narrativeOutput = { executive_summary: 'No disponible', key_metrics: {}, generated_from: {} };
+    }
+
+    // ── Respuesta final ─────────────────────────────────────────────────────
+    return res.json({
+      location: {
+        lat:        latNum,
+        lon:        lonNum,
+        distanceKm: fusedData.distanceKm,
+      },
+      signals:     signalOutput,
+      risks:       prioritizationOutput.prioritized_risks,
+      adaptations: adaptationOutput,
+      narrative:   {
+        executive_summary: narrativeOutput.executive_summary,
+        key_metrics:       narrativeOutput.key_metrics,
+      },
+      metadata: {
+        scenario:     fusedData.scenario,
+        generated_at: fusedData.generated_at,
+        data_sources: Object.entries(narrativeOutput.generated_from)
+          .filter(([k, v]) => v === true)
+          .map(([k]) => k),
+        layers_status: partialResult,
+        ...(Object.keys(errors).length > 0 ? { layer_errors: errors } : {}),
+      },
+    });
+  } catch (err) {
+    console.error('[v2] Error inesperado:', err.message);
+    return res.status(500).json({
+      error:   'Error interno en el análisis de riesgo climático',
+      details: err.message,
+      partial: partialResult,
+    });
+  }
+});
+
+// ============================================
+// FIN FASE 2
 // ============================================
 
 const PORT = process.env.PORT || 3001;
