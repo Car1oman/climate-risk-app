@@ -4,6 +4,20 @@
  * NUNCA usa texto genérico: siempre incluye señal + valor numérico + horizonte.
  */
 
+// Nombres legibles de hazards GRI para el mensaje de contexto
+const GRI_HAZARD_LABELS = {
+  drought:   'sequía',
+  flood:     'inundación',
+  fluvial:   'inundación fluvial',
+  pluvial:   'inundación pluvial',
+  coastal:   'inundación costera',
+  river:     'inundación fluvial',
+  heat:      'calor extremo',
+  wind:      'vientos extremos',
+  landslide: 'deslizamiento',
+  tsunami:   'tsunami',
+};
+
 // Etiquetas legibles por tipo de señal
 const SIGNAL_LABELS = {
   extreme_heat:  'calor extremo (días con Tmax > 35°C)',
@@ -37,6 +51,42 @@ function formatUSD(value) {
   if (value >= 1_000_000) return `USD ${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1_000)     return `USD ${Math.round(value / 1_000)}K`;
   return `USD ${value}`;
+}
+
+/**
+ * Construye un resumen informativo cuando ninguna señal supera umbrales IPCC.
+ * En lugar de decir "no hay datos", enumera las amenazas GRI presentes y
+ * explica por qué no se activaron señales de alerta.
+ */
+function buildFallbackSummary(fusedData) {
+  const hazards = fusedData?.griData?.hazards ?? [];
+  const scored  = hazards
+    .filter(h => h.baseline?.score && h.baseline.score !== 'sin data')
+    .sort((a, b) => {
+      const order = { alto: 3, medio: 2, bajo: 1 };
+      return (order[b.baseline.score] ?? 0) - (order[a.baseline.score] ?? 0);
+    });
+
+  const sources = [];
+  if (fusedData?.climateData)     sources.push('CMIP6');
+  if (fusedData?.griData)         sources.push('GRI Infrastructure Resilience');
+  if (fusedData?.meteoData)       sources.push('Open-Meteo');
+  if (fusedData?.territorialData) sources.push('World Bank');
+
+  const sourcePhrase = sources.length > 0 ? ` (${sources.join(', ')})` : '';
+  let msg = `Los datos analizados${sourcePhrase} no muestran cambios que superen los umbrales de alerta definidos por IPCC AR6 / WRI para esta ubicación.`;
+
+  if (scored.length > 0) {
+    const parts = scored.map(h => {
+      const name = h.hazard_name ?? GRI_HAZARD_LABELS[h.hazard] ?? h.hazard;
+      const future = h.future_high_emissions?.score ?? h.future_low_emissions?.score;
+      const trend  = future && future !== h.baseline.score ? ` → proyección ${future}` : '';
+      return `${name} (${h.baseline.score}${trend})`;
+    });
+    msg += ` GRI registra exposición a: ${parts.join(', ')}.`;
+  }
+
+  return msg;
 }
 
 /**
@@ -138,7 +188,7 @@ export function generateNarrative({
 
   const executive_summary = [sentence1, sentence2]
     .filter(Boolean)
-    .join(' ') || 'No se detectaron señales climáticas significativas para esta ubicación con los datos disponibles.';
+    .join(' ') || buildFallbackSummary(fusedData);
 
   // key_metrics: métricas clave extraídas de los outputs anteriores
   const topSignal = topRisk?.signal ?? null;

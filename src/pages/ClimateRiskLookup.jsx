@@ -362,11 +362,11 @@ function NarrativePanel({ narrative, location, metadata }) {
         <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">{summary}</p>
 
         {/* Key metrics strip */}
-        {(metrics.total_señales != null || metrics.impacto_financiero_min != null) && (
+        {(metrics.total_señales > 0 || scoreTop != null || metrics.impacto_financiero_min != null) && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-            {metrics.total_señales != null && (
+            {metrics.total_señales > 0 && (
               <div className="rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-2.5 text-center">
-                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-1">Señales</p>
+                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-1">Señales IPCC</p>
                 <p className="text-lg font-bold text-zinc-900 dark:text-white">{metrics.total_señales}</p>
               </div>
             )}
