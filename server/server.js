@@ -1599,10 +1599,11 @@ app.get('/api/documentos/context', async (req, res) => {
 // análisis completo de riesgo climático.
 // ============================================
 app.post('/api/v2/climate-risk-analysis', async (req, res) => {
-  const { lat, lon, sector, asset_type, scenario } = req.body;
+  const { lat, lon, sector: sectorRaw, asset_type, scenario } = req.body;
+  const sector = sectorRaw || 'retail';
 
-  if (!lat || !lon || !sector) {
-    return res.status(400).json({ error: 'lat, lon y sector son requeridos' });
+  if (!lat || !lon) {
+    return res.status(400).json({ error: 'lat y lon son requeridos' });
   }
 
   const latNum = parseFloat(lat);
@@ -1705,9 +1706,13 @@ app.post('/api/v2/climate-risk-analysis', async (req, res) => {
         executive_summary: narrativeOutput.executive_summary,
         key_metrics:       narrativeOutput.key_metrics,
       },
+      gri_hazards:       fusedData.griData?.hazards ?? [],
+      territorial:       fusedData.territorialData ?? null,
       metadata: {
+        sector,
         scenario:     fusedData.scenario,
         generated_at: fusedData.generated_at,
+        distance_km:  fusedData.distanceKm,
         data_sources: Object.entries(narrativeOutput.generated_from)
           .filter(([k, v]) => v === true)
           .map(([k]) => k),
