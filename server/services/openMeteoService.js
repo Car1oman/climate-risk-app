@@ -1,5 +1,14 @@
 const OPEN_METEO_URL = 'https://climate-api.open-meteo.com/v1/climate';
+
+// Modelos CMIP6 de alta resolución con cobertura para Perú
 const MODELS = ['CMCC_CM2_VHR4', 'FGOALS_f3_H', 'HiRAM_SIT_HR', 'MRI_AGCM3_2_S'];
+
+// Períodos climáticos definidos por IPCC AR6
+const PERIODS = {
+  historical: { from: 1980, to: 2014 },
+  short_term: { from: 2020, to: 2039 }, // SSP 2030-horizon
+  mid_term:   { from: 2040, to: 2059 }, // SSP 2050-horizon
+};
 
 async function fetchWithTimeout(url, timeoutMs) {
   const controller = new AbortController();
@@ -15,22 +24,201 @@ async function fetchOpenMeteo(lat, lon) {
   let lastError;
   for (const model of MODELS) {
     const params = new URLSearchParams({
-      latitude: lat,
-      longitude: lon,
+      latitude:   lat,
+      longitude:  lon,
       start_date: '1980-01-01',
-      end_date: '2050-01-01',
-      models: model,
-      daily: 'temperature_2m_mean,precipitation_sum',
+      end_date:   '2059-12-31',
+      models:     model,
+      // Añadimos tmax para computar hd35, hd40, txx
+      daily:      'temperature_2m_mean,temperature_2m_max,precipitation_sum',
     });
     try {
-      const res = await fetchWithTimeout(`${OPEN_METEO_URL}?${params}`, 30000);
+      const res = await fetchWithTimeout(`${OPEN_METEO_URL}?${params}`, 45000);
       if (!res.ok) continue;
-      return await res.json();
+      const json = await res.json();
+      // Validar que la respuesta tiene datos
+      if (json?.daily?.time?.length > 0) return json;
     } catch (e) {
       lastError = e;
     }
   }
   throw new Error(`No se pudo obtener datos de Open-Meteo: ${lastError?.message}`);
+}
+
+// ── Cómputo de índices climáticos extremos ────────────────────────────────────
+
+/**
+ * Calcula el máximo de una ventana deslizante de N días.
+ * Usado para rx5day (máxima precipitación acumulada en 5 días).
+ */
+function rollingMax(arr, window) {
+  if (arr.length < window) return null;
+  let max = -Infinity;
+  let current = arr.slice(0, window).reduce((s, v) => s + (v ?? 0), 0);
+  max = current;
+  for (let i = window; i < arr.length; i++) {
+    current += (arr[i] ?? 0) - (arr[i - window] ?? 0);
+    if (current > max) max = current;
+  }
+  return max;
+}
+
+/**
+ * Calcula índices climáticos extremos para un conjunto de registros diarios.
+ * @param {Array<{tmean, tmax, precip}>} records
+ * @returns {Object} Índices promediados sobre los años del período
+ */
+function computeExtremeIndices(records) {
+  if (!records.length) return null;
+
+  // Agrupar por año
+  const byYear = {};
+  for (const r of records) {
+    const y = r.year;
+    if (!byYear[y]) byYear[y] = [];
+    byYear[y].push(r);
+  }
+
+  const yearStats = Object.values(byYear)
+    .filter(days => days.length >= 30) // mínimo de datos para que el año sea válido
+    .map(days => {
+      const tmaxVals   = days.map(d => d.tmax).filter(v => v != null);
+      const tmeanVals  = days.map(d => d.tmean).filter(v => v != null);
+      const precipVals = days.map(d => d.precip).filter(v => v != null);
+
+      // Días calurosos
+      const hd35 = tmaxVals.filter(t => t > 35).length;
+      const hd40 = tmaxVals.filter(t => t > 40).length;
+
+      // Temperatura media anual
+      const tas = tmeanVals.length
+        ? tmeanVals.reduce((s, v) => s + v, 0) / tmeanVals.length
+        : null;
+
+      // Temperatura máxima del período (TXx)
+      const txx = tmaxVals.length ? Math.max(...tmaxVals) : null;
+
+      // Precipitación anual total
+      const pr = precipVals.reduce((s, v) => s + v, 0);
+
+      // Precipitación máxima diaria (Rx1day)
+      const rx1day = precipVals.length ? Math.max(...precipVals) : null;
+
+      // Precipitación máxima en 5 días consecutivos (Rx5day)
+      const rx5day = rollingMax(precipVals, 5);
+
+      // Días secos consecutivos (CDD): racha más larga de días con precip < 1mm
+      let cdd = 0, run = 0;
+      for (const p of precipVals) {
+        if (p < 1) { run++; if (run > cdd) cdd = run; }
+        else run = 0;
+      }
+
+      // Días húmedos consecutivos (CWD)
+      let cwd = 0;
+      run = 0;
+      for (const p of precipVals) {
+        if (p >= 1) { run++; if (run > cwd) cwd = run; }
+        else run = 0;
+      }
+
+      return { hd35, hd40, tas, txx, pr, rx1day, rx5day, cdd, cwd };
+    });
+
+  if (!yearStats.length) return null;
+
+  // Promedio de cada índice sobre los años válidos del período
+  const avgOf = (fn) => {
+    const vals = yearStats.map(fn).filter(v => v != null);
+    return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : null;
+  };
+
+  return {
+    hd35:   avgOf(y => y.hd35),
+    hd40:   avgOf(y => y.hd40),
+    tas:    avgOf(y => y.tas),
+    txx:    avgOf(y => y.txx),
+    pr:     avgOf(y => y.pr),
+    rx1day: avgOf(y => y.rx1day),
+    rx5day: avgOf(y => y.rx5day),
+    cdd:    avgOf(y => y.cdd),
+    cwd:    avgOf(y => y.cwd),
+    tnn:    null, // requeriría temperature_2m_min; se puede agregar si se necesita
+  };
+}
+
+/**
+ * Procesa los datos diarios de Open-Meteo y genera:
+ * - `meteo`: objeto de tendencias para narrativa (compatibilidad existente)
+ * - `climateIndices`: índices extremos por período, compatibles con Layer 2
+ */
+function processData(data) {
+  const daily   = data.daily || {};
+  const dates   = daily.time                  || [];
+  const tmeans  = daily.temperature_2m_mean   || [];
+  const tmaxs   = daily.temperature_2m_max    || [];
+  const precips = daily.precipitation_sum     || [];
+
+  // Agrupar registros por período IPCC
+  const buckets = {
+    historical: [],
+    short_term: [],
+    mid_term:   [],
+  };
+
+  dates.forEach((date, i) => {
+    const year   = parseInt(date.slice(0, 4), 10);
+    const record = { year, tmean: tmeans[i], tmax: tmaxs[i], precip: precips[i] };
+
+    if (year >= PERIODS.historical.from && year <= PERIODS.historical.to) {
+      buckets.historical.push(record);
+    } else if (year >= PERIODS.short_term.from && year <= PERIODS.short_term.to) {
+      buckets.short_term.push(record);
+    } else if (year >= PERIODS.mid_term.from && year <= PERIODS.mid_term.to) {
+      buckets.mid_term.push(record);
+    }
+  });
+
+  // Computar índices extremos por período
+  const climateIndices = {
+    historical: computeExtremeIndices(buckets.historical),
+    short_term: computeExtremeIndices(buckets.short_term),
+    mid_term:   computeExtremeIndices(buckets.mid_term),
+  };
+
+  // ── Mantener estructura `meteo` para compatibilidad con narrativa ─────────
+  const avg = (arr) => arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : null;
+
+  const histTmean = avg(buckets.historical.map(r => r.tmean).filter(v => v != null));
+  const histPrecip = avg(buckets.historical.map(r => r.precip).filter(v => v != null));
+
+  function buildMetePeriod(records) {
+    const temps   = records.map(r => r.tmean).filter(v => v != null);
+    const precips = records.map(r => r.precip).filter(v => v != null);
+    const avg_temp   = avg(temps);
+    const avg_precip = avg(precips);
+    const delta_temp = (histTmean != null && avg_temp != null) ? avg_temp - histTmean : null;
+    const delta_precip_pct =
+      (histPrecip != null && histPrecip > 0 && avg_precip != null)
+        ? ((avg_precip - histPrecip) / histPrecip) * 100
+        : null;
+    return {
+      avg_temp,
+      avg_precip,
+      delta_temp,
+      delta_precip_pct,
+      temp_trend:   delta_temp        != null ? classifyTempDelta(delta_temp)         : null,
+      precip_trend: delta_precip_pct  != null ? classifyPrecipDelta(delta_precip_pct) : null,
+    };
+  }
+
+  const meteo = {
+    historical:  { avg_temp: histTmean, avg_precip: histPrecip },
+    short_term:  buildMetePeriod(buckets.short_term),
+    medium_term: buildMetePeriod(buckets.mid_term),
+  };
+
+  return { meteo, climateIndices };
 }
 
 function classifyTempDelta(delta) {
@@ -47,59 +235,6 @@ function classifyPrecipDelta(pct) {
   return 'stable';
 }
 
-function processData(data) {
-  const daily = data.daily || {};
-  const dates = daily.time || [];
-  const temps = daily.temperature_2m_mean || [];
-  const precips = daily.precipitation_sum || [];
-
-  const buckets = {
-    historical: { temp: [], precip: [] },
-    short_term:  { temp: [], precip: [] },
-    medium_term: { temp: [], precip: [] },
-  };
-
-  dates.forEach((date, i) => {
-    const year = parseInt(date.slice(0, 4));
-    const temp   = temps[i];
-    const precip = precips[i];
-    const bucket = year <= 2020 ? 'historical' : year <= 2039 ? 'short_term' : 'medium_term';
-    if (temp   != null) buckets[bucket].temp.push(temp);
-    if (precip != null) buckets[bucket].precip.push(precip);
-  });
-
-  const avg = (arr) => arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : null;
-
-  const hist = {
-    avg_temp:   avg(buckets.historical.temp),
-    avg_precip: avg(buckets.historical.precip),
-  };
-
-  function buildPeriod(key) {
-    const avg_temp   = avg(buckets[key].temp);
-    const avg_precip = avg(buckets[key].precip);
-    const delta_temp = (hist.avg_temp != null && avg_temp != null) ? avg_temp - hist.avg_temp : null;
-    const delta_precip_pct =
-      (hist.avg_precip != null && hist.avg_precip > 0 && avg_precip != null)
-        ? ((avg_precip - hist.avg_precip) / hist.avg_precip) * 100
-        : null;
-    return {
-      avg_temp,
-      avg_precip,
-      delta_temp,
-      delta_precip_pct,
-      temp_trend:   delta_temp   != null ? classifyTempDelta(delta_temp)       : null,
-      precip_trend: delta_precip_pct != null ? classifyPrecipDelta(delta_precip_pct) : null,
-    };
-  }
-
-  return {
-    historical:  { ...hist },
-    short_term:  buildPeriod('short_term'),
-    medium_term: buildPeriod('medium_term'),
-  };
-}
-
 const TEMP_THRESHOLD_REFS = {
   extreme_warming:     'IPCC AR6 WG1: calentamiento extremo (≥4°C) — riesgo severo para ecosistemas y salud',
   significant_warming: 'IPCC AR6 WG1: calentamiento significativo (2–4°C) — impactos importantes en actividad económica',
@@ -111,7 +246,7 @@ const TEMP_THRESHOLD_REFS = {
 function buildNarrative(meteo) {
   const periods = [
     { key: 'short_term',  label: 'Corto plazo (2020–2039)' },
-    { key: 'medium_term', label: 'Mediano plazo (2040–2050)' },
+    { key: 'medium_term', label: 'Mediano plazo (2040–2059)' },
   ];
 
   return periods.map(({ key, label }) => {
@@ -158,7 +293,7 @@ function buildNarrative(meteo) {
 
 export async function getClimateTrends(lat, lon) {
   const data      = await fetchOpenMeteo(lat, lon);
-  const meteo     = processData(data);
+  const { meteo, climateIndices } = processData(data);
   const narrative = buildNarrative(meteo);
-  return { meteo, narrative };
+  return { meteo, climateIndices, narrative };
 }

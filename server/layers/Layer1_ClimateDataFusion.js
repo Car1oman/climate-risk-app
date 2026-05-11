@@ -118,12 +118,18 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
   if (territorialResult.status === 'rejected')
     console.warn('[Layer1] World Bank falló:', territorialResult.reason?.message);
 
+  // Cuando climate_cells no tiene datos, usar los índices extremos computados
+  // por Open-Meteo (hd35, hd40, cdd, rx5day, rx1day, pr, tas) como fallback.
+  // climateIndices ya está en el mismo formato que climateData (historical/short_term/mid_term).
+  const climateData = cellData?.climateData ?? meteoResult_?.climateIndices ?? null;
+
   return {
-    // Datos de climate_cells normalizados por horizonte
-    climateData:     cellData?.climateData    ?? null,
+    // Datos climáticos normalizados: climate_cells (preferido) u Open-Meteo computed
+    climateData,
+    climateSource:   cellData?.climateData ? 'climate_cells' : (meteoResult_?.climateIndices ? 'open_meteo_derived' : null),
     // Datos GRI (probabilidades de amenaza por peligro)
     griData:         griData                  ?? null,
-    // Datos Open-Meteo (deltas de temperatura y precipitación)
+    // Datos Open-Meteo (deltas de temperatura y precipitación para narrativa)
     meteoData:       meteoResult_?.meteo      ?? null,
     // Contexto territorial World Bank
     territorialData: territorial              ?? null,

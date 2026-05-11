@@ -366,7 +366,7 @@ function NarrativePanel({ narrative, location, metadata }) {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
             {metrics.total_señales > 0 && (
               <div className="rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-2.5 text-center">
-                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-1">Señales IPCC</p>
+                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-1">Señales</p>
                 <p className="text-lg font-bold text-zinc-900 dark:text-white">{metrics.total_señales}</p>
               </div>
             )}
@@ -409,10 +409,21 @@ function NarrativePanel({ narrative, location, metadata }) {
 // ── Panel 2: Señales climáticas (Layer 2) ─────────────────────────────────────
 
 function SignalRow({ signal }) {
-  const meta  = SIGNAL_META[signal.signalType] ?? { icon: "⚠️", label: signal.signalType, unit: "" };
-  const sign  = (signal.delta ?? 0) >= 0 ? "+" : "";
-  const conf  = signal.confidence;
-  const confColor = conf === "high" ? "text-emerald-600 dark:text-emerald-400" : conf === "medium" ? "text-amber-600 dark:text-amber-400" : "text-zinc-400";
+  const meta     = SIGNAL_META[signal.signalType] ?? { icon: "⚠️", label: signal.signalType, unit: "" };
+  const isGRI    = signal.indicator?.startsWith('gri_');
+  const sign     = (signal.delta ?? 0) >= 0 ? "+" : "";
+  const conf     = signal.confidence;
+  const confColor = conf === "high"
+    ? "text-emerald-600 dark:text-emerald-400"
+    : conf === "medium" ? "text-amber-600 dark:text-amber-400"
+    : "text-zinc-400";
+
+  // Para señales GRI, los valores son probabilidades (0-1) → mostrar como %
+  const fmtVal  = (v) => v == null ? "—" : isGRI ? `${(v * 100).toFixed(0)}%` : fmtNum(v);
+  const unit    = isGRI ? "" : meta.unit;
+  const fmtDelta = (v) => v == null ? null : isGRI
+    ? `${sign}${(v * 100).toFixed(0)}pp`
+    : `${sign}${fmtNum(v)}`;
 
   return (
     <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-3 space-y-2">
@@ -420,17 +431,18 @@ function SignalRow({ signal }) {
         <span className="flex items-center gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
           <span className="text-base leading-none">{meta.icon}</span>
           {meta.label}
+          {isGRI && <span className="text-[9px] font-normal text-zinc-400 ml-1">GRI</span>}
         </span>
         <span className={`text-[10px] font-semibold ${confColor}`}>{conf}</span>
       </div>
 
       <div className="flex items-center gap-2 font-mono text-xs text-zinc-600 dark:text-zinc-400">
-        <span className="tabular-nums">{fmtNum(signal.historical)}</span>
+        <span className="tabular-nums">{fmtVal(signal.historical)}</span>
         <span className="text-zinc-300 dark:text-zinc-600">→</span>
-        <span className="tabular-nums font-bold text-zinc-900 dark:text-white">{fmtNum(signal.projected)}</span>
-        <span className="text-zinc-400 dark:text-zinc-500 font-sans">{meta.unit}</span>
+        <span className="tabular-nums font-bold text-zinc-900 dark:text-white">{fmtVal(signal.projected)}</span>
+        {unit && <span className="text-zinc-400 dark:text-zinc-500 font-sans">{unit}</span>}
         {signal.delta != null && (
-          <span className="ml-auto text-zinc-500">({sign}{fmtNum(signal.delta)})</span>
+          <span className="ml-auto text-zinc-500">({fmtDelta(signal.delta)})</span>
         )}
       </div>
 
@@ -438,7 +450,7 @@ function SignalRow({ signal }) {
         <p className="text-[10px] text-zinc-400 dark:text-zinc-500">{HORIZON_LABEL[signal.horizon] ?? signal.horizon}</p>
         {signal.threshold_reference && (
           <p className="text-[10px] text-zinc-400 dark:text-zinc-500 truncate max-w-[55%] text-right" title={signal.threshold_reference}>
-            {signal.threshold_reference.slice(0, 40)}…
+            {signal.threshold_reference.slice(0, 45)}…
           </p>
         )}
       </div>
@@ -461,7 +473,7 @@ function SignalsPanel({ signals }) {
           </span>
         </CardTitle>
         <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-1">
-          Comparación histórico (1995–2014) vs. proyectado · umbrales IPCC AR6 / WRI Aqueduct
+          Cuantitativas (IPCC AR6 / WRI Aqueduct) + cualitativas GRI · histórico vs. proyectado
         </p>
       </CardHeader>
       <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pb-4">

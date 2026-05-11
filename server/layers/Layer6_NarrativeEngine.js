@@ -105,18 +105,35 @@ function buildMainSentence(topRisk, lat, lon) {
   // Construir descripción del delta numérico según tipo de señal
   let deltaDesc = '';
   if (signal.signalType === 'flood_risk') {
-    const prob = signal.projected != null ? `${(signal.projected * 100).toFixed(0)}%` : 'elevada';
-    deltaDesc = `probabilidad de inundación de ${prob}`;
+    const histP = signal.historical != null ? `${(signal.historical * 100).toFixed(0)}%` : null;
+    const projP = signal.projected  != null ? `${(signal.projected  * 100).toFixed(0)}%` : 'elevada';
+    deltaDesc = histP && signal.indicator?.startsWith('gri_')
+      ? `probabilidad de inundación de ${histP} → proyectada ${projP} (GRI)`
+      : `probabilidad de inundación de ${projP}`;
   } else if (signal.signalType === 'temp_increase') {
     const d = signal.delta != null ? `+${signal.delta.toFixed(1)}°C` : 'incremento significativo';
     const hist = signal.historical != null ? ` (base histórica: ${signal.historical.toFixed(1)}°C)` : '';
     deltaDesc = `aumento de temperatura media de ${d}${hist}`;
   } else if (['extreme_heat', 'severe_heat'].includes(signal.signalType)) {
-    const proj = signal.projected != null ? `${Math.round(signal.projected)} días/año` : 'incremento significativo';
-    const d    = signal.delta     != null ? ` (+${Math.round(signal.delta)} días vs histórico)` : '';
-    deltaDesc = `${proj}${d} con ${signal.indicator === 'hd40' ? 'Tmax > 40°C' : 'Tmax > 35°C'}`;
+    if (signal.indicator === 'gri_heat_probability') {
+      const prob = signal.historical != null ? `${(signal.historical * 100).toFixed(0)}%` : null;
+      const futP = signal.projected  != null ? `${(signal.projected  * 100).toFixed(0)}%` : null;
+      deltaDesc = prob
+        ? `probabilidad de calor extremo de ${prob}${futP && futP !== prob ? ` → proyectada ${futP}` : ''} (GRI)`
+        : 'exposición a calor extremo registrada (GRI)';
+    } else {
+      const proj = signal.projected != null ? `${Math.round(signal.projected)} días/año` : 'incremento significativo';
+      const d    = signal.delta     != null ? ` (+${Math.round(signal.delta)} días vs histórico)` : '';
+      deltaDesc = `${proj}${d} con ${signal.indicator === 'hd40' ? 'Tmax > 40°C' : 'Tmax > 35°C'}`;
+    }
   } else if (signal.signalType === 'drought') {
-    if (signal.indicator === 'cdd') {
+    if (signal.indicator === 'gri_drought_probability') {
+      const prob = signal.historical != null ? `${(signal.historical * 100).toFixed(0)}%` : null;
+      const futP = signal.projected  != null ? `${(signal.projected  * 100).toFixed(0)}%` : null;
+      deltaDesc = prob
+        ? `probabilidad de sequía de ${prob}${futP && futP !== prob ? ` → proyectada ${futP}` : ''} (GRI)`
+        : 'exposición a sequía registrada (GRI)';
+    } else if (signal.indicator === 'cdd') {
       const d = signal.delta != null ? `+${Math.round(signal.delta)} días` : 'aumento significativo';
       deltaDesc = `${d} de días secos consecutivos`;
     } else {

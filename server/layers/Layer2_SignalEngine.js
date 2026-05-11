@@ -309,6 +309,107 @@ export function detectSignals(fusedData) {
     }));
   }
 
+  // ── SEÑALES CUALITATIVAS GRI ─────────────────────────────────────────────
+  // Cuando los índices cuantitativos (CMIP6 / Open-Meteo) no generan señales,
+  // los scores GRI brindan contexto de exposición real. Se agregan solo si no
+  // existe ya una señal cuantitativa del mismo tipo.
+  // confidence = 'medium' porque GRI usa probabilidades históricas, no proyecciones CMIP6.
+  //
+  // Conversión score GRI → probabilidad representativa
+  const GRI_SCORE_PROB = { bajo: 0.15, medio: 0.50, alto: 0.85 };
+
+  function extractGriHazard(types) {
+    return griData?.hazards?.find(h => types.includes(h.hazard)) ?? null;
+  }
+  function griProb(entry) {
+    return entry?.value_decimal ?? GRI_SCORE_PROB[entry?.score] ?? null;
+  }
+
+  // Sequía/estrés hídrico desde GRI
+  if (!signals.some(s => s.signalType === 'drought')) {
+    const griDrought = extractGriHazard(['drought']);
+    const baseScore  = griDrought?.baseline?.score;
+    if (baseScore && baseScore !== 'sin data') {
+      const baseProb   = griProb(griDrought.baseline);
+      const futureHigh = griDrought.future_high_emissions;
+      const futureMod  = griDrought.future_moderate_emissions;
+      const futureProb = griProb(futureHigh) ?? griProb(futureMod);
+      const futureScore = futureHigh?.score ?? futureMod?.score;
+      const scoreOrder  = { bajo: 1, medio: 2, alto: 3 };
+      const exceeds = (scoreOrder[baseScore] ?? 0) >= 2
+        || (scoreOrder[futureScore] ?? 0) > (scoreOrder[baseScore] ?? 0);
+
+      signals.push(buildSignal({
+        signalType:          'drought',
+        indicator:           'gri_drought_probability',
+        historical:          baseProb,
+        projected:           futureProb,
+        delta:               (baseProb != null && futureProb != null) ? futureProb - baseProb : null,
+        delta_pct:           deltaPct(baseProb, futureProb),
+        conf:                'medium',
+        horizon:             'short_term',
+        threshold_reference: `GRI Infrastructure Resilience — exposición sequía nivel ${baseScore}`,
+        exceeds_threshold:   exceeds,
+      }));
+    }
+  }
+
+  // Calor extremo desde GRI
+  if (!signals.some(s => ['extreme_heat', 'severe_heat'].includes(s.signalType))) {
+    const griHeat   = extractGriHazard(['heat', 'extreme_heat', 'wildfire']);
+    const baseScore = griHeat?.baseline?.score;
+    if (baseScore && baseScore !== 'sin data') {
+      const baseProb    = griProb(griHeat.baseline);
+      const futureEntry = griHeat.future_high_emissions ?? griHeat.future_moderate_emissions;
+      const futureProb  = griProb(futureEntry);
+      const futureScore = futureEntry?.score;
+      const scoreOrder  = { bajo: 1, medio: 2, alto: 3 };
+      const exceeds = (scoreOrder[baseScore] ?? 0) >= 2
+        || (scoreOrder[futureScore] ?? 0) > (scoreOrder[baseScore] ?? 0);
+
+      signals.push(buildSignal({
+        signalType:          'extreme_heat',
+        indicator:           'gri_heat_probability',
+        historical:          baseProb,
+        projected:           futureProb,
+        delta:               (baseProb != null && futureProb != null) ? futureProb - baseProb : null,
+        delta_pct:           deltaPct(baseProb, futureProb),
+        conf:                'medium',
+        horizon:             'short_term',
+        threshold_reference: `GRI Infrastructure Resilience — exposición calor extremo nivel ${baseScore}`,
+        exceeds_threshold:   exceeds,
+      }));
+    }
+  }
+
+  // Inundación costera desde GRI (complementa flood_risk si prob < 0.35)
+  if (!signals.some(s => s.signalType === 'flood_risk')) {
+    const griFlood  = extractGriHazard(['flood', 'fluvial', 'pluvial', 'coastal', 'river']);
+    const baseScore = griFlood?.baseline?.score;
+    if (baseScore && baseScore !== 'sin data') {
+      const baseProb    = griProb(griFlood.baseline);
+      const futureEntry = griFlood.future_high_emissions ?? griFlood.future_moderate_emissions;
+      const futureProb  = griProb(futureEntry) ?? baseProb;
+      const futureScore = futureEntry?.score;
+      const scoreOrder  = { bajo: 1, medio: 2, alto: 3 };
+      const exceeds = (scoreOrder[baseScore] ?? 0) >= 2
+        || (scoreOrder[futureScore] ?? 0) > (scoreOrder[baseScore] ?? 0);
+
+      signals.push(buildSignal({
+        signalType:          'flood_risk',
+        indicator:           'gri_flood_probability',
+        historical:          baseProb,
+        projected:           futureProb,
+        delta:               (baseProb != null && futureProb != null) ? futureProb - baseProb : null,
+        delta_pct:           deltaPct(baseProb, futureProb),
+        conf:                'medium',
+        horizon:             'short_term',
+        threshold_reference: `GRI Infrastructure Resilience — exposición inundación nivel ${baseScore}`,
+        exceeds_threshold:   exceeds,
+      }));
+    }
+  }
+
   // ── Señal dominante: la de mayor delta absoluto o la primera ─────────────
   const dominant_signal = signals.length > 0
     ? signals.reduce((best, s) =>
