@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { API_URL, fetchAssetDetail, getRiskModelFromBackend } from "@/lib/api";
-import { formatCurrency, getRiskColor, getCompleteRiskModel } from "@/lib/riskEngine";
+import { formatCurrency, getRiskColor } from "@/lib/riskEngine";
 import { Link } from "react-router-dom";
 import { ArrowLeft, MapPin, Sparkles, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -242,9 +242,16 @@ Genera exactamente 3 recomendaciones de adaptación climática específicas para
         </div>
       </div>
 
-      {/* Risk Model Section — usa backend si disponible, frontend como fallback */}
+      {/* Risk Model Section */}
       <div className="bg-card border border-border rounded-xl p-6">
-        <RiskModel riskData={backendRiskModel ?? getCompleteRiskModel(asset)} asset={asset} />
+        {backendRiskModel ? (
+          <RiskModel riskData={backendRiskModel} asset={asset} />
+        ) : (
+          <div className="flex items-center justify-center py-8 text-muted-foreground text-sm gap-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Calculando modelo de riesgo...
+          </div>
+        )}
       </div>
 
       {/* AI Recommendations */}
