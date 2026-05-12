@@ -1,3 +1,11 @@
+// LEGACY — This service uses an incorrect chained .from().rpc() pattern
+// that does not execute correctly against Supabase.
+// The active lookup path is GET /api/climate-risks/lookup in server.js,
+// which calls supabase.rpc('get_climate_by_location') directly.
+// This file is only kept because server.js still imports getClimateByLocation
+// and interpretClimateRisks for the /api/climate-cells/query endpoint.
+// Do NOT add new features here. Migrate consumers to /api/climate-risks/lookup.
+
 /**
  * Servicio de datos climáticos geoespaciales
  * Consulta la tabla climate_cells usando PostGIS para búsquedas por proximidad

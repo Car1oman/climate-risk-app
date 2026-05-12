@@ -688,7 +688,9 @@ app.post('/api/assets/bulk', async (req, res) => {
   }
 });
 
-// Carga masiva de datos climáticos for endpoint climático (para pruebas o integración con fuentes externas)
+// LEGACY — Writes to old `climate_data` table (flat weather records), not `climate_cells`.
+// The canonical data ingestion path is POST /api/climate-cells/upload (climateImportService).
+// This endpoint is retained for backward compatibility only. Do NOT use for new ingestion.
 app.post('/api/climate/bulk', async (req, res) => {
   try {
     const { climateData } = req.body;
@@ -982,7 +984,10 @@ app.get('/api/external-risks/lookup', async (req, res) => {
   }
 });
 
-// 🌍 Carga de datos climáticos del Banco Mundial hacia climate_risks_grid
+// LEGACY — Writes to old `climate_risks_grid` table and `climate_dataset_control`.
+// These tables are superseded by `climate_cells` (CMIP6 JSONB schema + PostGIS).
+// The canonical upload path is POST /api/climate-cells/upload (climateImportService).
+// This endpoint is retained for backward compatibility only. Do NOT use for new ingestion.
 app.post('/api/climate-risks/upload', async (req, res) => {
   try {
     const { data } = req.body;

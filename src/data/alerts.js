@@ -1,3 +1,6 @@
+// TODO: Replace with a live backend endpoint (e.g. GET /api/alerts) that reads
+// from the DB. This static array is a placeholder — it does not reflect real
+// alert state and will diverge from production data over time.
 export const alerts = [
   {
     id: "a1",

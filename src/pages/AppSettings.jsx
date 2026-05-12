@@ -9,6 +9,8 @@ export default function AppSettings() {
   const [recalculating, setRecalculating] = useState(false);
   const { data: assets = [], isLoading, error } = useAssets();
 
+  // TODO: Replace fake setTimeout with real POST /api/risk-model calls per asset.
+  // Currently simulates recalculation — no scores are actually updated in the DB.
   const recalculateAll = async () => {
     setRecalculating(true);
     setTimeout(() => {
