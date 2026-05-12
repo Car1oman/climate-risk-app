@@ -43,32 +43,8 @@ export const uploadClimateRisks = async (data) => {
   return res.json();
 };
 
-export const calculateRisk = async (assetId) => {
-  try {
-    const res = await fetch(`${API_URL}/api/calculate-risk/${assetId}`, {
-      method: 'POST',
-    });
-    if (!res.ok) {
-      throw new Error(`Error cálculo riesgo: ${res.status}`);
-    }
-    return await res.json();
-  } catch (error) {
-    console.error('Error cálculo riesgo', error);
-    return null;
-  }
-};
-
 export const fetchExternalRisks = async (lat, lng) => {
   const res = await fetch(`${API_URL}/api/external-risks/lookup?lat=${lat}&lng=${lng}`);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || err.error || `Error ${res.status}`);
-  }
-  return res.json();
-};
-
-export const fetchClimateTrends = async (lat, lng) => {
-  const res = await fetch(`${API_URL}/api/climate-trends?lat=${lat}&lng=${lng}`);
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.message || err.error || `Error ${res.status}`);

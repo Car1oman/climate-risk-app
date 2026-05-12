@@ -20,9 +20,7 @@ import {
   CATEGORIAS,
 } from './services/documentosService.js';
 import { getGriRiskByLocation } from './services/griRiskService.js';
-import { getClimateTrends } from './services/openMeteoService.js';
 import { getTerritorialContext } from './services/worldBankService.js';
-import { getHistoricalEnrichment } from './services/historicalEnrichmentService.js';
 import { getDocumentosEnrichment } from './services/documentosEnrichmentService.js';
 import { getCompleteRiskModel } from './services/riskModelService.js';
 import { supabase } from "./supabaseClient.js";
@@ -350,34 +348,6 @@ app.post('/api/climate-cells/upload', async (req, res) => {
   }
 });
 
-/**
- * GET /api/climate-cells/status
- * Información sobre los datos disponibles en climate_cells
- */
-app.get('/api/climate-cells/status', async (req, res) => {
-  try {
-    const { data: stats, error } = await supabase
-      .rpc('get_climate_cells_stats');
-
-    if (error) {
-      return res.status(500).json({
-        error: 'No se pudo obtener estadísticas',
-      });
-    }
-
-    return res.json({
-      database_stats: stats,
-      cache_size: Object.keys(climateCache).length,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    console.error('Error en /api/climate-cells/status:', error.message);
-    return res.status(500).json({
-      error: error.message,
-    });
-  }
-});
-
 // ============================================
 // FIN NUEVOS ENDPOINTS
 // ============================================
@@ -401,93 +371,6 @@ app.post('/api/risk-model', (req, res) => {
   } catch (err) {
     console.error('Error en /api/risk-model:', err.message);
     return res.status(500).json({ error: 'Error al calcular el modelo de riesgo.' });
-  }
-});
-
-app.post('/api/calculate-risk/:assetId', async (req, res) => {
-  try {
-    const { assetId } = req.params;
-
-    const { data: asset, error: assetError } = await supabase
-      .from('asset_risk_summary')
-      .select('*')
-      .eq('id', assetId)
-      .single();
-
-    if (assetError) {
-      console.error('Error leyendo activo:', assetError.message);
-      return res.status(500).json({ error: 'No se pudo obtener el activo' });
-    }
-
-    if (!asset) {
-      return res.status(404).json({ error: 'Activo no encontrado' });
-    }
-
-    const climate = await getClimateData(asset.lat, asset.lng);
-
-    if (!climate) {
-      return res.json({
-        warning: 'No hay datos climáticos disponibles',
-        riskScore: 0,
-        riskLevel: 'bajo',
-      });
-    }
-
-    const lastCalculated = asset.risk_calculated_at || asset.updated_at || asset.created_at;
-    const recalcThresholdMs = 1000 * 60 * 60 * 24;
-    const shouldRecalculate = !lastCalculated || (Date.now() - new Date(lastCalculated).getTime()) > recalcThresholdMs;
-
-    if (!shouldRecalculate) {
-      return res.json({
-        warning: 'El cálculo de riesgo ya está vigente',
-        riskScore: asset.risk_score ?? 0,
-        riskLevel: asset.risk_level ?? 'bajo',
-        asset,
-        climate,
-      });
-    }
-
-    const floodRisk = climate.precipitation > 50 ? 0.8 : 0.3;
-    const heatRisk = climate.temperature > 30 ? 0.7 : 0.2;
-    const windRisk = climate.wind_kph > 25 ? 0.6 : 0.2;
-
-    const hazard = floodRisk * 0.4 + heatRisk * 0.3 + windRisk * 0.3;
-    const riskScore = Math.min(1, hazard * 0.65 + (asset.impact_score || 0) * 0.35);
-    const riskLevel = riskScore >= 0.75 ? 'critico' : riskScore >= 0.5 ? 'alto' : riskScore >= 0.25 ? 'medio' : 'bajo';
-    const topRisk = climate.precipitation > 50 ? 'Inundación' : climate.temperature > 30 ? 'Ola de calor' : 'Vientos fuertes';
-
-    const updatePayload = {
-      hazard_score: hazard,
-      risk_score: riskScore,
-      risk_level: riskLevel,
-      top_risk: topRisk,
-    };
-
-    if (Object.prototype.hasOwnProperty.call(asset, 'risk_calculated_at')) {
-      updatePayload.risk_calculated_at = new Date().toISOString();
-    }
-
-    const { data: updatedAsset, error: updateError } = await supabase
-      .from('assets')
-      .update(updatePayload)
-      .eq('id', assetId)
-      .select()
-      .single();
-
-    if (updateError) {
-      console.warn('No se pudo actualizar el cálculo de riesgo:', updateError.message);
-    }
-
-    return res.json({
-      asset: updatedAsset || asset,
-      climate,
-      hazard,
-      riskScore,
-      riskLevel,
-    });
-  } catch (error) {
-    console.error(' Error en /api/calculate-risk:', error.message);
-    return res.status(500).json({ error: 'Error al calcular el riesgo' });
   }
 });
 
@@ -1480,30 +1363,6 @@ app.post('/api/places/assets', async (req, res) => {
   }
 });
 
-/**
- * GET /api/place/:id/assets
- * Devuelve todos los activos asociados a una ubicación
- */
-app.get('/api/place/:id/assets', async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from('assets')
-      .select('id, name, unidad_negocio, status, created_at')
-      .eq('place_id', req.params.id)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error obteniendo assets de place:', error.message);
-      return res.status(500).json({ error: 'Error al obtener los activos' });
-    }
-
-    return res.json(data || []);
-  } catch (error) {
-    console.error('Error en GET /api/place/:id/assets:', error.message);
-    return res.status(500).json({ error: 'Error interno del servidor' });
-  }
-});
-
 // ============================================
 // FIN ENDPOINTS BÚSQUEDA GEOGRÁFICA HÍBRIDA
 // ============================================
@@ -1511,46 +1370,6 @@ app.get('/api/place/:id/assets', async (req, res) => {
 // ============================================
 // ENDPOINTS — APIS EXTERNAS NARRATIVAS
 // ============================================
-
-// GET /api/climate-trends?lat=X&lng=Y
-// Proyecciones climáticas en lenguaje humano (Open-Meteo)
-app.get('/api/climate-trends', async (req, res) => {
-  const { lat, lng } = req.query;
-  const latNum = parseFloat(lat);
-  const lngNum = parseFloat(lng);
-
-  if (isNaN(latNum) || isNaN(lngNum)) {
-    return res.status(400).json({ error: 'lat y lng son requeridos' });
-  }
-
-  const cacheKey = `climate-trends-${latNum.toFixed(3)}-${lngNum.toFixed(3)}`;
-  const now = Date.now();
-
-  if (climateCache[cacheKey] && now - climateCache[cacheKey].timestamp < CACHE_TTL) {
-    return res.json(climateCache[cacheKey].data);
-  }
-
-  try {
-    // Open-Meteo (primario) + enriquecimiento histórico BD (complemento) en paralelo
-    const [trendsResult, enrichmentResult] = await Promise.allSettled([
-      getClimateTrends(latNum, lngNum),
-      getHistoricalEnrichment(latNum, lngNum),
-    ]);
-
-    if (trendsResult.status === 'rejected') throw trendsResult.reason;
-
-    const data = {
-      ...trendsResult.value,
-      historical_context: enrichmentResult.status === 'fulfilled' ? enrichmentResult.value : null,
-    };
-
-    climateCache[cacheKey] = { data, timestamp: now };
-    return res.json(data);
-  } catch (err) {
-    console.error('Error en /api/climate-trends:', err.message);
-    return res.status(500).json({ error: err.message });
-  }
-});
 
 // GET /api/territorial-context
 // Contexto socioeconómico de Perú (Banco Mundial) — cacheable 24h
