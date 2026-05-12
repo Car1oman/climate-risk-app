@@ -1,4 +1,4 @@
-import { HAZARD_LABELS, HAZARD_WEIGHTS, HORIZON } from "@/lib/riskEngine";
+import { HAZARD_LABELS, HAZARD_WEIGHTS, HORIZON, HORIZON_LABELS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { Droplets, Waves, Activity, Mountain, CloudOff } from "lucide-react";
 
@@ -9,8 +9,6 @@ const ICONS = {
   hazard_landslide: Mountain,
   hazard_drought: CloudOff,
 };
-
-const HORIZON_LABELS = { corto: "0–2 años", medio: "2–10 años", largo: "10–50 años" };
 
 const LEVEL_LABELS = ["Sin riesgo", "Bajo", "Medio", "Alto", "Extremo"];
 const LEVEL_COLORS = [
