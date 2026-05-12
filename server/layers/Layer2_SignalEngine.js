@@ -8,37 +8,35 @@
 // Fuente: IPCC AR6 WG1 Chapter 11 (extremos climáticos), WMO 2023 State of Climate
 const THRESHOLDS = {
   // Días con Tmax > 35°C: aumento > 10 días en corto plazo, > 20 en mediano
-  // Fuente: IPCC AR6 WG1 Table 11.1 — Heat extreme indices
   EXTREME_HEAT_SHORT: 10,
   EXTREME_HEAT_MID:   20,
 
   // Días con Tmax > 40°C: aumento > 5 días
-  // Fuente: IPCC AR6 WG1 SPM — umbrales de calor severo para salud humana
   SEVERE_HEAT: 5,
 
+  // Noches tropicales (Tmin > 20°C): aumento > 10 días en corto, > 20 en mediano
+  // Fuente: IPCC AR6 WG1 Chapter 11.3 — Warm nights / TN90p
+  // Señal clave para salud, confort y cadena frío en regiones costeras de Perú
+  TROPICAL_NIGHTS_SHORT: 10,
+  TROPICAL_NIGHTS_MID:   20,
+
   // Días secos consecutivos: aumento > 15 días
-  // Fuente: IPCC AR6 WG1 Chapter 11.6 — Droughts and aridity
   DROUGHT_CDD: 15,
 
-  // Precipitación anual: reducción > 15%
-  // Fuente: IPCC AR6 WG2 Chapter 4 — Water security thresholds
+  // Precipitación anual: reducción > 15% (usando prpercnt de DB o delta_pct calculado)
   DROUGHT_PR_PCT: -15,
 
   // Precipitación máxima 5 días: aumento > 20%
-  // Fuente: IPCC AR6 WG1 Chapter 11.4 — Heavy precipitation
   EXTREME_RAIN_RX5DAY_PCT: 20,
 
-  // Precipitación máxima 1 día: supera 50 mm
-  // Fuente: WMO 2023 — umbral operacional de alerta por lluvia intensa
+  // Precipitación máxima 1 día: supera 50 mm (o r50mm > 0 días/año con lluvia > 50mm)
   EXTREME_RAIN_RX1DAY_MM: 50,
 
   // Temperatura media: delta > 1.5°C corto plazo, > 2.5°C mediano
-  // Fuente: IPCC AR6 WG1 SPM — Paris Agreement thresholds
   TEMP_INCREASE_SHORT: 1.5,
   TEMP_INCREASE_MID:   2.5,
 
   // Probabilidad de inundación GRI > 0.35
-  // Fuente: WRI Aqueduct Floods — umbral de riesgo significativo
   FLOOD_RISK_PROB: 0.35,
 };
 
@@ -181,9 +179,35 @@ export function detectSignals(fusedData) {
     }
   }
 
-  // ── DROUGHT (cdd + pr) ───────────────────────────────────────────────────
+  // ── TROPICAL_NIGHTS (tr) ────────────────────────────────────────────────
+  // Noches con Tmin > 20°C — señal de bienestar, salud y cadena frío en Perú costero
+  // La DB tiene este índice y muestra incrementos de +20-50 días en la región
+  for (const [horizon, period, threshold] of [
+    ['short_term', short, THRESHOLDS.TROPICAL_NIGHTS_SHORT],
+    ['mid_term',   mid,   THRESHOLDS.TROPICAL_NIGHTS_MID],
+  ]) {
+    if (hist?.tr != null && period?.tr != null) {
+      const d = deltaAbs(hist.tr, period.tr);
+      if (d != null && d > threshold) {
+        signals.push(buildSignal({
+          signalType:          'tropical_nights',
+          indicator:           'tr',
+          historical:          hist.tr,
+          projected:           period.tr,
+          delta:               d,
+          delta_pct:           deltaPct(hist.tr, period.tr),
+          conf:                confidence(hasCC, !!meteoData),
+          horizon,
+          threshold_reference: `IPCC AR6 WG1 Ch.11.3 / WMO — noches tropicales: +${threshold} días Tmin>20°C`,
+          exceeds_threshold:   true,
+        }));
+      }
+    }
+  }
+
+  // ── DROUGHT (cdd + pr + prpercnt) ────────────────────────────────────────
   for (const [horizon, period] of [['short_term', short], ['mid_term', mid]]) {
-    // Por CDD
+    // Por CDD (cuando está disponible en DB)
     if (hist?.cdd != null && period?.cdd != null) {
       const d = deltaAbs(hist.cdd, period.cdd);
       if (d != null && d > THRESHOLDS.DROUGHT_CDD) {
@@ -201,8 +225,27 @@ export function detectSignals(fusedData) {
         }));
       }
     }
-    // Por PR (precipitación anual)
-    if (hist?.pr != null && period?.pr != null) {
+    // Por prpercnt (porcentaje de precipitación vs histórico — directo de DB)
+    // prpercnt = 100 significa igual al histórico; < 85 significa reducción > 15%
+    if (period?.prpercnt != null) {
+      const pctChange = period.prpercnt - 100; // convierte a delta vs histórico
+      if (pctChange < THRESHOLDS.DROUGHT_PR_PCT) {
+        signals.push(buildSignal({
+          signalType:          'drought',
+          indicator:           'prpercnt',
+          historical:          100,
+          projected:           period.prpercnt,
+          delta:               null,
+          delta_pct:           pctChange,
+          conf:                confidence(hasCC, !!meteoData),
+          horizon,
+          threshold_reference: 'IPCC AR6 WG2 Chapter 4 — umbral estrés hídrico: -15% precipitación',
+          exceeds_threshold:   true,
+        }));
+      }
+    }
+    // Por PR (precipitación anual absoluta — fallback)
+    if (!period?.prpercnt && hist?.pr != null && period?.pr != null) {
       const pct = deltaPct(hist.pr, period.pr);
       if (pct != null && pct < THRESHOLDS.DROUGHT_PR_PCT) {
         signals.push(buildSignal({

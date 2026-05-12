@@ -20,12 +20,13 @@ const GRI_HAZARD_LABELS = {
 
 // Etiquetas legibles por tipo de señal
 const SIGNAL_LABELS = {
-  extreme_heat:  'calor extremo (días con Tmax > 35°C)',
-  severe_heat:   'calor severo (días con Tmax > 40°C)',
-  drought:       'sequía / estrés hídrico',
-  extreme_rain:  'lluvia extrema',
-  temp_increase: 'aumento de temperatura media',
-  flood_risk:    'riesgo de inundación',
+  extreme_heat:    'calor extremo (días con Tmax > 35°C)',
+  severe_heat:     'calor severo (días con Tmax > 40°C)',
+  tropical_nights: 'noches tropicales (Tmin > 20°C)',
+  drought:         'sequía / estrés hídrico',
+  extreme_rain:    'lluvia extrema',
+  temp_increase:   'aumento de temperatura media',
+  flood_risk:      'riesgo de inundación',
 };
 
 // Etiquetas de horizonte temporal
@@ -114,6 +115,13 @@ function buildMainSentence(topRisk, lat, lon) {
     const d = signal.delta != null ? `+${signal.delta.toFixed(1)}°C` : 'incremento significativo';
     const hist = signal.historical != null ? ` (base histórica: ${signal.historical.toFixed(1)}°C)` : '';
     deltaDesc = `aumento de temperatura media de ${d}${hist}`;
+  } else if (signal.signalType === 'tropical_nights') {
+    const hist = signal.historical != null ? `${Math.round(signal.historical)} noches/año` : null;
+    const proj = signal.projected  != null ? `${Math.round(signal.projected)} noches/año`  : 'incremento significativo';
+    const d    = signal.delta      != null ? ` (+${Math.round(signal.delta)} noches vs histórico)` : '';
+    deltaDesc  = hist
+      ? `${proj}${d} con Tmin > 20°C (histórico: ${hist})`
+      : `${proj} con Tmin > 20°C`;
   } else if (['extreme_heat', 'severe_heat'].includes(signal.signalType)) {
     if (signal.indicator === 'gri_heat_probability') {
       const prob = signal.historical != null ? `${(signal.historical * 100).toFixed(0)}%` : null;
@@ -133,6 +141,10 @@ function buildMainSentence(topRisk, lat, lon) {
       deltaDesc = prob
         ? `probabilidad de sequía de ${prob}${futP && futP !== prob ? ` → proyectada ${futP}` : ''} (GRI)`
         : 'exposición a sequía registrada (GRI)';
+    } else if (signal.indicator === 'prpercnt') {
+      const pct = signal.delta_pct != null ? `${signal.delta_pct.toFixed(0)}%` : 'reducción significativa';
+      const proj = signal.projected != null ? `(${signal.projected.toFixed(1)}% del histórico)` : '';
+      deltaDesc = `${pct} de variación en precipitación anual ${proj}`.trim();
     } else if (signal.indicator === 'cdd') {
       const d = signal.delta != null ? `+${Math.round(signal.delta)} días` : 'aumento significativo';
       deltaDesc = `${d} de días secos consecutivos`;

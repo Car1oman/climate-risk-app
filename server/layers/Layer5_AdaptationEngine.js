@@ -177,6 +177,33 @@ const ADAPTATION_CATALOG = {
       efectividad:               'media',
     },
   ],
+
+  tropical_nights: [
+    {
+      nombre:                    'Climatización nocturna eficiente',
+      descripcion:               'Programación horaria de HVAC para corte de temperatura nocturno; reducción de hasta 30% en costo energético nocturno',
+      donde_impacta:             'Cadena frío, almacenes, tiendas',
+      horizonte_implementacion:  'inmediato',
+      costo_estimado_rango:      { min_usd: 2_000, max_usd: 8_000 },
+      efectividad:               'alta',
+    },
+    {
+      nombre:                    'Monitoreo de cadena frío 24/7',
+      descripcion:               'Sensores IoT con alertas automáticas para detectar rupturas de cadena frío durante horas nocturnas de alta temperatura',
+      donde_impacta:             'Cadena frío, almacenes refrigerados, farmacias',
+      horizonte_implementacion:  'corto',
+      costo_estimado_rango:      { min_usd: 5_000, max_usd: 18_000 },
+      efectividad:               'alta',
+    },
+    {
+      nombre:                    'Ventilación natural y diseño bioclimático',
+      descripcion:               'Auditoría de ventilación en instalaciones para aprovechar flujo de aire natural y reducir carga térmica nocturna',
+      donde_impacta:             'Infraestructura física, confort laboral',
+      horizonte_implementacion:  'mediano',
+      costo_estimado_rango:      { min_usd: 8_000, max_usd: 30_000 },
+      efectividad:               'media',
+    },
+  ],
 };
 
 /**

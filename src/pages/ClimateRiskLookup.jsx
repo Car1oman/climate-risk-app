@@ -62,12 +62,13 @@ const URGENCY_STYLES = {
 };
 
 const SIGNAL_META = {
-  extreme_heat:  { icon: "🌡️", label: "Calor extremo (>35°C)",        unit: "días/año" },
-  severe_heat:   { icon: "🔥", label: "Calor severo (>40°C)",          unit: "días/año" },
-  drought:       { icon: "☀️", label: "Sequía / estrés hídrico",        unit: "días"     },
-  extreme_rain:  { icon: "🌧️", label: "Lluvia extrema",                unit: "mm"       },
-  temp_increase: { icon: "📈", label: "Aumento temperatura media",      unit: "°C"       },
-  flood_risk:    { icon: "🌊", label: "Riesgo de inundación",           unit: "%"        },
+  extreme_heat:    { icon: "🌡️", label: "Calor extremo (>35°C)",        unit: "días/año" },
+  severe_heat:     { icon: "🔥", label: "Calor severo (>40°C)",          unit: "días/año" },
+  tropical_nights: { icon: "🌙", label: "Noches tropicales (>20°C)",     unit: "noches/año" },
+  drought:         { icon: "☀️", label: "Sequía / estrés hídrico",       unit: "días"     },
+  extreme_rain:    { icon: "🌧️", label: "Lluvia extrema",               unit: "mm"       },
+  temp_increase:   { icon: "📈", label: "Aumento temperatura media",     unit: "°C"       },
+  flood_risk:      { icon: "🌊", label: "Riesgo de inundación",          unit: "%"        },
 };
 
 const HORIZON_LABEL = {

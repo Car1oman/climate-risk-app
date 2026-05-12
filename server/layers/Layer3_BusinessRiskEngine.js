@@ -49,6 +49,14 @@ const OPERATIONAL_IMPACTS = {
     entretenimiento:['Daño a instalaciones recreativas', 'Cancelación prolongada de operaciones'],
     otros:          ['Interrupción operativa', 'Daño a infraestructura', 'Riesgo logístico'],
   },
+  // Noches tropicales: afectan confort nocturno, cadena frío y productividad laboral
+  tropical_nights: {
+    retail:         ['↑ carga HVAC nocturna y costos energéticos', 'Riesgo cadena frío en horario nocturno', 'Disminución confort del personal'],
+    educacion:      ['Disminución calidad del sueño y rendimiento estudiantil', '↑ costos climatización nocturna'],
+    salud:          ['Riesgo para pacientes hospitalizados durante la noche', '↑ demanda de urgencias por estrés térmico'],
+    entretenimiento:['Reducción de afluencia en eventos nocturnos', '↑ costos climatización instalaciones'],
+    otros:          ['↑ costos energéticos nocturnos', 'Disminución productividad laboral por calor acumulado'],
+  },
 };
 
 // ─── Rangos de impacto financiero (USD/año) por señal × sector ───────────────
@@ -96,6 +104,13 @@ const FINANCIAL_RANGES = {
     salud:          { min_usd: 150_000, max_usd: 600_000 },
     entretenimiento:{ min_usd: 80_000,  max_usd: 300_000 },
     otros:          { min_usd: 40_000,  max_usd: 150_000 },
+  },
+  tropical_nights: {
+    retail:         { min_usd: 25_000,  max_usd: 80_000  },
+    educacion:      { min_usd: 8_000,   max_usd: 25_000  },
+    salud:          { min_usd: 20_000,  max_usd: 70_000  },
+    entretenimiento:{ min_usd: 15_000,  max_usd: 50_000  },
+    otros:          { min_usd: 5_000,   max_usd: 20_000  },
   },
 };
 

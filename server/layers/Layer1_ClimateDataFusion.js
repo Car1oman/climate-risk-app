@@ -9,15 +9,31 @@ import { getGriRiskByLocation } from '../services/griRiskService.js';
 import { getClimateTrends } from '../services/openMeteoService.js';
 import { getTerritorialContext } from '../services/worldBankService.js';
 
-// Variables climáticas de interés extraídas de climate_cells JSONB
-const CLIMATE_VARS = ['txx', 'tnn', 'hd35', 'hd40', 'rx1day', 'rx5day', 'cdd', 'cwd', 'pr', 'tas'];
+// Variables climáticas extraídas del JSONB de climate_cells
+// Refleja las columnas reales de la DB: tr (noches tropicales), prpercnt (% cambio precip),
+// r20mm/r50mm (días con lluvia intensa), tasmax (temp máx media), tx84rr (días cálidos)
+const CLIMATE_VARS = [
+  'txx', 'tas', 'tasmax',            // temperatura
+  'hd30', 'hd35',                    // días calurosos (hd40 no está en DB)
+  'tr',                              // noches tropicales (Tmin > 20°C) — señal clave Perú
+  'rx1day', 'rx5day',               // extremos de precipitación
+  'r20mm', 'r50mm',                 // días con lluvia intensa
+  'pr', 'prpercnt',                  // precipitación total y % vs histórico
+  'tx84rr',                          // días/noches cálidos (percentil 84)
+];
 
-// Mapeo de claves JSONB de climate_cells a nombres internos de horizonte
-const HORIZON_MAP = {
-  historical:                        'historical',
-  'ensemble-all-ssp245_2020-2039':   'short_term',
-  'ensemble-all-ssp245_2040-2059':   'mid_term',
-};
+/**
+ * Construye el mapa horizonte→clave interna para el escenario solicitado.
+ * Permite usar SSP245 (conservador) o SSP585 (pesimista) dependiendo del request.
+ */
+function buildHorizonMap(scenario) {
+  const sc = (scenario || 'ssp245').toLowerCase();
+  return {
+    historical:                              'historical',
+    [`ensemble-all-${sc}_2020-2039`]:        'short_term',
+    [`ensemble-all-${sc}_2040-2059`]:        'mid_term',
+  };
+}
 
 /**
  * Calcula distancia Haversine en km entre dos puntos.
@@ -60,24 +76,31 @@ function normalizePeriod(periodData) {
 
 /**
  * Consulta la celda climática más cercana vía RPC PostGIS.
- * Retorna { climateData, distanceKm } o null si no hay datos.
+ * @param {number} lat
+ * @param {number} lon
+ * @param {string} scenario - 'ssp245' | 'ssp585'
+ * @returns {{ climateData, distanceKm }} o null si no hay datos
  */
-async function fetchClimateCell(lat, lon) {
+async function fetchClimateCell(lat, lon, scenario) {
   try {
     const { data, error } = await supabase
       .rpc('get_nearest_climate_cell', { p_lat: lat, p_lon: lon });
 
     if (error || !data || data.length === 0) return null;
 
-    const cell = data[0];
-    const raw = cell.data || {};
+    const cell       = data[0];
+    const raw        = typeof cell.data === 'string' ? JSON.parse(cell.data) : (cell.data || {});
+    const horizonMap = buildHorizonMap(scenario);
     const climateData = {};
 
-    for (const [rawKey, mappedKey] of Object.entries(HORIZON_MAP)) {
+    for (const [rawKey, mappedKey] of Object.entries(horizonMap)) {
       if (raw[rawKey]) {
         climateData[mappedKey] = normalizePeriod(raw[rawKey]);
       }
     }
+
+    // Validar que al menos tenemos el período histórico
+    if (!climateData.historical) return null;
 
     const distanceKm = haversineKm(lat, lon, cell.lat, cell.lon);
     return { climateData, distanceKm, cellLat: cell.lat, cellLon: cell.lon };
@@ -98,7 +121,7 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
 
   // Ejecutar todas las fuentes en paralelo; cada una falla silenciosamente
   const [cellResult, griResult, meteoResult, territorialResult] = await Promise.allSettled([
-    fetchClimateCell(latNum, lonNum),
+    fetchClimateCell(latNum, lonNum, scenario),
     getGriRiskByLocation(latNum, lonNum),
     getClimateTrends(latNum, lonNum),
     getTerritorialContext(),

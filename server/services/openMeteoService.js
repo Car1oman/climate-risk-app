@@ -4,10 +4,11 @@ const OPEN_METEO_URL = 'https://climate-api.open-meteo.com/v1/climate';
 const MODELS = ['CMCC_CM2_VHR4', 'FGOALS_f3_H', 'HiRAM_SIT_HR', 'MRI_AGCM3_2_S'];
 
 // Períodos climáticos definidos por IPCC AR6
+// end_date se mantiene en 2049 porque los modelos PRIMAVERA tienen cobertura hasta ~2050
 const PERIODS = {
   historical: { from: 1980, to: 2014 },
-  short_term: { from: 2020, to: 2039 }, // SSP 2030-horizon
-  mid_term:   { from: 2040, to: 2059 }, // SSP 2050-horizon
+  short_term: { from: 2020, to: 2039 },
+  mid_term:   { from: 2040, to: 2049 }, // hasta donde los modelos tienen datos
 };
 
 async function fetchWithTimeout(url, timeoutMs) {
@@ -27,17 +28,16 @@ async function fetchOpenMeteo(lat, lon) {
       latitude:   lat,
       longitude:  lon,
       start_date: '1980-01-01',
-      end_date:   '2059-12-31',
+      end_date:   '2049-12-31',
       models:     model,
-      // Añadimos tmax para computar hd35, hd40, txx
+      // tmax para computar hd35, hd40, txx; mean+precip para tas, pr, cdd
       daily:      'temperature_2m_mean,temperature_2m_max,precipitation_sum',
     });
     try {
       const res = await fetchWithTimeout(`${OPEN_METEO_URL}?${params}`, 45000);
       if (!res.ok) continue;
       const json = await res.json();
-      // Validar que la respuesta tiene datos
-      if (json?.daily?.time?.length > 0) return json;
+      if (json?.daily?.time?.length > 100) return json; // al menos 100 días de datos
     } catch (e) {
       lastError = e;
     }
@@ -80,34 +80,32 @@ function computeExtremeIndices(records) {
   }
 
   const yearStats = Object.values(byYear)
-    .filter(days => days.length >= 30) // mínimo de datos para que el año sea válido
+    .filter(days => days.length >= 30)
     .map(days => {
       const tmaxVals   = days.map(d => d.tmax).filter(v => v != null);
       const tmeanVals  = days.map(d => d.tmean).filter(v => v != null);
       const precipVals = days.map(d => d.precip).filter(v => v != null);
 
-      // Días calurosos
-      const hd35 = tmaxVals.filter(t => t > 35).length;
-      const hd40 = tmaxVals.filter(t => t > 40).length;
+      // Días calurosos (requieren tmax; null si no disponible)
+      const hd35 = tmaxVals.length ? tmaxVals.filter(t => t > 35).length : null;
+      const hd40 = tmaxVals.length ? tmaxVals.filter(t => t > 40).length : null;
+      const txx  = tmaxVals.length ? Math.max(...tmaxVals)              : null;
 
       // Temperatura media anual
       const tas = tmeanVals.length
         ? tmeanVals.reduce((s, v) => s + v, 0) / tmeanVals.length
         : null;
 
-      // Temperatura máxima del período (TXx)
-      const txx = tmaxVals.length ? Math.max(...tmaxVals) : null;
-
       // Precipitación anual total
-      const pr = precipVals.reduce((s, v) => s + v, 0);
+      const pr = precipVals.length ? precipVals.reduce((s, v) => s + v, 0) : null;
 
       // Precipitación máxima diaria (Rx1day)
       const rx1day = precipVals.length ? Math.max(...precipVals) : null;
 
       // Precipitación máxima en 5 días consecutivos (Rx5day)
-      const rx5day = rollingMax(precipVals, 5);
+      const rx5day = precipVals.length >= 5 ? rollingMax(precipVals, 5) : null;
 
-      // Días secos consecutivos (CDD): racha más larga de días con precip < 1mm
+      // Días secos consecutivos (CDD)
       let cdd = 0, run = 0;
       for (const p of precipVals) {
         if (p < 1) { run++; if (run > cdd) cdd = run; }
@@ -122,7 +120,12 @@ function computeExtremeIndices(records) {
         else run = 0;
       }
 
-      return { hd35, hd40, tas, txx, pr, rx1day, rx5day, cdd, cwd };
+      return {
+        hd35, hd40, tas, txx,
+        pr, rx1day, rx5day,
+        cdd: precipVals.length ? cdd : null,
+        cwd: precipVals.length ? cwd : null,
+      };
     });
 
   if (!yearStats.length) return null;
