@@ -453,16 +453,38 @@ export function detectSignals(fusedData) {
     }
   }
 
+  // ── ENSO PHASE (Sprint 5 — informacional, non-blocking) ─────────────────
+  // Solo agrega señal cuando hay una fase activa (El Niño o La Niña).
+  // No modifica señales existentes ni scores de riesgo.
+  const ensoData = fusedData?.ensoData ?? null;
+  if (ensoData && ensoData.phase !== 'neutral' && ensoData.oni_latest != null) {
+    signals.push(buildSignal({
+      signalType:          'enso_phase',
+      indicator:           'oni',
+      historical:          null,
+      projected:           ensoData.oni_latest,
+      delta:               ensoData.oni_latest,  // anomaly vs baseline (0)
+      delta_pct:           null,
+      conf:                'high',               // NOAA official data
+      horizon:             'short_term',
+      threshold_reference: `NOAA CPC ONI — umbral ENSO: ±0.5°C (actual: ${ensoData.oni_latest > 0 ? '+' : ''}${ensoData.oni_latest.toFixed(2)}°C, fase: ${ensoData.phase})`,
+      exceeds_threshold:   true,
+    }));
+  }
+
   // ── Señal dominante: la de mayor delta absoluto o la primera ─────────────
-  const dominant_signal = signals.length > 0
-    ? signals.reduce((best, s) =>
+  // enso_phase excluido de dominancia — es informacional, no un señal de riesgo primaria
+  const scorableSignals = signals.filter(s => s.signalType !== 'enso_phase');
+  const dominant_signal = scorableSignals.length > 0
+    ? scorableSignals.reduce((best, s) =>
         (Math.abs(s.delta ?? 0) > Math.abs(best.delta ?? 0) ? s : best)
       ).signalType
-    : null;
+    : (signals.length > 0 ? signals[0].signalType : null);
 
   return {
     signals,
     signals_count:   signals.length,
     dominant_signal,
+    enso_phase:      ensoData?.phase ?? null,   // convenience field for consumers
   };
 }

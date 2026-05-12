@@ -2,7 +2,12 @@
  * Layer 6 — Narrative Engine
  * Genera executive_summary y key_metrics basados en datos numéricos reales.
  * NUNCA usa texto genérico: siempre incluye señal + valor numérico + horizonte.
+ *
+ * Sprint 5: ENSO narrative enrichment is additive — appended to summary when
+ * ensoData is present. No existing narrative logic is modified.
  */
+
+import { buildEnsoNarrative } from '../services/ensoService.js';
 
 // Nombres legibles de hazards GRI para el mensaje de contexto
 const GRI_HAZARD_LABELS = {
@@ -27,6 +32,7 @@ const SIGNAL_LABELS = {
   extreme_rain:    'lluvia extrema',
   temp_increase:   'aumento de temperatura media',
   flood_risk:      'riesgo de inundación',
+  enso_phase:      'fase ENSO activa (ONI)',      // Sprint 5
 };
 
 // Etiquetas de horizonte temporal
@@ -215,7 +221,10 @@ export function generateNarrative({
   const sentence1 = buildMainSentence(topRisk, latNum, lonNum);
   const sentence2 = buildContextSentence(topRisk, adaptationOutput);
 
-  const executive_summary = [sentence1, sentence2]
+  // Sprint 5: ENSO narrative enrichment (appended, never replaces existing sentences)
+  const ensoSentence = buildEnsoNarrative(fusedData?.ensoData ?? null);
+
+  const executive_summary = [sentence1, sentence2, ensoSentence]
     .filter(Boolean)
     .join(' ') || buildFallbackSummary(fusedData);
 
@@ -234,14 +243,24 @@ export function generateNarrative({
     total_señales:          signals.length,
     exposicion_general:     businessRiskOutput?.overall_exposure ?? null,
     sector,
+    // Sprint 5: ENSO intelligence (informational, may be null)
+    enso_fase:              enso?.phase          ?? null,
+    enso_intensidad:        enso?.intensity      ?? null,
+    enso_oni:               enso?.oni_latest     ?? null,
+    enso_supply_chain_risk: enso?.supply_chain_risk ?? null,
   };
 
   // Trazabilidad: qué fuentes de datos alimentaron el análisis
+  const enso = fusedData?.ensoData ?? null;
   const generated_from = {
     climate_cells:   fusedData?.climateData    != null,
     gri:             fusedData?.griData        != null,
     open_meteo:      fusedData?.meteoData      != null,
     world_bank:      fusedData?.territorialData != null,
+    // Sprint 5: ENSO provenance
+    enso:            enso != null,
+    enso_phase:      enso?.phase               ?? null,
+    enso_oni:        enso?.oni_latest          ?? null,
     distance_km:     fusedData?.distanceKm     ?? null,
     scenario:        fusedData?.scenario       ?? null,
   };

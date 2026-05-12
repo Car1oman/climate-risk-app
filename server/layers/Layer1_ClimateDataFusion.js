@@ -8,6 +8,7 @@ import { supabase } from '../supabaseClient.js';
 import { getGriRiskByLocation } from '../services/griRiskService.js';
 import { getClimateTrends } from '../services/openMeteoService.js';
 import { getTerritorialContext } from '../services/worldBankService.js';
+import { getEnsoContext } from '../services/ensoService.js';
 
 // Variables climáticas extraídas del JSONB de climate_cells
 // Refleja las columnas reales de la DB: tr (noches tropicales), prpercnt (% cambio precip),
@@ -120,17 +121,19 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
   const lonNum = Number(lon);
 
   // Ejecutar todas las fuentes en paralelo; cada una falla silenciosamente
-  const [cellResult, griResult, meteoResult, territorialResult] = await Promise.allSettled([
+  const [cellResult, griResult, meteoResult, territorialResult, ensoResult] = await Promise.allSettled([
     fetchClimateCell(latNum, lonNum, scenario),
     getGriRiskByLocation(latNum, lonNum),
     getClimateTrends(latNum, lonNum),
     getTerritorialContext(),
+    getEnsoContext(),           // Sprint 5: ENSO — informacional, non-blocking
   ]);
 
   const cellData      = cellResult.status      === 'fulfilled' ? cellResult.value      : null;
   const griData       = griResult.status        === 'fulfilled' ? griResult.value        : null;
   const meteoResult_  = meteoResult.status      === 'fulfilled' ? meteoResult.value      : null;
   const territorial   = territorialResult.status === 'fulfilled' ? territorialResult.value : null;
+  const ensoData      = ensoResult.status        === 'fulfilled' ? ensoResult.value        : null;
 
   if (cellResult.status === 'rejected')
     console.warn('[Layer1] GRI falló:', cellResult.reason?.message);
@@ -140,6 +143,8 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
     console.warn('[Layer1] Open-Meteo falló:', meteoResult.reason?.message);
   if (territorialResult.status === 'rejected')
     console.warn('[Layer1] World Bank falló:', territorialResult.reason?.message);
+  if (ensoResult.status === 'rejected')
+    console.warn('[Layer1] ENSO falló (non-blocking):', ensoResult.reason?.message);
 
   // Cuando climate_cells no tiene datos, usar los índices extremos computados
   // por Open-Meteo (hd35, hd40, cdd, rx5day, rx1day, pr, tas) como fallback.
@@ -156,6 +161,8 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
     meteoData:       meteoResult_?.meteo      ?? null,
     // Contexto territorial World Bank
     territorialData: territorial              ?? null,
+    // Sprint 5: ENSO — informacional, null cuando NOAA no responde
+    ensoData:        ensoData                 ?? null,
     // Metadatos de ubicación
     distanceKm:      cellData?.distanceKm     ?? null,
     scenario,
