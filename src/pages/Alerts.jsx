@@ -1,5 +1,4 @@
-import { useState, useEffect } from "react";
-import { alerts as alertsData } from "@/data/alerts";
+import { useAlerts, useArchiveAlert } from "@/hooks/useAlerts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -19,20 +18,15 @@ const typeLabels = {
   elnino: "El Niño",
   deslizamiento: "Deslizamiento",
   sequia: "Sequía",
+  inspeccion: "Inspección",
 };
 
 export default function Alerts() {
-  const [dismissedIds, setDismissedIds] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: activeAlerts = [], isLoading: loadingActive } = useAlerts({ active: true });
+  const { data: allAlerts = [], isLoading: loadingAll } = useAlerts({ active: false });
+  const archiveMutation = useArchiveAlert();
 
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const dismissAlert = (id) => {
-    setDismissedIds(prev => [...prev, id]);
-  };
+  const isLoading = loadingActive || loadingAll;
 
   if (isLoading) {
     return (
@@ -42,27 +36,26 @@ export default function Alerts() {
     );
   }
 
-  const active = alertsData.filter((a) => !dismissedIds.includes(a.id));
-  const dismissed = alertsData.filter((a) => dismissedIds.includes(a.id));
+  const archivedAlerts = allAlerts.filter((a) => !a.is_active);
 
   return (
     <div className="p-6 max-w-[1200px] mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Alertas</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          {active.length} alertas activas · {dismissed.length} archivadas
+          {activeAlerts.length} alertas activas · {archivedAlerts.length} archivadas
         </p>
       </div>
 
       {/* Active Alerts */}
       <div className="space-y-3">
-        {active.length === 0 && (
+        {activeAlerts.length === 0 && (
           <div className="text-center py-16 text-muted-foreground">
             <Bell className="w-8 h-8 mx-auto mb-3 opacity-50" />
             <p className="text-sm">Sin alertas activas</p>
           </div>
         )}
-        {active.map((alert) => {
+        {activeAlerts.map((alert) => {
           const config = severityConfig[alert.severity] || severityConfig.info;
           const Icon = config.icon;
           return (
@@ -82,9 +75,11 @@ export default function Alerts() {
                         <Badge variant="outline" className={cn("text-[10px]", config.bg, config.color, config.border)}>
                           {config.label}
                         </Badge>
-                        <Badge variant="outline" className="text-[10px]">
-                          {typeLabels[alert.type] || alert.type}
-                        </Badge>
+                        {alert.type && (
+                          <Badge variant="outline" className="text-[10px]">
+                            {typeLabels[alert.type] || alert.type}
+                          </Badge>
+                        )}
                         {alert.source && (
                           <span className="text-[10px] text-muted-foreground">Fuente: {alert.source}</span>
                         )}
@@ -93,18 +88,23 @@ export default function Alerts() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => dismissAlert(alert.id)}
+                      onClick={() => archiveMutation.mutate(alert.id)}
+                      disabled={archiveMutation.isPending}
                       className="flex-shrink-0 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
                     >
                       <CheckCircle className="w-3.5 h-3.5" /> Archivar
                     </Button>
                   </div>
-                  <p className="text-sm text-muted-foreground mt-2">{alert.description}</p>
+                  {alert.description && (
+                    <p className="text-sm text-muted-foreground mt-2">{alert.description}</p>
+                  )}
                   {alert.region && (
                     <p className="text-xs text-muted-foreground mt-1">Región: {alert.region}</p>
                   )}
                   <p className="text-[10px] text-muted-foreground/50 mt-2">
-                    {alert.created_date ? format(new Date(alert.created_date), "dd MMM yyyy, HH:mm", { locale: es }) : "—"}
+                    {alert.created_at
+                      ? format(new Date(alert.created_at), "dd MMM yyyy, HH:mm", { locale: es })
+                      : "—"}
                   </p>
                 </div>
               </div>
@@ -113,20 +113,20 @@ export default function Alerts() {
         })}
       </div>
 
-      {/* Dismissed */}
-      {dismissed.length > 0 && (
+      {/* Archived */}
+      {archivedAlerts.length > 0 && (
         <div>
           <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-            Alertas Archivadas ({dismissed.length})
+            Alertas Archivadas ({archivedAlerts.length})
           </h2>
           <div className="space-y-2">
-            {dismissed.slice(0, 10).map((alert) => (
+            {archivedAlerts.slice(0, 10).map((alert) => (
               <div key={alert.id} className="bg-card/50 border border-border rounded-lg p-3 opacity-60">
                 <div className="flex items-center gap-3">
                   <CheckCircle className="w-4 h-4 text-muted-foreground" />
                   <p className="text-sm">{alert.title}</p>
                   <span className="text-[10px] text-muted-foreground ml-auto">
-                    {alert.created_date ? format(new Date(alert.created_date), "dd/MM/yy") : ""}
+                    {alert.created_at ? format(new Date(alert.created_at), "dd/MM/yy") : ""}
                   </span>
                 </div>
               </div>

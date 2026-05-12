@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAssets } from "@/hooks/useAssets";
-import { alerts } from "@/data/alerts";
+import { useAlerts } from "@/hooks/useAlerts";
 import { formatCurrency } from "@/lib/riskEngine";
 import { Building2, DollarSign, AlertTriangle, TrendingUp } from "lucide-react";
 import StatCard from "@/components/dashboard/StatCard";
@@ -12,6 +12,7 @@ import AlertsFeed from "@/components/dashboard/AlertsFeed";
 export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const { data: assets = [], isLoading: assetsLoading, error: assetsError } = useAssets();
+  const { data: alerts = [] } = useAlerts({ active: true });
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 500);

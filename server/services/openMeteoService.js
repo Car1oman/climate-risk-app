@@ -1,3 +1,5 @@
+import * as openMeteoCache from './openMeteoCache.js';
+
 const OPEN_METEO_URL = 'https://climate-api.open-meteo.com/v1/climate';
 
 // Modelos CMIP6 de alta resolución con cobertura para Perú
@@ -295,8 +297,18 @@ function buildNarrative(meteo) {
 }
 
 export async function getClimateTrends(lat, lon) {
+  const cached = openMeteoCache.get(lat, lon);
+  if (cached) {
+    console.log(`[OpenMeteo] Cache HIT (${lat}, ${lon})`);
+    return cached;
+  }
+
+  console.log(`[OpenMeteo] Cache MISS — fetching (${lat}, ${lon})`);
   const data      = await fetchOpenMeteo(lat, lon);
   const { meteo, climateIndices } = processData(data);
   const narrative = buildNarrative(meteo);
-  return { meteo, climateIndices, narrative };
+  const result    = { meteo, climateIndices, narrative };
+
+  openMeteoCache.set(lat, lon, result);
+  return result;
 }

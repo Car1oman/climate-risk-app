@@ -41,8 +41,8 @@ export default function AlertsFeed({ alerts }) {
                 <p className="text-sm font-medium">{alert.title}</p>
                 <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{alert.description}</p>
                 <p className="text-[10px] text-muted-foreground/60 mt-1">
-                  {alert.created_date
-                    ? formatDistanceToNow(new Date(alert.created_date), { addSuffix: true, locale: es })
+                  {(alert.created_at || alert.created_date)
+                    ? formatDistanceToNow(new Date(alert.created_at || alert.created_date), { addSuffix: true, locale: es })
                     : "reciente"}
                 </p>
               </div>

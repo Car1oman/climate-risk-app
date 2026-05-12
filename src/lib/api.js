@@ -94,6 +94,35 @@ export const analyzeClimateRisk = async ({ lat, lon, sector, asset_type }) => {
   }
 };
 
+/** @returns {Promise<any[]>} */
+export const fetchAlerts = async ({ active = true } = {}) => {
+  try {
+    const url = `${API_URL}/api/alerts${active ? '' : '?active=false'}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Error API alerts: ${res.status}`);
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error('Error fetching alerts:', error);
+    return [];
+  }
+};
+
+/** @param {string} id @returns {Promise<any|null>} */
+export const archiveAlert = async (id) => {
+  try {
+    const res = await fetch(`${API_URL}/api/alerts/${id}/archive`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) throw new Error(`Error archiving alert: ${res.status}`);
+    return res.json();
+  } catch (error) {
+    console.error('Error archiving alert:', error);
+    return null;
+  }
+};
+
 // POST /api/risk-model — modelo H×E×I calculado en backend
 // Retorna el mismo shape que getCompleteRiskModel() del frontend
 export const getRiskModelFromBackend = async (asset) => {

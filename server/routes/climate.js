@@ -1,4 +1,5 @@
 import express from 'express';
+import * as openMeteoCache from '../services/openMeteoCache.js';
 import { getClimateData } from '../services/climateService.js';
 import {
   getClimateByLocation,
@@ -782,6 +783,31 @@ router.post('/v2/climate-risk-analysis', async (req, res) => {
       partial: partialResult,
     });
   }
+});
+
+// ── Open-Meteo cache management ──────────────────────────────────────────────
+
+/**
+ * GET /api/v2/open-meteo-cache/stats
+ * Returns in-memory cache metrics for observability and validation.
+ */
+router.get('/v2/open-meteo-cache/stats', (_req, res) => {
+  res.json(openMeteoCache.stats());
+});
+
+/**
+ * DELETE /api/v2/open-meteo-cache
+ * Flushes all cached Open-Meteo responses (use for forced refresh or testing).
+ * Optional query: ?lat=X&lon=Y to invalidate a single coordinate.
+ */
+router.delete('/v2/open-meteo-cache', (req, res) => {
+  const { lat, lon } = req.query;
+  if (lat != null && lon != null) {
+    openMeteoCache.invalidate(parseFloat(lat), parseFloat(lon));
+    return res.json({ invalidated: true, lat: parseFloat(lat), lon: parseFloat(lon) });
+  }
+  openMeteoCache.clear();
+  return res.json({ cleared: true });
 });
 
 export default router;

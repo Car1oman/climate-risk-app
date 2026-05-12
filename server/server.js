@@ -7,6 +7,7 @@ import aiRouter        from './routes/ai.js';
 import climateRouter   from './routes/climate.js';
 import documentosRouter from './routes/documentos.js';
 import searchRouter    from './routes/search.js';
+import alertsRouter    from './routes/alerts.js';
 
 dotenv.config();
 
@@ -20,6 +21,7 @@ app.use(express.static('dist'));
 
 // ── Route modules ─────────────────────────────────────────────────────────────
 app.use('/api/assets',     assetsRouter);
+app.use('/api/alerts',     alertsRouter);
 app.use('/api/ai',         aiRouter);
 app.use('/api/documentos', documentosRouter);
 app.use('/api',            searchRouter);   // /api/test, /api/search, /api/places/assets
