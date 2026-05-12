@@ -1,43 +1,11 @@
-const HAZARD_WEIGHTS = {
-  hazard_flood:     0.30,
-  hazard_elnino:    0.25,
-  hazard_earthquake: 0.20,
-  hazard_landslide: 0.15,
-  hazard_drought:   0.10,
-};
-
-const HAZARD_LABELS = {
-  hazard_flood:      'Inundación Fluvial',
-  hazard_elnino:     'Fenómeno El Niño',
-  hazard_earthquake: 'Sismo',
-  hazard_landslide:  'Deslizamiento',
-  hazard_drought:    'Sequía Hídrica',
-};
-
-const HORIZON = {
-  hazard_flood:      'corto',
-  hazard_elnino:     'corto',
-  hazard_earthquake: 'largo',
-  hazard_landslide:  'medio',
-  hazard_drought:    'medio',
-};
-
-const TYPE_FACTOR = {
-  supermercado_grande:  1.0,
-  supermercado_mediano: 0.8,
-  centro_distribucion:  1.2,
-  tienda_express:       0.6,
-};
-
-const REHAB_COST_PER_M2 = {
-  hazard_flood:      120,
-  hazard_elnino:     150,
-  hazard_earthquake: 350,
-  hazard_landslide:  200,
-  hazard_drought:    40,
-};
-
-const CLOSURE_DAYS = { 0: 0, 1: 3, 2: 7, 3: 21, 4: 45 };
+import {
+  HAZARD_WEIGHTS,
+  HAZARD_LABELS,
+  HORIZON,
+  TYPE_FACTOR,
+  REHAB_FACTOR,
+  CLOSURE_DAYS,
+} from '../shared/riskConstants.js';
 
 function calculateHazardScore(asset) {
   let weightedSum = 0;
@@ -74,7 +42,7 @@ function calculateFinancialImpact(asset, elNinoMultiplier = 1.0) {
   const lostSales    = sales * (closureDays / 30);
   const staffCost    = employees * 80 * closureDays;
   const logisticsCost = lostSales * 0.15;
-  const rehabCost    = area * (REHAB_COST_PER_M2[topHazardKey] || 120) * (isRented ? 0.4 : 1);
+  const rehabCost    = area * (REHAB_FACTOR[topHazardKey] || 120) * (isRented ? 0.4 : 1);
 
   return {
     total: lostSales + staffCost + logisticsCost + rehabCost,
