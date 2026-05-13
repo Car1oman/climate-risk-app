@@ -194,6 +194,7 @@ export function assessBusinessRisk(signalOutput, { sector, asset_type = null }) 
 
     return {
       signal,
+      source_traceability:   signal.source_traceability ?? null,
       operational_impacts:   impacts,
       exposure_level:        calcExposureLevel([signal]),
       sensitivity_level:     calcSensitivityLevel(sectorKey, asset_type),

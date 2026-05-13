@@ -316,6 +316,63 @@ function UrgencyBadge({ urgency }) {
   );
 }
 
+const CONFIDENCE_BADGE = {
+  high:   "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-200 dark:border-emerald-700",
+  medium: "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-700",
+  low:    "bg-zinc-100 text-zinc-700 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-600",
+};
+
+function TraceBadges({ trace }) {
+  if (!trace) return null;
+  const confidence = trace.confidence_level ?? "low";
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <Badge variant="outline" className={`text-[9px] py-0 px-1.5 font-semibold border ${CONFIDENCE_BADGE[confidence] ?? CONFIDENCE_BADGE.low}`}>
+        confianza {confidence}
+      </Badge>
+      {(trace.provenance_badges ?? []).map(source => (
+        <Badge key={source} variant="outline" className="text-[9px] py-0 px-1.5 border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
+          {source}
+        </Badge>
+      ))}
+      {trace.climate_model_badge && (
+        <Badge variant="outline" className="text-[9px] py-0 px-1.5 border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-900/30 dark:text-violet-200">
+          {trace.climate_model_badge}
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+function TraceabilityDetails({ trace }) {
+  if (!trace) return null;
+  const rows = [
+    ["Fuente", trace.source_origin],
+    ["Variable", trace.climate_variable],
+    ["Periodo", trace.temporal_period_label ?? trace.temporal_period],
+    ["Escenario", trace.scenario_ssp],
+    ["Cambio detectado", trace.transformation_applied],
+    ["Umbral", trace.threshold_applied],
+    ["API", trace.responsible_endpoint],
+  ];
+
+  return (
+    <div className="rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-2.5 space-y-2">
+      <p className="text-[10px] font-semibold text-zinc-700 dark:text-zinc-300">
+        ¿Por qué se detectó este riesgo?
+      </p>
+      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5">
+        {rows.map(([label, value]) => (
+          <div key={label} className="min-w-0">
+            <dt className="text-[9px] uppercase tracking-widest text-zinc-400">{label}</dt>
+            <dd className="text-[10px] text-zinc-600 dark:text-zinc-300 break-words">{value ?? "No disponible"}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 function ScoreBar({ score }) {
   const pct = Math.round((score ?? 0) * 100);
   const color = pct >= 75 ? "bg-red-500" : pct >= 50 ? "bg-orange-500" : pct >= 25 ? "bg-yellow-500" : "bg-emerald-500";
@@ -413,6 +470,7 @@ function NarrativePanel({ narrative, location, metadata }) {
 function SignalRow({ signal }) {
   const meta     = SIGNAL_META[signal.signalType] ?? { icon: "⚠️", label: signal.signalType, unit: "" };
   const isGRI    = signal.indicator?.startsWith('gri_');
+  const trace    = signal.source_traceability;
   const sign     = (signal.delta ?? 0) >= 0 ? "+" : "";
   const conf     = signal.confidence;
   const confColor = conf === "high"
@@ -429,6 +487,8 @@ function SignalRow({ signal }) {
 
   return (
     <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-3 space-y-2">
+      <TraceBadges trace={trace} />
+
       <div className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
           <span className="text-base leading-none">{meta.icon}</span>
@@ -456,6 +516,8 @@ function SignalRow({ signal }) {
           </p>
         )}
       </div>
+
+      <TraceabilityDetails trace={trace} />
     </div>
   );
 }
@@ -490,8 +552,7 @@ function SignalsPanel({ signals }) {
 function RiskCard({ risk }) {
   const [expanded, setExpanded] = useState(false);
   const signalMeta = SIGNAL_META[risk.signal?.signalType] ?? { icon: "⚠️", label: risk.signal?.signalType ?? "Riesgo" };
-  const s = URGENCY_STYLES[risk.urgency] ?? URGENCY_STYLES.baja;
-
+  const trace = risk.source_traceability ?? risk.signal?.source_traceability;
   return (
     <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 overflow-hidden">
       <div className="p-3 space-y-2.5">
@@ -506,6 +567,8 @@ function RiskCard({ risk }) {
           </div>
           <UrgencyBadge urgency={risk.urgency} />
         </div>
+
+        <TraceBadges trace={trace} />
 
         {/* Score bar */}
         <ScoreBar score={risk.composite_score} />
@@ -550,6 +613,9 @@ function RiskCard({ risk }) {
                   <p className="text-xs font-mono font-bold text-zinc-700 dark:text-zinc-300">{(v * 100).toFixed(0)}</p>
                 </div>
               ))}
+              <div className="col-span-3">
+                <TraceabilityDetails trace={trace} />
+              </div>
             </div>
           )}
         </div>

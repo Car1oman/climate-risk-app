@@ -88,6 +88,92 @@ function buildSignal({ signalType, indicator, historical, projected, delta, delt
   };
 }
 
+function climateSourceLabel(climateSource) {
+  if (climateSource === 'climate_cells') return 'CMIP6 ensemble / climate_cells';
+  if (climateSource === 'open_meteo_derived') return 'Open-Meteo derived climate indices';
+  return 'climate model unavailable';
+}
+
+function endpointForSignal(signal, fusedData) {
+  const indicator = signal.indicator ?? '';
+  if (signal.signalType === 'enso_phase') return 'NOAA CPC ONI via getEnsoContext()';
+  if (signal.signalType === 'landslide_risk' || signal.signalType === 'huayco_risk') {
+    return 'Terrain intelligence API via getTerrainIntelligence()';
+  }
+  if (indicator.startsWith('gri_') || signal.signalType === 'flood_risk') {
+    return 'GRI Infrastructure Resilience via getGriRiskByLocation()';
+  }
+  if (fusedData?.climateSource === 'climate_cells') {
+    return 'Supabase RPC get_nearest_climate_cell';
+  }
+  if (fusedData?.climateSource === 'open_meteo_derived') {
+    return 'Open-Meteo Archive/Forecast via getClimateTrends()';
+  }
+  return 'Layer2_SignalEngine.detectSignals()';
+}
+
+function sourceForSignal(signal, fusedData) {
+  const indicator = signal.indicator ?? '';
+  if (signal.signalType === 'enso_phase') return 'NOAA CPC';
+  if (signal.signalType === 'landslide_risk' || signal.signalType === 'huayco_risk') return 'SRTM terrain + INGEMMET/SENAMHI thresholds';
+  if (indicator.startsWith('gri_')) return 'GRI Infrastructure Resilience';
+  if (signal.signalType === 'flood_risk') return 'GRI Infrastructure Resilience + WRI Aqueduct Floods';
+  return climateSourceLabel(fusedData?.climateSource);
+}
+
+function modelBadgeForSignal(signal, fusedData) {
+  const indicator = signal.indicator ?? '';
+  if (indicator.startsWith('gri_') || signal.signalType === 'flood_risk') return 'GRI/WRI';
+  if (signal.signalType === 'enso_phase') return 'NOAA ONI';
+  if (signal.signalType === 'landslide_risk' || signal.signalType === 'huayco_risk') return 'SRTM';
+  return fusedData?.climateSource === 'climate_cells' ? 'CMIP6 ensemble' : 'Open-Meteo derived';
+}
+
+function transformationForSignal(signal) {
+  if (signal.delta_pct != null) {
+    const sign = signal.delta_pct >= 0 ? '+' : '';
+    return `Percent change vs historical baseline (${sign}${signal.delta_pct.toFixed(1)}pp)`;
+  }
+  if (signal.delta != null) {
+    const sign = signal.delta >= 0 ? '+' : '';
+    return `Absolute delta vs historical baseline (${sign}${Number(signal.delta).toFixed(1)})`;
+  }
+  return 'Threshold comparison against projected/current indicator value';
+}
+
+function enrichTraceability(signal, fusedData) {
+  const scenario = (fusedData?.scenario ?? 'ssp245').toUpperCase();
+  const source = sourceForSignal(signal, fusedData);
+  const modelBadge = modelBadgeForSignal(signal, fusedData);
+
+  return {
+    ...signal,
+    source_traceability: {
+      source_origin: source,
+      climate_variable: signal.indicator ?? signal.signalType,
+      temporal_period: signal.horizon,
+      temporal_period_label: signal.horizon === 'mid_term'
+        ? '2040-2059'
+        : signal.horizon === 'long_term'
+          ? '2060+'
+          : '2020-2039',
+      scenario_ssp: scenario,
+      threshold_applied: signal.threshold_reference ?? 'No explicit threshold reference',
+      transformation_applied: transformationForSignal(signal),
+      confidence_level: signal.confidence ?? 'low',
+      responsible_endpoint: endpointForSignal(signal, fusedData),
+      provenance_badges: Array.from(new Set([
+        source.includes('GRI') ? 'GRI' : null,
+        source.includes('CMIP6') ? 'CMIP6' : null,
+        source.includes('Open-Meteo') ? 'Open-Meteo' : null,
+        source.includes('NOAA') ? 'NOAA' : null,
+        source.includes('SRTM') ? 'Terrain' : null,
+      ].filter(Boolean))),
+      climate_model_badge: modelBadge,
+    },
+  };
+}
+
 /**
  * Extrae la probabilidad de inundación del objeto GRI.
  * Busca en los hazards de tipo flood/fluvial/pluvial/coastal.
@@ -520,8 +606,10 @@ export function detectSignals(fusedData) {
       ).signalType
     : (signals.length > 0 ? signals[0].signalType : null);
 
+  const traceableSignals = signals.map(signal => enrichTraceability(signal, fusedData));
+
   return {
-    signals,
+    signals:          traceableSignals,
     signals_count:    signals.length,
     dominant_signal,
     enso_phase:       ensoData?.phase   ?? null,  // convenience field for consumers
