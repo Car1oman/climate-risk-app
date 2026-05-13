@@ -13,6 +13,7 @@ import {
   RESPONSIBLE_INSTITUTIONS,
   resolveSourceKey,
 } from "@/lib/methodologyConfig";
+import ScientificReferencesModal from "@/components/climate/ScientificReferencesModal";
 
 // ── Style maps ────────────────────────────────────────────────────────────────
 
@@ -138,6 +139,9 @@ export default function MethodologyPanel({ metadata }) {
               </Badge>
             );
           })}
+        </div>
+        <div className="pb-3">
+          <ScientificReferencesModal />
         </div>
       </CardHeader>
 
