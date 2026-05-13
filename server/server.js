@@ -1,6 +1,11 @@
+// dotenv/config MUST be the first import in ESM — module bodies run after all
+// imports are evaluated, so dotenv.config() in the body would be too late.
+import 'dotenv/config';
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
 import assetsRouter    from './routes/assets.js';
 import aiRouter        from './routes/ai.js';
@@ -8,10 +13,12 @@ import climateRouter   from './routes/climate.js';
 import documentosRouter from './routes/documentos.js';
 import searchRouter    from './routes/search.js';
 import alertsRouter    from './routes/alerts.js';
-import ensoRouter      from './routes/enso.js';     // Sprint 5
-import terrainRouter   from './routes/terrain.js';  // Sprint 6
+import ensoRouter      from './routes/enso.js';
+import terrainRouter   from './routes/terrain.js';
 
-dotenv.config();
+// __dirname is not available in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname  = dirname(__filename);
 
 const app = express();
 app.use(cors());
@@ -36,7 +43,7 @@ const PORT = process.env.PORT || 3001;
 // Fallback para SPA: servir index.html para rutas no encontradas
 app.use((req, res, next) => {
   if (!req.path.startsWith('/api/')) {
-    res.sendFile('../dist/index.html', { root: __dirname });
+    res.sendFile(join(__dirname, '..', 'dist', 'index.html'));
   } else {
     res.status(404).json({ error: 'API endpoint no encontrado' });
   }

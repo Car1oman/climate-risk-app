@@ -63,21 +63,21 @@ Formato Markdown. Sé específico con los datos proporcionados. Incluye recomend
 
       const response = await fetch(`${API_URL}/api/ai`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt }),
       });
 
+      const result = await response.json();
       if (!response.ok) {
-        throw new Error('Error al generar el reporte');
+        throw new Error(result?.error || 'Error al generar el reporte');
       }
 
-      const result = await response.text();
-      setReport(result);
+      const text = typeof result === 'string' ? result : result.response ?? '';
+      if (!text) throw new Error('La IA no devolvió contenido. Intenta de nuevo.');
+      setReport(text);
     } catch (error) {
       console.error('Error generating report:', error);
-      setReport('Error al generar el reporte. Asegúrate de que el servidor backend esté ejecutándose.');
+      setReport(`**Error:** ${error.message}`);
     } finally {
       setGenerating(false);
     }

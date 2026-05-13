@@ -56,10 +56,10 @@ const SECTORS = [
 ];
 
 const URGENCY_STYLES = {
-  "crítica": { badge: "bg-red-100 text-red-800 border-red-300 dark:bg-red-900 dark:text-red-200 dark:border-red-700",    dot: "bg-red-500"     },
-  alta:      { badge: "bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900 dark:text-orange-200 dark:border-orange-700", dot: "bg-orange-500" },
-  media:     { badge: "bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900 dark:text-yellow-200 dark:border-yellow-700", dot: "bg-yellow-500" },
-  baja:      { badge: "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900 dark:text-emerald-200 dark:border-emerald-700", dot: "bg-emerald-500" },
+  "crítica": { badge: "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700",    dot: "bg-red-400"     },
+  alta:      { badge: "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700", dot: "bg-orange-400" },
+  media:     { badge: "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-700", dot: "bg-yellow-400" },
+  baja:      { badge: "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700", dot: "bg-emerald-400" },
 };
 
 const SIGNAL_META = {
@@ -84,10 +84,10 @@ const GRI_ICONS = {
 };
 
 const GRI_BADGE = {
-  alto:       "bg-red-100 text-red-800 border-red-300 dark:bg-red-900 dark:text-red-200 dark:border-red-700",
-  medio:      "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900 dark:text-amber-200 dark:border-amber-700",
-  bajo:       "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900 dark:text-emerald-200 dark:border-emerald-700",
-  "sin data": "bg-zinc-100 text-zinc-600 border-zinc-300 dark:bg-zinc-700 dark:text-zinc-300 dark:border-zinc-600",
+  alto:       "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700",
+  medio:      "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700",
+  bajo:       "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700",
+  "sin data": "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600",
 };
 
 // ── Map sub-components ─────────────────────────────────────────────────────────
@@ -201,7 +201,7 @@ function SearchPanel({ onLocationSelect }) {
                       <p className="text-sm font-medium truncate">{r.name}</p>
                       <p className="text-xs text-muted-foreground truncate">{r.direccion}</p>
                       {r.unidad_negocio && (
-                        <Badge className="text-[10px] px-1.5 py-0 mt-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border-0">
+                        <Badge className="text-[10px] px-1.5 py-0 mt-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border-0">
                           {r.unidad_negocio}
                         </Badge>
                       )}
@@ -209,7 +209,7 @@ function SearchPanel({ onLocationSelect }) {
                   ) : (
                     <>
                       <p className="text-sm font-medium truncate">{r.direccion}</p>
-                      <Badge className="text-[10px] px-1.5 py-0 mt-0.5 bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border-0">
+                      <Badge className="text-[10px] px-1.5 py-0 mt-0.5 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border-0">
                         Sin activos registrados
                       </Badge>
                     </>
@@ -222,9 +222,9 @@ function SearchPanel({ onLocationSelect }) {
       </div>
 
       {selectedPlace && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-900/50 dark:border-amber-600 p-3 space-y-3">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 p-3 space-y-3">
           <div className="flex items-start gap-2">
-            <MapPin className="w-4 h-4 text-amber-600 dark:text-amber-300 flex-shrink-0 mt-0.5" />
+            <MapPin className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-xs font-semibold text-amber-900 dark:text-amber-200">No hay activos registrados aquí</p>
               <p className="text-[11px] text-amber-800 dark:text-amber-300 mt-0.5 leading-snug">{selectedPlace.direccion}</p>
@@ -317,9 +317,9 @@ function UrgencyBadge({ urgency }) {
 }
 
 const CONFIDENCE_BADGE = {
-  high:   "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-200 dark:border-emerald-700",
-  medium: "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-700",
-  low:    "bg-zinc-100 text-zinc-700 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-600",
+  high:   "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700",
+  medium: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700",
+  low:    "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600",
 };
 
 function TraceBadges({ trace }) {
@@ -357,15 +357,15 @@ function TraceabilityDetails({ trace }) {
   ];
 
   return (
-    <div className="rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-2.5 space-y-2">
-      <p className="text-[10px] font-semibold text-zinc-700 dark:text-zinc-300">
+    <div className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2.5 space-y-2">
+      <p className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
         ¿Por qué se detectó este riesgo?
       </p>
       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5">
         {rows.map(([label, value]) => (
           <div key={label} className="min-w-0">
-            <dt className="text-[9px] uppercase tracking-widest text-zinc-400">{label}</dt>
-            <dd className="text-[10px] text-zinc-600 dark:text-zinc-300 break-words">{value ?? "No disponible"}</dd>
+            <dt className="text-[9px] uppercase tracking-widest text-slate-400">{label}</dt>
+            <dd className="text-[10px] text-slate-600 dark:text-slate-300 break-words">{value ?? "No disponible"}</dd>
           </div>
         ))}
       </dl>
@@ -375,13 +375,13 @@ function TraceabilityDetails({ trace }) {
 
 function ScoreBar({ score }) {
   const pct = Math.round((score ?? 0) * 100);
-  const color = pct >= 75 ? "bg-red-500" : pct >= 50 ? "bg-orange-500" : pct >= 25 ? "bg-yellow-500" : "bg-emerald-500";
+  const color = pct >= 75 ? "bg-red-400" : pct >= 50 ? "bg-orange-400" : pct >= 25 ? "bg-yellow-400" : "bg-emerald-400";
   return (
     <div className="flex items-center gap-2 w-full">
-      <div className="flex-1 h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
+      <div className="flex-1 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
         <div className={`h-full rounded-full ${color} transition-all`} style={{ width: `${pct}%` }} />
       </div>
-      <span className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 w-7 text-right">{pct}</span>
+      <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 w-7 text-right">{pct}</span>
     </div>
   );
 }
@@ -396,19 +396,19 @@ function NarrativePanel({ narrative, location, metadata }) {
   const distKm = location?.distanceKm ?? metadata?.distance_km;
 
   const urgencyBorderColor = {
-    "crítica": "border-red-400 dark:border-red-700",
-    alta:      "border-orange-400 dark:border-orange-700",
-    media:     "border-yellow-400 dark:border-yellow-700",
-    baja:      "border-emerald-400 dark:border-emerald-700",
+    "crítica": "border-red-300 dark:border-red-600",
+    alta:      "border-orange-300 dark:border-orange-600",
+    media:     "border-yellow-300 dark:border-yellow-600",
+    baja:      "border-emerald-300 dark:border-emerald-600",
   }[urgency] ?? "border-primary/30";
 
   if (!summary) return null;
 
   return (
-    <Card className={`border-2 ${urgencyBorderColor} bg-white dark:bg-zinc-900 shadow-sm`}>
+    <Card className={`border-2 ${urgencyBorderColor} bg-slate-50 dark:bg-slate-900 shadow-sm`}>
       <CardHeader className="pb-3 pt-4">
         <div className="flex items-start justify-between gap-3">
-          <CardTitle className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+          <CardTitle className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-primary flex-shrink-0" />
             Evaluación de riesgo climático
           </CardTitle>
@@ -418,28 +418,28 @@ function NarrativePanel({ narrative, location, metadata }) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4 pb-4">
-        <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">{summary}</p>
+        <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">{summary}</p>
 
         {/* Key metrics strip */}
         {(metrics.total_señales > 0 || scoreTop != null || metrics.impacto_financiero_min != null) && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
             {metrics.total_señales > 0 && (
-              <div className="rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-2.5 text-center">
-                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-1">Señales</p>
-                <p className="text-lg font-bold text-zinc-900 dark:text-white">{metrics.total_señales}</p>
+              <div className="rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2.5 text-center">
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Señales</p>
+                <p className="text-lg font-bold text-slate-900 dark:text-white">{metrics.total_señales}</p>
               </div>
             )}
             {scoreTop != null && (
-              <div className="rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-2.5 text-center">
-                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-1">Score riesgo</p>
-                <p className="text-lg font-bold text-zinc-900 dark:text-white">{Math.round(scoreTop * 100)}<span className="text-xs font-normal text-zinc-400">/100</span></p>
+              <div className="rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2.5 text-center">
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Score riesgo</p>
+                <p className="text-lg font-bold text-slate-900 dark:text-white">{Math.round(scoreTop * 100)}<span className="text-xs font-normal text-slate-400">/100</span></p>
               </div>
             )}
             {metrics.impacto_financiero_min != null && (
-              <div className="rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-2.5 text-center col-span-2">
-                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-1">Impacto financiero est.</p>
-                <p className="text-sm font-bold text-zinc-900 dark:text-white">
-                  {fmtUSD(metrics.impacto_financiero_min)} – {fmtUSD(metrics.impacto_financiero_max)}<span className="text-[10px] font-normal text-zinc-400 ml-1">/año</span>
+              <div className="rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2.5 text-center col-span-2">
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Impacto financiero est.</p>
+                <p className="text-sm font-bold text-slate-900 dark:text-white">
+                  {fmtUSD(metrics.impacto_financiero_min)} – {fmtUSD(metrics.impacto_financiero_max)}<span className="text-[10px] font-normal text-slate-400 ml-1">/año</span>
                 </p>
               </div>
             )}
@@ -456,7 +456,7 @@ function NarrativePanel({ narrative, location, metadata }) {
           </Alert>
         )}
 
-        <p className="text-[10px] text-zinc-400 dark:text-zinc-500">
+        <p className="text-[10px] text-slate-400 dark:text-slate-500">
           Fuentes: {(metadata?.data_sources ?? []).join(" · ") || "climate_cells · GRI · Open-Meteo · World Bank"}
           {metadata?.scenario && ` · ${metadata.scenario}`}
         </p>
@@ -476,7 +476,7 @@ function SignalRow({ signal }) {
   const confColor = conf === "high"
     ? "text-emerald-600 dark:text-emerald-400"
     : conf === "medium" ? "text-amber-600 dark:text-amber-400"
-    : "text-zinc-400";
+    : "text-slate-400";
 
   // Para señales GRI, los valores son probabilidades (0-1) → mostrar como %
   const fmtVal  = (v) => v == null ? "—" : isGRI ? `${(v * 100).toFixed(0)}%` : fmtNum(v);
@@ -486,32 +486,32 @@ function SignalRow({ signal }) {
     : `${sign}${fmtNum(v)}`;
 
   return (
-    <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-3 space-y-2">
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3 space-y-2">
       <TraceBadges trace={trace} />
 
       <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-800 dark:text-slate-200">
           <span className="text-base leading-none">{meta.icon}</span>
           {meta.label}
-          {isGRI && <span className="text-[9px] font-normal text-zinc-400 ml-1">GRI</span>}
+          {isGRI && <span className="text-[9px] font-normal text-slate-400 ml-1">GRI</span>}
         </span>
         <span className={`text-[10px] font-semibold ${confColor}`}>{conf}</span>
       </div>
 
-      <div className="flex items-center gap-2 font-mono text-xs text-zinc-600 dark:text-zinc-400">
+      <div className="flex items-center gap-2 font-mono text-xs text-slate-600 dark:text-slate-400">
         <span className="tabular-nums">{fmtVal(signal.historical)}</span>
-        <span className="text-zinc-300 dark:text-zinc-600">→</span>
-        <span className="tabular-nums font-bold text-zinc-900 dark:text-white">{fmtVal(signal.projected)}</span>
-        {unit && <span className="text-zinc-400 dark:text-zinc-500 font-sans">{unit}</span>}
+        <span className="text-slate-300 dark:text-slate-600">→</span>
+        <span className="tabular-nums font-bold text-slate-900 dark:text-white">{fmtVal(signal.projected)}</span>
+        {unit && <span className="text-slate-400 dark:text-slate-500 font-sans">{unit}</span>}
         {signal.delta != null && (
-          <span className="ml-auto text-zinc-500">({fmtDelta(signal.delta)})</span>
+          <span className="ml-auto text-slate-500">({fmtDelta(signal.delta)})</span>
         )}
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[10px] text-zinc-400 dark:text-zinc-500">{HORIZON_LABEL[signal.horizon] ?? signal.horizon}</p>
+        <p className="text-[10px] text-slate-400 dark:text-slate-500">{HORIZON_LABEL[signal.horizon] ?? signal.horizon}</p>
         {signal.threshold_reference && (
-          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 truncate max-w-[55%] text-right" title={signal.threshold_reference}>
+          <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[55%] text-right" title={signal.threshold_reference}>
             {signal.threshold_reference.slice(0, 45)}…
           </p>
         )}
@@ -527,16 +527,16 @@ function SignalsPanel({ signals }) {
   if (!list.length) return null;
 
   return (
-    <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm">
+    <Card className="bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm">
       <CardHeader className="pb-3 pt-4">
         <CardTitle className="text-sm flex items-center gap-2">
           <Thermometer className="w-4 h-4 text-amber-500" />
-          <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+          <span className="font-semibold text-slate-900 dark:text-slate-100">
             Señales climáticas detectadas
-            <span className="ml-2 text-[11px] font-normal text-zinc-400">({list.length})</span>
+            <span className="ml-2 text-[11px] font-normal text-slate-400">({list.length})</span>
           </span>
         </CardTitle>
-        <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-1">
+        <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
           Cuantitativas (IPCC AR6 / WRI Aqueduct) + cualitativas GRI · histórico vs. proyectado
         </p>
       </CardHeader>
@@ -554,16 +554,16 @@ function RiskCard({ risk }) {
   const signalMeta = SIGNAL_META[risk.signal?.signalType] ?? { icon: "⚠️", label: risk.signal?.signalType ?? "Riesgo" };
   const trace = risk.source_traceability ?? risk.signal?.source_traceability;
   return (
-    <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 overflow-hidden">
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 overflow-hidden">
       <div className="p-3 space-y-2.5">
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-zinc-200 dark:bg-zinc-700 text-[10px] font-bold flex items-center justify-center text-zinc-600 dark:text-zinc-300">
+            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 text-[10px] font-bold flex items-center justify-center text-slate-600 dark:text-slate-300">
               {risk.rank}
             </span>
             <span className="text-base leading-none flex-shrink-0">{signalMeta.icon}</span>
-            <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">{signalMeta.label}</p>
+            <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">{signalMeta.label}</p>
           </div>
           <UrgencyBadge urgency={risk.urgency} />
         </div>
@@ -577,8 +577,8 @@ function RiskCard({ risk }) {
         {risk.operational_impacts?.length > 0 && (
           <ul className="space-y-1">
             {risk.operational_impacts.slice(0, expanded ? undefined : 3).map((imp, j) => (
-              <li key={j} className="flex items-start gap-1.5 text-[11px] text-zinc-600 dark:text-zinc-400">
-                <span className="w-1 h-1 rounded-full bg-zinc-400 flex-shrink-0 mt-1.5" />
+              <li key={j} className="flex items-start gap-1.5 text-[11px] text-slate-600 dark:text-slate-400">
+                <span className="w-1 h-1 rounded-full bg-slate-400 flex-shrink-0 mt-1.5" />
                 {imp}
               </li>
             ))}
@@ -587,8 +587,8 @@ function RiskCard({ risk }) {
 
         {/* Financial impact */}
         {risk.financial_impact_range && (
-          <p className="text-[10px] text-zinc-400 dark:text-zinc-500">
-            Impacto estimado: <span className="font-semibold text-zinc-600 dark:text-zinc-300">
+          <p className="text-[10px] text-slate-400 dark:text-slate-500">
+            Impacto estimado: <span className="font-semibold text-slate-600 dark:text-slate-300">
               {fmtUSD(risk.financial_impact_range.min_usd)} – {fmtUSD(risk.financial_impact_range.max_usd)}
             </span>/año
           </p>
@@ -597,10 +597,10 @@ function RiskCard({ risk }) {
 
       {/* Expandable: score components */}
       {risk.score_components && (
-        <div className="border-t border-zinc-200 dark:border-zinc-700">
+        <div className="border-t border-slate-200 dark:border-slate-700">
           <button
             onClick={() => setExpanded(e => !e)}
-            className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+            className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
           >
             <span>Componentes del score</span>
             {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
@@ -609,8 +609,8 @@ function RiskCard({ risk }) {
             <div className="px-3 pb-3 grid grid-cols-3 gap-2">
               {Object.entries(risk.score_components).map(([k, v]) => (
                 <div key={k} className="text-center">
-                  <p className="text-[9px] text-zinc-400 uppercase tracking-widest">{k}</p>
-                  <p className="text-xs font-mono font-bold text-zinc-700 dark:text-zinc-300">{(v * 100).toFixed(0)}</p>
+                  <p className="text-[9px] text-slate-400 uppercase tracking-widest">{k}</p>
+                  <p className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">{(v * 100).toFixed(0)}</p>
                 </div>
               ))}
               <div className="col-span-3">
@@ -627,13 +627,13 @@ function RiskCard({ risk }) {
 function RisksPanel({ risks }) {
   if (!risks?.length) return null;
   return (
-    <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm">
+    <Card className="bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm">
       <CardHeader className="pb-3 pt-4">
         <CardTitle className="text-sm flex items-center gap-2">
           <ShieldAlert className="w-4 h-4 text-orange-500" />
-          <span className="font-semibold text-zinc-900 dark:text-zinc-100">Riesgos empresariales priorizados</span>
+          <span className="font-semibold text-slate-900 dark:text-slate-100">Riesgos empresariales priorizados</span>
         </CardTitle>
-        <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-1">
+        <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
           Ordenados por score compuesto: probabilidad · intensidad · exposición · sensibilidad sectorial
         </p>
       </CardHeader>
@@ -657,13 +657,13 @@ function GRIThreatsPanel({ hazards }) {
   if (!filtered.length) return null;
 
   return (
-    <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm">
+    <Card className="bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm">
       <CardHeader className="pb-3 pt-4">
         <CardTitle className="text-sm flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 text-amber-500" />
-          <span className="font-semibold text-zinc-900 dark:text-zinc-100">Exposición a amenazas</span>
+          <span className="font-semibold text-slate-900 dark:text-slate-100">Exposición a amenazas</span>
         </CardTitle>
-        <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-1">Fuente: GRI Infrastructure Resilience · probabilidad histórica y proyecciones</p>
+        <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">Fuente: GRI Infrastructure Resilience · probabilidad histórica y proyecciones</p>
       </CardHeader>
       <CardContent className="space-y-2 pb-4">
         {filtered.map(h => {
@@ -676,14 +676,14 @@ function GRIThreatsPanel({ hazards }) {
           return (
             <div
               key={h.hazard}
-              className="rounded-lg border border-zinc-200 dark:border-zinc-700 p-3 flex items-center justify-between gap-3 bg-zinc-50 dark:bg-zinc-800"
+              className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800"
             >
               <div className="flex items-center gap-3">
                 <span className="text-lg leading-none">{icon}</span>
                 <div>
-                  <p className="text-sm font-semibold text-zinc-900 dark:text-white">{h.hazard_name}</p>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">{h.hazard_name}</p>
                   {hasChange && (
-                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500">
                       Proyección: {h.baseline?.score} → {futureScore}
                     </p>
                   )}
@@ -707,13 +707,13 @@ function AdaptationPanel({ adaptations }) {
   if (!list.length) return null;
 
   return (
-    <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm">
+    <Card className="bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm">
       <CardHeader className="pb-3 pt-4">
         <CardTitle className="text-sm flex items-center gap-2">
           <Leaf className="w-4 h-4 text-emerald-500" />
-          <span className="font-semibold text-zinc-900 dark:text-zinc-100">Medidas de adaptación</span>
+          <span className="font-semibold text-slate-900 dark:text-slate-100">Medidas de adaptación</span>
         </CardTitle>
-        <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-1">Priorizadas por riesgo detectado · incluye horizonte y costo estimado</p>
+        <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">Priorizadas por riesgo detectado · incluye horizonte y costo estimado</p>
       </CardHeader>
       <CardContent className="space-y-3 pb-4">
         {list.map((adapt, i) => {
@@ -722,22 +722,22 @@ function AdaptationPanel({ adaptations }) {
             <div key={i} className="space-y-2">
               <div className="flex items-center gap-2">
                 <span className="text-sm leading-none">{signalMeta.icon}</span>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                   {signalMeta.label}
                 </p>
                 <UrgencyBadge urgency={adapt.urgency} />
               </div>
               <div className="space-y-1.5 pl-1">
                 {(adapt.measures ?? []).slice(0, 3).map((m, j) => (
-                  <div key={j} className="flex items-start justify-between gap-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-2.5">
+                  <div key={j} className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2.5">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">{m.nombre}</p>
-                      <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">
+                      <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">{m.nombre}</p>
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
                         {m.horizonte_implementacion} plazo
                         {m.costo_estimado_rango && ` · ${fmtUSD(m.costo_estimado_rango.min_usd)}–${fmtUSD(m.costo_estimado_rango.max_usd)}`}
                       </p>
                       {m.donde_impacta && (
-                        <p className="text-[10px] text-zinc-400 dark:text-zinc-600 mt-0.5 italic">{m.donde_impacta}</p>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-600 mt-0.5 italic">{m.donde_impacta}</p>
                       )}
                     </div>
                     <Badge
@@ -745,7 +745,7 @@ function AdaptationPanel({ adaptations }) {
                       className={`text-[9px] py-0 px-1.5 flex-shrink-0 ${
                         m.efectividad === "alta"  ? "border-emerald-400 text-emerald-700 dark:text-emerald-300" :
                         m.efectividad === "media" ? "border-amber-400 text-amber-700 dark:text-amber-300" :
-                                                    "border-zinc-400 text-zinc-500"
+                                                    "border-slate-400 text-slate-500"
                       }`}
                     >
                       {m.efectividad}
@@ -753,7 +753,7 @@ function AdaptationPanel({ adaptations }) {
                   </div>
                 ))}
               </div>
-              {i < list.length - 1 && <div className="border-t border-zinc-100 dark:border-zinc-800" />}
+              {i < list.length - 1 && <div className="border-t border-slate-100 dark:border-slate-800" />}
             </div>
           );
         })}
@@ -767,18 +767,18 @@ function AdaptationPanel({ adaptations }) {
 function TerritorialContextPanel({ data }) {
   if (!data?.narrative?.length) return null;
   return (
-    <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm">
+    <Card className="bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm">
       <CardHeader className="pb-2 pt-4">
         <CardTitle className="text-sm flex items-center gap-2">
           <Globe2 className="w-4 h-4 text-blue-500" />
-          <span className="font-semibold text-zinc-900 dark:text-zinc-100">Contexto del territorio</span>
+          <span className="font-semibold text-slate-900 dark:text-slate-100">Contexto del territorio</span>
         </CardTitle>
-        <p className="text-xs text-zinc-500 dark:text-zinc-500">Fuente: Banco Mundial · indicadores socioeconómicos de Perú</p>
+        <p className="text-xs text-slate-500 dark:text-slate-500">Fuente: Banco Mundial · indicadores socioeconómicos de Perú</p>
       </CardHeader>
       <CardContent className="pb-4">
         <ul className="space-y-2">
           {data.narrative.map((msg, i) => (
-            <li key={i} className="flex items-start gap-2.5 text-sm text-zinc-700 dark:text-zinc-300">
+            <li key={i} className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-300">
               <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0 mt-1.5" />
               {msg}
             </li>
@@ -831,9 +831,11 @@ Responde en español. Usa lenguaje claro y directo, sin términos técnicos cien
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ prompt }),
       });
-      if (!res.ok) throw new Error("Error al generar recomendaciones");
       const data = await res.json();
-      setText(typeof data === "string" ? data : data.response || "");
+      if (!res.ok) throw new Error(data?.error || "Error al generar recomendaciones");
+      const text = typeof data === "string" ? data : data.response ?? "";
+      if (!text) throw new Error("La IA no devolvió texto. Intenta de nuevo.");
+      setText(text);
     } catch (err) {
       toast.error(err.message || "Error al generar recomendaciones");
     } finally {
@@ -845,16 +847,16 @@ Responde en español. Usa lenguaje claro y directo, sin términos técnicos cien
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold flex items-center gap-1.5 text-zinc-900 dark:text-zinc-100">
+          <p className="text-sm font-semibold flex items-center gap-1.5 text-slate-900 dark:text-slate-100">
             <Sparkles className="w-4 h-4 text-primary" />
             Recomendaciones con IA
           </p>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Análisis generado a partir de los datos de riesgo detectados.
           </p>
         </div>
         {docCount > 0 && (
-          <span className="inline-flex items-center gap-1 rounded-full border border-zinc-300 bg-zinc-100 px-3 py-1 text-[11px] font-semibold text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+          <span className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300">
             <BookOpen className="w-3.5 h-3.5" />
             {docCount} documento{docCount !== 1 ? "s" : ""}
           </span>
@@ -869,16 +871,16 @@ Responde en español. Usa lenguaje claro y directo, sin términos técnicos cien
         </Button>
       ) : (
         <div className="space-y-3">
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4 shadow-sm">
+          <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3 mb-3">
-              <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Análisis IA</p>
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Análisis IA</p>
               <span className="rounded-full bg-primary/15 dark:bg-primary/25 px-2.5 py-1 text-[11px] font-bold text-primary">IA</span>
             </div>
-            <div className="text-sm leading-6 text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap">{text}</div>
+            <div className="text-sm leading-6 text-slate-800 dark:text-slate-200 whitespace-pre-wrap">{text}</div>
           </div>
           <div className="flex items-center justify-between gap-2">
             <Button size="sm" variant="secondary" onClick={() => setText(null)}>Regenerar</Button>
-            <p className="text-[11px] text-zinc-400 dark:text-zinc-500">Valida las acciones con tu equipo técnico.</p>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500">Valida las acciones con tu equipo técnico.</p>
           </div>
         </div>
       )}
@@ -890,12 +892,12 @@ Responde en español. Usa lenguaje claro y directo, sin términos técnicos cien
 
 function AnalysisLoading() {
   return (
-    <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800">
+    <Card className="bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
       <CardContent className="py-6 flex flex-col items-center gap-3 text-center">
         <Loader2 className="w-6 h-6 animate-spin text-primary" />
         <div>
-          <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Ejecutando análisis climático</p>
-          <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Ejecutando análisis climático</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
             Consultando climate_cells · GRI · Open-Meteo · World Bank
           </p>
         </div>
@@ -1130,7 +1132,7 @@ export default function ClimateRiskLookup() {
 
           {/* Recomendaciones IA */}
           {hasResults && !loading && (
-            <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm">
+            <Card className="bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm">
               <CardContent className="pt-4 pb-4">
                 <AIPanel analysis={analysis} docContext={docContext} />
               </CardContent>
@@ -1140,9 +1142,9 @@ export default function ClimateRiskLookup() {
           {/* Estado vacío */}
           {!hasResults && !loading && !error && (
             <div className="text-center py-12">
-              <MapPin className="w-8 h-8 mx-auto mb-2 text-zinc-300 dark:text-zinc-700" />
-              <p className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">Selecciona un punto en el mapa</p>
-              <p className="text-xs mt-1 text-zinc-400 dark:text-zinc-600">o ingresa coordenadas para analizar los riesgos climáticos</p>
+              <MapPin className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-700" />
+              <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">Selecciona un punto en el mapa</p>
+              <p className="text-xs mt-1 text-slate-400 dark:text-slate-600">o ingresa coordenadas para analizar los riesgos climáticos</p>
             </div>
           )}
         </div>
