@@ -7,7 +7,8 @@
  * ensoData is present. No existing narrative logic is modified.
  */
 
-import { buildEnsoNarrative } from '../services/ensoService.js';
+import { buildEnsoNarrative }    from '../services/ensoService.js';
+import { buildTerrainNarrative } from '../services/terrainService.js'; // Sprint 6
 
 // Nombres legibles de hazards GRI para el mensaje de contexto
 const GRI_HAZARD_LABELS = {
@@ -33,6 +34,8 @@ const SIGNAL_LABELS = {
   temp_increase:   'aumento de temperatura media',
   flood_risk:      'riesgo de inundación',
   enso_phase:      'fase ENSO activa (ONI)',      // Sprint 5
+  landslide_risk:  'riesgo de deslizamiento (pendiente crítica)',  // Sprint 6
+  huayco_risk:     'riesgo de huayco (flujo de detritos)',         // Sprint 6
 };
 
 // Etiquetas de horizonte temporal
@@ -217,14 +220,20 @@ export function generateNarrative({
   const dominantSignal = signalOutput?.dominant_signal  ?? null;
   const signals        = signalOutput?.signals          ?? [];
 
+  // Resolve data sources once — used in key_metrics, generated_from, and narrative
+  const enso        = fusedData?.ensoData    ?? null;  // declared here to avoid TDZ (was after key_metrics)
+  const terrainData = fusedData?.terrainData ?? null;  // Sprint 6
+
   // Construir executive_summary con datos numéricos reales
   const sentence1 = buildMainSentence(topRisk, latNum, lonNum);
   const sentence2 = buildContextSentence(topRisk, adaptationOutput);
 
   // Sprint 5: ENSO narrative enrichment (appended, never replaces existing sentences)
-  const ensoSentence = buildEnsoNarrative(fusedData?.ensoData ?? null);
+  const ensoSentence    = buildEnsoNarrative(enso);
+  // Sprint 6: Terrain narrative enrichment (appended only when risk exceeds threshold)
+  const terrainSentence = buildTerrainNarrative(terrainData);
 
-  const executive_summary = [sentence1, sentence2, ensoSentence]
+  const executive_summary = [sentence1, sentence2, ensoSentence, terrainSentence]
     .filter(Boolean)
     .join(' ') || buildFallbackSummary(fusedData);
 
@@ -244,25 +253,34 @@ export function generateNarrative({
     exposicion_general:     businessRiskOutput?.overall_exposure ?? null,
     sector,
     // Sprint 5: ENSO intelligence (informational, may be null)
-    enso_fase:              enso?.phase          ?? null,
-    enso_intensidad:        enso?.intensity      ?? null,
-    enso_oni:               enso?.oni_latest     ?? null,
+    enso_fase:              enso?.phase             ?? null,
+    enso_intensidad:        enso?.intensity         ?? null,
+    enso_oni:               enso?.oni_latest        ?? null,
     enso_supply_chain_risk: enso?.supply_chain_risk ?? null,
+    // Sprint 6: Terrain intelligence (informational, may be null)
+    terrain_region:         terrainData?.terrain_region    ?? null,
+    terrain_elevation_m:    terrainData?.elevation_m       ?? null,
+    terrain_slope_deg:      terrainData?.slope_degrees     ?? null,
+    terrain_susceptibility: terrainData?.susceptibility    ?? null,
+    terrain_huayco_risk:    terrainData?.huayco_risk       ?? null,
+    terrain_landslide_score: terrainData?.landslide_score  ?? null,
   };
 
   // Trazabilidad: qué fuentes de datos alimentaron el análisis
-  const enso = fusedData?.ensoData ?? null;
   const generated_from = {
-    climate_cells:   fusedData?.climateData    != null,
-    gri:             fusedData?.griData        != null,
-    open_meteo:      fusedData?.meteoData      != null,
+    climate_cells:   fusedData?.climateData     != null,
+    gri:             fusedData?.griData         != null,
+    open_meteo:      fusedData?.meteoData       != null,
     world_bank:      fusedData?.territorialData != null,
     // Sprint 5: ENSO provenance
     enso:            enso != null,
-    enso_phase:      enso?.phase               ?? null,
-    enso_oni:        enso?.oni_latest          ?? null,
-    distance_km:     fusedData?.distanceKm     ?? null,
-    scenario:        fusedData?.scenario       ?? null,
+    enso_phase:      enso?.phase                ?? null,
+    enso_oni:        enso?.oni_latest           ?? null,
+    // Sprint 6: Terrain provenance
+    terrain:         terrainData != null,
+    terrain_source:  terrainData?.source        ?? null,
+    distance_km:     fusedData?.distanceKm      ?? null,
+    scenario:        fusedData?.scenario        ?? null,
   };
 
   return {

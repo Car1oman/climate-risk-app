@@ -472,9 +472,48 @@ export function detectSignals(fusedData) {
     }));
   }
 
+  // ── LANDSLIDE / HUAYCO (terrain — Sprint 6) ──────────────────────────────
+  // Terrain signals are derived from SRTM elevation data, not CMIP6 projections.
+  // They represent static topographic susceptibility, not climate change delta.
+  // confidence = 'medium': SRTM-derived slope, not ensemble climate model.
+  const terrainData = fusedData?.terrainData ?? null;
+
+  if (terrainData?.exceeds_landslide_threshold) {
+    signals.push(buildSignal({
+      signalType:          'landslide_risk',
+      indicator:           'slope_degrees',
+      historical:          null,
+      projected:           terrainData.slope_degrees,
+      delta:               null,
+      delta_pct:           null,
+      conf:                'medium',
+      horizon:             'short_term',
+      threshold_reference: `INGEMMET/SENAMHI — susceptibilidad ${terrainData.susceptibility}: pendiente ${terrainData.slope_degrees}° en ${terrainData.terrain_region} (score: ${terrainData.landslide_score})`,
+      exceeds_threshold:   true,
+    }));
+  }
+
+  if (terrainData?.huayco_risk === 'alto' || terrainData?.huayco_risk === 'medio') {
+    signals.push(buildSignal({
+      signalType:          'huayco_risk',
+      indicator:           'terrain_huayco',
+      historical:          null,
+      projected:           terrainData.landslide_score,
+      delta:               null,
+      delta_pct:           null,
+      conf:                'medium',
+      horizon:             'short_term',
+      threshold_reference: `INGEMMET — riesgo de huayco nivel ${terrainData.huayco_risk}: ${terrainData.terrain_region} a ${terrainData.elevation_m} m.s.n.m., pendiente ${terrainData.slope_degrees}°`,
+      exceeds_threshold:   true,
+    }));
+  }
+
   // ── Señal dominante: la de mayor delta absoluto o la primera ─────────────
-  // enso_phase excluido de dominancia — es informacional, no un señal de riesgo primaria
-  const scorableSignals = signals.filter(s => s.signalType !== 'enso_phase');
+  // enso_phase, landslide_risk y huayco_risk excluidos de dominancia —
+  // son señales informacionales/estáticas, no proyecciones climáticas primarias.
+  const scorableSignals = signals.filter(s =>
+    !['enso_phase', 'landslide_risk', 'huayco_risk'].includes(s.signalType)
+  );
   const dominant_signal = scorableSignals.length > 0
     ? scorableSignals.reduce((best, s) =>
         (Math.abs(s.delta ?? 0) > Math.abs(best.delta ?? 0) ? s : best)
@@ -483,8 +522,10 @@ export function detectSignals(fusedData) {
 
   return {
     signals,
-    signals_count:   signals.length,
+    signals_count:    signals.length,
     dominant_signal,
-    enso_phase:      ensoData?.phase ?? null,   // convenience field for consumers
+    enso_phase:       ensoData?.phase   ?? null,  // convenience field for consumers
+    terrain_region:   terrainData?.terrain_region ?? null,  // Sprint 6 convenience
+    terrain_slope:    terrainData?.slope_degrees  ?? null,  // Sprint 6 convenience
   };
 }

@@ -9,6 +9,7 @@ import documentosRouter from './routes/documentos.js';
 import searchRouter    from './routes/search.js';
 import alertsRouter    from './routes/alerts.js';
 import ensoRouter      from './routes/enso.js';     // Sprint 5
+import terrainRouter   from './routes/terrain.js';  // Sprint 6
 
 dotenv.config();
 
@@ -28,6 +29,7 @@ app.use('/api/documentos', documentosRouter);
 app.use('/api',            searchRouter);   // /api/test, /api/search, /api/places/assets
 app.use('/api',            climateRouter);  // /api/climate, /api/climate-cells/*, /api/climate-risks/*, etc.
 app.use('/api',            ensoRouter);     // Sprint 5: /api/enso/status, /api/enso/refresh, /api/enso/cache-stats
+app.use('/api',            terrainRouter); // Sprint 6: /api/terrain/slope, /api/terrain/cache-stats, /api/terrain/cache
 
 const PORT = process.env.PORT || 3001;
 

@@ -5,10 +5,11 @@
  */
 
 import { supabase } from '../supabaseClient.js';
-import { getGriRiskByLocation } from '../services/griRiskService.js';
-import { getClimateTrends } from '../services/openMeteoService.js';
-import { getTerritorialContext } from '../services/worldBankService.js';
-import { getEnsoContext } from '../services/ensoService.js';
+import { getGriRiskByLocation }    from '../services/griRiskService.js';
+import { getClimateTrends }        from '../services/openMeteoService.js';
+import { getTerritorialContext }   from '../services/worldBankService.js';
+import { getEnsoContext }          from '../services/ensoService.js';
+import { getTerrainIntelligence }  from '../services/terrainService.js';  // Sprint 6
 
 // Variables climáticas extraídas del JSONB de climate_cells
 // Refleja las columnas reales de la DB: tr (noches tropicales), prpercnt (% cambio precip),
@@ -121,12 +122,13 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
   const lonNum = Number(lon);
 
   // Ejecutar todas las fuentes en paralelo; cada una falla silenciosamente
-  const [cellResult, griResult, meteoResult, territorialResult, ensoResult] = await Promise.allSettled([
+  const [cellResult, griResult, meteoResult, territorialResult, ensoResult, terrainResult] = await Promise.allSettled([
     fetchClimateCell(latNum, lonNum, scenario),
     getGriRiskByLocation(latNum, lonNum),
     getClimateTrends(latNum, lonNum),
     getTerritorialContext(),
-    getEnsoContext(),           // Sprint 5: ENSO — informacional, non-blocking
+    getEnsoContext(),                           // Sprint 5: ENSO — informacional, non-blocking
+    getTerrainIntelligence(latNum, lonNum),    // Sprint 6: terrain — informacional, non-blocking
   ]);
 
   const cellData      = cellResult.status      === 'fulfilled' ? cellResult.value      : null;
@@ -134,9 +136,10 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
   const meteoResult_  = meteoResult.status      === 'fulfilled' ? meteoResult.value      : null;
   const territorial   = territorialResult.status === 'fulfilled' ? territorialResult.value : null;
   const ensoData      = ensoResult.status        === 'fulfilled' ? ensoResult.value        : null;
+  const terrainData   = terrainResult.status     === 'fulfilled' ? terrainResult.value     : null;
 
   if (cellResult.status === 'rejected')
-    console.warn('[Layer1] GRI falló:', cellResult.reason?.message);
+    console.warn('[Layer1] climate_cells falló:', cellResult.reason?.message);
   if (griResult.status === 'rejected')
     console.warn('[Layer1] GRI falló:', griResult.reason?.message);
   if (meteoResult.status === 'rejected')
@@ -145,6 +148,8 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
     console.warn('[Layer1] World Bank falló:', territorialResult.reason?.message);
   if (ensoResult.status === 'rejected')
     console.warn('[Layer1] ENSO falló (non-blocking):', ensoResult.reason?.message);
+  if (terrainResult.status === 'rejected')
+    console.warn('[Layer1] Terrain falló (non-blocking):', terrainResult.reason?.message);
 
   // Cuando climate_cells no tiene datos, usar los índices extremos computados
   // por Open-Meteo (hd35, hd40, cdd, rx5day, rx1day, pr, tas) como fallback.
@@ -163,6 +168,8 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
     territorialData: territorial              ?? null,
     // Sprint 5: ENSO — informacional, null cuando NOAA no responde
     ensoData:        ensoData                 ?? null,
+    // Sprint 6: Terrain — informacional, null cuando elevation APIs no responden
+    terrainData:     terrainData              ?? null,
     // Metadatos de ubicación
     distanceKm:      cellData?.distanceKm     ?? null,
     scenario,
