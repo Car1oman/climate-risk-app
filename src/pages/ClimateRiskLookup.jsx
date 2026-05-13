@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { API_URL, fetchTerritorialContext, fetchDocumentContext, analyzeClimateRisk } from "@/lib/api";
+import MethodologyPanel from "@/components/climate/MethodologyPanel";
 import {
   Search, MapPin, Loader2, AlertTriangle,
   Sparkles, Building2, Plus, Globe2, BookOpen, ChevronDown, ChevronUp,
@@ -1054,6 +1055,9 @@ export default function ClimateRiskLookup() {
               <AdaptationPanel adaptations={analysis.adaptations} />
             </>
           )}
+
+          {/* Panel de Metodología y Fuentes — siempre visible, badges dinámicos con análisis */}
+          <MethodologyPanel metadata={analysis?.metadata} />
 
           {/* Contexto territorial Banco Mundial (siempre disponible) */}
           <TerritorialContextPanel data={territorialCtx} />
