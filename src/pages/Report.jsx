@@ -1,15 +1,18 @@
 import { useState, useEffect } from "react";
 import { useAssets } from "@/hooks/useAssets";
 import { API_URL } from "@/lib/api";
+import { exportEnterprisePdf } from "@/lib/enterprisePdfReport";
 import { formatCurrency } from "@/lib/riskEngine";
 import { Button } from "@/components/ui/button";
-import { FileText, Loader2 } from "lucide-react";
+import { Download, FileText, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 const RISK_LABELS = { critico: "Crítico", alto: "Alto", medio: "Medio", bajo: "Bajo" };
 
 export default function Report() {
   const [isLoading, setIsLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
   const [report, setReport] = useState(null);
   const { data: assets = [], isLoading: assetsLoading, error: assetsError } = useAssets();
 
@@ -80,6 +83,19 @@ Formato Markdown. Sé específico con los datos proporcionados. Incluye recomend
     }
   };
 
+  const exportPdf = () => {
+    setExportingPdf(true);
+    try {
+      exportEnterprisePdf({ assets, generatedReport: report });
+      toast.success("Reporte PDF listo para exportar");
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+      toast.error("No se pudo preparar el PDF");
+    } finally {
+      setTimeout(() => setExportingPdf(false), 600);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -97,10 +113,21 @@ Formato Markdown. Sé específico con los datos proporcionados. Incluye recomend
             Genera reportes compatibles con marcos de divulgación climática
           </p>
         </div>
-        <Button onClick={generateReport} disabled={generating || assetsError || assets.length === 0} className="gap-2">
-          {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-          {generating ? "Generando..." : "Generar Reporte"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={exportPdf}
+            disabled={exportingPdf || assetsLoading || assetsError || assets.length === 0}
+            className="gap-2"
+          >
+            {exportingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            {exportingPdf ? "Preparando..." : "Exportar PDF"}
+          </Button>
+          <Button onClick={generateReport} disabled={generating || assetsError || assets.length === 0} className="gap-2">
+            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+            {generating ? "Generando..." : "Generar Reporte"}
+          </Button>
+        </div>
       </div>
 
       {assetsError && (
@@ -108,6 +135,13 @@ Formato Markdown. Sé específico con los datos proporcionados. Incluye recomend
           No se pudieron cargar los activos desde el backend.
         </div>
       )}
+      <div className="rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30 p-4">
+        <p className="text-sm font-semibold text-blue-950 dark:text-blue-100">Reporte Ejecutivo PDF Enterprise</p>
+        <p className="text-xs text-blue-800 dark:text-blue-200 mt-1">
+          La exportación incluye resumen ejecutivo, riesgos priorizados, score climático, impacto financiero,
+          escenarios SSP, fuentes, metodología, limitaciones, bibliografía científica y nivel de confianza.
+        </p>
+      </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-card border border-border rounded-xl p-4 text-center">
           <p className="text-xs text-muted-foreground">Activos</p>
