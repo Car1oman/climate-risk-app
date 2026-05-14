@@ -10,7 +10,10 @@
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test tests/regression/layer2-signal-engine.test.js tests/regression/layer4-prioritization-engine.test.js tests/regression/risk-engine.test.js tests/regression/risk-model-service.test.js tests/regression/formula-consistency.test.js tests/baselines/baseline-validation.test.js",
+    "test:regression": "node --test tests/regression/layer2-signal-engine.test.js tests/regression/layer4-prioritization-engine.test.js tests/regression/risk-engine.test.js tests/regression/risk-model-service.test.js tests/regression/formula-consistency.test.js",
+    "test:baselines": "node --test tests/baselines/baseline-validation.test.js"
   },
   "dependencies": {
     "@google/genai": "^1.48.0",
