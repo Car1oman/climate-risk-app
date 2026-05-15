@@ -9,6 +9,8 @@
 import express from 'express';
 import { getEnsoContext, refreshEnsoContext, buildEnsoAlertSignal } from '../services/ensoService.js';
 import * as ensoCache from '../services/ensoCache.js';
+import { requireAuth } from '../middleware/auth.js';
+import { strictLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
 
@@ -39,8 +41,8 @@ router.get('/enso/status', async (req, res) => {
   }
 });
 
-// POST /api/enso/refresh  — forces cache invalidation
-router.post('/enso/refresh', async (req, res) => {
+// POST /api/enso/refresh  — forces cache invalidation (admin)
+router.post('/enso/refresh', requireAuth, strictLimiter, async (req, res) => {
   try {
     const ensoData = await refreshEnsoContext();
     if (!ensoData) {

@@ -1,5 +1,9 @@
 import express from 'express';
 import { GoogleGenAI } from '@google/genai';
+import { requireAuth } from '../middleware/auth.js';
+import { aiLimiter }   from '../middleware/rateLimiter.js';
+import { validate }    from '../middleware/validate.js';
+import { aiPromptSchema } from '../validators/ai.js';
 
 const router = express.Router();
 
@@ -23,7 +27,7 @@ function userFriendlyError(err) {
   return 'Error al procesar la solicitud de IA. Revisa la consola del servidor para más detalles.';
 }
 
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, aiLimiter, validate(aiPromptSchema), async (req, res) => {
   try {
     const { prompt } = req.body;
 

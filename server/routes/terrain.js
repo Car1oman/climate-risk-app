@@ -12,6 +12,8 @@
 import express from 'express';
 import { getTerrainIntelligence } from '../services/terrainService.js';
 import * as terrainCache          from '../services/terrainCache.js';
+import { requireAuth } from '../middleware/auth.js';
+import { strictLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
 
@@ -73,7 +75,7 @@ router.get('/terrain/cache-stats', (_req, res) => {
 // Query params (optional):
 //   lat, lon — invalidate a single coordinate entry; omit to clear all entries.
 
-router.delete('/terrain/cache', (req, res) => {
+router.delete('/terrain/cache', requireAuth, strictLimiter, (req, res) => {
   const lat = req.query.lat != null ? parseFloat(req.query.lat) : null;
   const lon = req.query.lon != null ? parseFloat(req.query.lon) : null;
 

@@ -1,5 +1,14 @@
 import express from 'express';
 import { supabase } from '../supabaseClient.js';
+import { requireAuth } from '../middleware/auth.js';
+import { strictLimiter } from '../middleware/rateLimiter.js';
+import { validate } from '../middleware/validate.js';
+import {
+  createAssetSchema,
+  updateAssetSchema,
+  bulkAssetsSchema,
+  checkDuplicateSchema,
+} from '../validators/assets.js';
 
 const router = express.Router();
 
@@ -30,7 +39,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Verificar duplicados
-router.post('/check-duplicate', async (req, res) => {
+router.post('/check-duplicate', requireAuth, validate(checkDuplicateSchema), async (req, res) => {
   try {
     const { name, lat, lng, excludeId } = req.body;
 
@@ -60,7 +69,7 @@ router.post('/check-duplicate', async (req, res) => {
 });
 
 // Crear activo
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, strictLimiter, validate(createAssetSchema), async (req, res) => {
   try {
     const {
       name,
@@ -142,7 +151,7 @@ router.post('/', async (req, res) => {
 });
 
 // Actualizar activo
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAuth, strictLimiter, validate(updateAssetSchema), async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -215,7 +224,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // Eliminar activo
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAuth, strictLimiter, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -237,7 +246,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // Carga masiva de activos
-router.post('/bulk', async (req, res) => {
+router.post('/bulk', requireAuth, strictLimiter, validate(bulkAssetsSchema), async (req, res) => {
   try {
     const { assets } = req.body;
 

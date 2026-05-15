@@ -3,10 +3,22 @@
 import 'dotenv/config';
 
 import express from 'express';
-import cors from 'cors';
+import cors    from 'cors';
+import helmet  from 'helmet';
+import compression from 'compression';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
+// ── Security infrastructure ───────────────────────────────────────────────────
+import { validateEnv }    from './config/env.js';
+import { buildCorsOptions } from './config/corsOptions.js';
+import { requestId }      from './middleware/requestId.js';
+import { requestLogger }  from './middleware/requestLogger.js';
+import { generalLimiter } from './middleware/rateLimiter.js';
+import { errorHandler }   from './middleware/errorHandler.js';
+
+// ── Route modules ─────────────────────────────────────────────────────────────
+import healthRouter    from './routes/health.js';
 import assetsRouter    from './routes/assets.js';
 import aiRouter        from './routes/ai.js';
 import climateRouter   from './routes/climate.js';
@@ -16,39 +28,76 @@ import alertsRouter    from './routes/alerts.js';
 import ensoRouter      from './routes/enso.js';
 import terrainRouter   from './routes/terrain.js';
 
-// __dirname is not available in ES modules
+// Fail fast if required env vars are absent.
+validateEnv();
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = dirname(__filename);
 
 const app = express();
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Servir archivos estáticos (build de Vite)
+// ── Global middleware (order matters) ─────────────────────────────────────────
+
+// 1. Request ID — must be first so reqId is available in all downstream middleware
+app.use(requestId);
+
+// 2. Security headers
+app.use(helmet({
+  // Content-Security-Policy is relaxed because the frontend is a SPA served from
+  // the same origin — a strict CSP would block inline React scripts.
+  contentSecurityPolicy: false,
+}));
+
+// 3. CORS — allowlist from ALLOWED_ORIGINS env var
+app.use(cors(buildCorsOptions()));
+
+// 4. Compression
+app.use(compression());
+
+// 5. Body parsers — 10 MB for JSON (was 50 MB; bulk climate uploads use multipart)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// 6. Structured request logging
+app.use(requestLogger);
+
+// 7. Global rate limiter (generous — per-endpoint limiters are stricter)
+app.use('/api/', generalLimiter);
+
+// ── Static files (Vite build) ─────────────────────────────────────────────────
 app.use(express.static('dist'));
 
-// ── Route modules ─────────────────────────────────────────────────────────────
+// ── Health probes (no auth, no rate limit) ────────────────────────────────────
+app.use(healthRouter);
+
+// ── API routes ────────────────────────────────────────────────────────────────
 app.use('/api/assets',     assetsRouter);
 app.use('/api/alerts',     alertsRouter);
 app.use('/api/ai',         aiRouter);
 app.use('/api/documentos', documentosRouter);
 app.use('/api',            searchRouter);   // /api/test, /api/search, /api/places/assets
 app.use('/api',            climateRouter);  // /api/climate, /api/climate-cells/*, /api/climate-risks/*, etc.
-app.use('/api',            ensoRouter);     // Sprint 5: /api/enso/status, /api/enso/refresh, /api/enso/cache-stats
-app.use('/api',            terrainRouter); // Sprint 6: /api/terrain/slope, /api/terrain/cache-stats, /api/terrain/cache
+app.use('/api',            ensoRouter);     // /api/enso/status, /api/enso/refresh, /api/enso/cache-stats
+app.use('/api',            terrainRouter);  // /api/terrain/slope, /api/terrain/cache-stats, /api/terrain/cache
 
-const PORT = process.env.PORT || 3001;
-
-// Fallback para SPA: servir index.html para rutas no encontradas
+// ── SPA fallback ──────────────────────────────────────────────────────────────
 app.use((req, res, next) => {
   if (!req.path.startsWith('/api/')) {
     res.sendFile(join(__dirname, '..', 'dist', 'index.html'));
   } else {
-    res.status(404).json({ error: 'API endpoint no encontrado' });
+    res.status(404).json({ error: 'API endpoint no encontrado', reqId: req.id });
   }
 });
 
+// ── Centralized error handler (must be last) ──────────────────────────────────
+app.use(errorHandler);
+
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+  console.log(JSON.stringify({
+    ts:      new Date().toISOString(),
+    level:   'INFO',
+    message: `Servidor corriendo en http://localhost:${PORT}`,
+    nodeEnv: process.env.NODE_ENV,
+  }));
 });

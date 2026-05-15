@@ -1,5 +1,9 @@
 import express from 'express';
 import { supabase } from '../supabaseClient.js';
+import { requireAuth } from '../middleware/auth.js';
+import { strictLimiter } from '../middleware/rateLimiter.js';
+import { validate } from '../middleware/validate.js';
+import { createAlertSchema } from '../validators/alerts.js';
 
 const router = express.Router();
 
@@ -26,7 +30,7 @@ router.get('/', async (req, res) => {
 });
 
 // PATCH /api/alerts/:id/archive — mark alert as inactive
-router.patch('/:id/archive', async (req, res) => {
+router.patch('/:id/archive', requireAuth, strictLimiter, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -46,7 +50,7 @@ router.patch('/:id/archive', async (req, res) => {
 });
 
 // POST /api/alerts — create a new alert
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, strictLimiter, validate(createAlertSchema), async (req, res) => {
   try {
     const { title, description, severity, type, source, region, asset_id } = req.body;
 

@@ -1,4 +1,6 @@
 import express from 'express';
+import { requireAuth } from '../middleware/auth.js';
+import { strictLimiter } from '../middleware/rateLimiter.js';
 import * as openMeteoCache from '../services/openMeteoCache.js';
 import { getClimateData } from '../services/climateService.js';
 import {
@@ -210,7 +212,7 @@ router.get('/climate-cells/query', async (req, res) => {
  *
  * Retorna: 3-phase pipeline results con estadísticas detalladas
  */
-router.post('/climate-cells/upload', async (req, res) => {
+router.post('/climate-cells/upload', requireAuth, strictLimiter, async (req, res) => {
   try {
     const { data, format = 'auto' } = req.body;
 
@@ -284,7 +286,7 @@ router.post('/climate-cells/upload', async (req, res) => {
 // Calcula modelo de riesgo H×E×I en el backend.
 // Body: { asset: {...}, maxArea?: number, elNinoMultiplier?: number }
 // -----------------------------------------------
-router.post('/risk-model', (req, res) => {
+router.post('/risk-model', requireAuth, (req, res) => {
   try {
     const { asset, maxArea, elNinoMultiplier } = req.body;
     if (!asset || typeof asset !== 'object') {
@@ -304,7 +306,7 @@ router.post('/risk-model', (req, res) => {
 // LEGACY — Writes to old `climate_data` table (flat weather records), not `climate_cells`.
 // The canonical data ingestion path is POST /api/climate-cells/upload (climateImportService).
 // This endpoint is retained for backward compatibility only. Do NOT use for new ingestion.
-router.post('/climate/bulk', async (req, res) => {
+router.post('/climate/bulk', requireAuth, strictLimiter, async (req, res) => {
   try {
     const { climateData } = req.body;
 
@@ -542,7 +544,7 @@ router.get('/external-risks/lookup', async (req, res) => {
 // These tables are superseded by `climate_cells` (CMIP6 JSONB schema + PostGIS).
 // The canonical upload path is POST /api/climate-cells/upload (climateImportService).
 // This endpoint is retained for backward compatibility only. Do NOT use for new ingestion.
-router.post('/climate-risks/upload', async (req, res) => {
+router.post('/climate-risks/upload', requireAuth, strictLimiter, async (req, res) => {
   try {
     const { data } = req.body;
 
@@ -653,7 +655,7 @@ router.get('/territorial-context', async (req, res) => {
 // Ejecuta las 6 capas en secuencia y retorna
 // análisis completo de riesgo climático.
 // ============================================
-router.post('/v2/climate-risk-analysis', async (req, res) => {
+router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
   const { lat, lon, sector: sectorRaw, asset_type, scenario } = req.body;
   const sector = sectorRaw || 'retail';
 
@@ -800,7 +802,7 @@ router.get('/v2/open-meteo-cache/stats', (_req, res) => {
  * Flushes all cached Open-Meteo responses (use for forced refresh or testing).
  * Optional query: ?lat=X&lon=Y to invalidate a single coordinate.
  */
-router.delete('/v2/open-meteo-cache', (req, res) => {
+router.delete('/v2/open-meteo-cache', requireAuth, strictLimiter, (req, res) => {
   const { lat, lon } = req.query;
   if (lat != null && lon != null) {
     openMeteoCache.invalidate(parseFloat(lat), parseFloat(lon));

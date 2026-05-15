@@ -8,6 +8,8 @@ import {
 } from '../services/documentosService.js';
 import { getDocumentosEnrichment } from '../services/documentosEnrichmentService.js';
 import { climateCache, CACHE_TTL } from '../shared/cache.js';
+import { requireAuth } from '../middleware/auth.js';
+import { strictLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
 
@@ -25,7 +27,7 @@ const upload = multer({
  *   - descripcion (string) — opcional
  *   - categoria  (string) — opcional: riesgo | impacto | adaptacion | informe
  */
-router.post('/upload', upload.single('archivo'), async (req, res) => {
+router.post('/upload', requireAuth, strictLimiter, upload.single('archivo'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No se recibió ningún archivo (campo: "archivo")' });
@@ -63,7 +65,7 @@ router.get('/', async (req, res) => {
  * DELETE /api/documentos/:id
  * Elimina el documento de la BD y del Storage.
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAuth, strictLimiter, async (req, res) => {
   try {
     const result = await deleteDocumento(req.params.id);
     return res.json(result);
