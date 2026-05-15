@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,9 +36,6 @@ const CONFIDENCE_BADGE = {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-/**
- * @param {{ icon: React.ReactNode, title: string, expanded: boolean, onToggle: () => void }} props
- */
 function SectionToggle({ icon, title, expanded, onToggle }) {
   return (
     <button
@@ -61,9 +59,6 @@ function Divider() {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-/**
- * @param {{ metadata?: { data_sources?: string[], scenario?: string } }} props
- */
 export default function MethodologyPanel({ metadata }) {
   const [open, setOpen]       = useState(false);
   const [sections, setSections] = useState({

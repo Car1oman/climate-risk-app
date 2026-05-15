@@ -148,7 +148,7 @@ export const TEMPORAL_HORIZONS = [
     label: "Largo plazo",
     period: "2060–2100",
     description:
-      "Horizon factor: 0.50 (urgencia de planificación). Actualmente usa datos 2040–2059 como proxy — no se aplica extrapolación matemática. Sin datos CMIP6 disponibles para 2060+. Incertidumbre mayor.",
+      "Horizon factor: 0.50 (urgencia de planificación). Datos extrapolados linealmente desde SSP5-8.5 2040-2059. Incertidumbre mayor.",
   },
 ];
 
@@ -255,7 +255,7 @@ export const ANALYSIS_LIMITATIONS = [
   "No incluye riesgos en cascada (inundación → interrupción logística → recesión).",
   "Datos World Bank son nacionales (Perú); sin desagregación regional o departamental.",
   "SRTM (terreno) de año 2000; no refleja cambios de uso del suelo posteriores.",
-  "Horizonte long_term reutiliza datos 2040–2059 como proxy; no representa extrapolación matemática a 2060+.",
+  "Open-Meteo cubre hasta ~2049; horizonte long_term (2060+) se extrapola linealmente.",
   "Resolución CMIP6 de ~25 km no captura microclimas urbanos ni efecto de isla de calor.",
   "El score es un valor puntual del ensemble; no expone intervalos de confianza.",
 ];
