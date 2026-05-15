@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { AlertCircle, TrendingUp, Info, CheckCircle2, Cloud, Building2, DollarSign } from "lucide-react";
+import TechnicalDetailModal from "@/components/climate/TechnicalDetailModal";
 
 export default function RiskModel({ riskData, asset }) {
   if (!riskData) return null;
@@ -222,6 +223,11 @@ export default function RiskModel({ riskData, asset }) {
             <span className="font-semibold">Nota sobre este análisis:</span> Este cálculo se basa en datos climáticos actuales y características del negocio. Se actualiza conforme hay nueva información disponible. Para decisiones de inversión importantes, se recomienda consultar con especialistas en gestión de riesgos climáticos.
           </p>
         </div>
+      </div>
+
+      {/* Trazabilidad metodológica */}
+      <div className="flex justify-end">
+        <TechnicalDetailModal asset={asset} riskData={riskData} />
       </div>
     </div>
   );
