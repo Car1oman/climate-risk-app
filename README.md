@@ -297,15 +297,12 @@ Retorna análisis completo con riesgos por horizonte
 | `src/pages/AssetDetail.jsx` | Primary asset risk display |
 | `src/pages/Dashboard.jsx` | Primary KPI + map view |
 
-Ver `docs/architecture-baseline.md` para detalles completos del baseline Sprint 0.
-
 ---
 
 ## 📚 Documentación Adicional
 
 | Documento | Contenido |
 |-----------|-----------|
-| `docs/architecture-baseline.md` | Baseline arquitectónico Sprint 0 |
 | `scripts/README.md` | Documentación de scripts ETL |
 
 ---
@@ -335,4 +332,4 @@ Proyecto interno Intercorp Retail.
 
 ---
 
-**Última actualización:** Mayo 2026 (Sprint 0)
+**Última actualización:** Enero 2025
