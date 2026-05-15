@@ -6,7 +6,7 @@ import { Errors } from '../errors/AppError.js';
 let _authClient = null;
 function getAuthClient() {
   if (!_authClient) {
-    _authClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+    _authClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
   }
   return _authClient;
 }
@@ -15,7 +15,7 @@ function getAuthClient() {
  * requireAuth — protects mutable endpoints.
  *
  * DEV mode (DEV_AUTH_BYPASS=true, non-production):
- *   Injects a synthetic demo user that matches the frontend AuthContext stub.
+ *   Injects a synthetic user for backend integration testing (e.g., curl/Postman).
  *   Never active in NODE_ENV=production regardless of the env var.
  *
  * Production mode:

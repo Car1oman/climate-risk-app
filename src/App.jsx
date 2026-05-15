@@ -4,7 +4,8 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
-import { AuthProvider } from '@/lib/AuthContext';
+import { AuthProvider, useAuth } from '@/lib/AuthContext';
+import LoginPage from '@/pages/LoginPage';
 
 import AppLayout from './components/layout/AppLayout';
 import Dashboard from './pages/Dashboard';
@@ -43,6 +44,22 @@ const AuthenticatedApp = () => {
   );
 };
 
+const AppGate = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) return <LoginPage />;
+
+  return <AuthenticatedApp />;
+};
+
 function App() {
   const [backendMessage, setBackendMessage] = useState(null);
   const [backendError, setBackendError] = useState(null);
@@ -63,7 +80,6 @@ function App() {
     pingBackend();
   }, []);
 
-  // Auto-dismiss notifications after 5 seconds
   useEffect(() => {
     if (!backendMessage) return;
     const t = setTimeout(() => setBackendMessage(null), 5000);
@@ -80,7 +96,7 @@ function App() {
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
         <Router>
-          <AuthenticatedApp />
+          <AppGate />
         </Router>
         <Toaster />
         {backendMessage && (
