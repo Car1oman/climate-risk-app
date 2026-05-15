@@ -62,6 +62,7 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(requestLogger);
 
 // 7. Global rate limiter (generous — per-endpoint limiters are stricter)
+app.set('trust proxy', 1);
 app.use('/api/', generalLimiter);
 
 // ── Static files (Vite build) ─────────────────────────────────────────────────
