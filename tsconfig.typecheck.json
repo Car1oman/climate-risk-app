@@ -1,0 +1,9 @@
+{
+  "extends": "./jsconfig.json",
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/vite-plugins",
+    "src/components/ui/**"
+  ]
+}

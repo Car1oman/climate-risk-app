@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "leaflet": ["./src/types/leaflet.d.ts"]
     },
     "jsx": "react-jsx",
     "module": "esnext",
@@ -9,6 +10,7 @@
     "lib": ["esnext", "dom"],
     "target": "esnext",
     "checkJs": true,
+    "noEmit": true,
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
@@ -17,4 +19,4 @@
   },
   "include": ["src/**/*", "vite-env.d.ts"],
   "exclude": ["node_modules", "dist", "src/vite-plugins"]
-} 
+}

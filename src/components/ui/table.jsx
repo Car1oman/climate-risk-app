@@ -2,38 +2,47 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-const Table = React.forwardRef(({ className, ...props }, ref) => (
+/** @type {React.ForwardRefRenderFunction<any, any>} */
+const TableImpl = ({ className, ...props }, ref) => (
   <div className="relative w-full overflow-auto">
     <table
       ref={ref}
       className={cn("w-full caption-bottom text-sm", className)}
       {...props} />
   </div>
-))
+)
+const Table = React.forwardRef(TableImpl)
 Table.displayName = "Table"
 
-const TableHeader = React.forwardRef(({ className, ...props }, ref) => (
+/** @type {React.ForwardRefRenderFunction<any, any>} */
+const TableHeaderImpl = ({ className, ...props }, ref) => (
   <thead ref={ref} className={cn("[&_tr]:border-b", className)} {...props} />
-))
+)
+const TableHeader = React.forwardRef(TableHeaderImpl)
 TableHeader.displayName = "TableHeader"
 
-const TableBody = React.forwardRef(({ className, ...props }, ref) => (
+/** @type {React.ForwardRefRenderFunction<any, any>} */
+const TableBodyImpl = ({ className, ...props }, ref) => (
   <tbody
     ref={ref}
     className={cn("[&_tr:last-child]:border-0", className)}
     {...props} />
-))
+)
+const TableBody = React.forwardRef(TableBodyImpl)
 TableBody.displayName = "TableBody"
 
-const TableFooter = React.forwardRef(({ className, ...props }, ref) => (
+/** @type {React.ForwardRefRenderFunction<any, any>} */
+const TableFooterImpl = ({ className, ...props }, ref) => (
   <tfoot
     ref={ref}
     className={cn("border-t bg-muted/50 font-medium [&>tr]:last:border-b-0", className)}
     {...props} />
-))
+)
+const TableFooter = React.forwardRef(TableFooterImpl)
 TableFooter.displayName = "TableFooter"
 
-const TableRow = React.forwardRef(({ className, ...props }, ref) => (
+/** @type {React.ForwardRefRenderFunction<any, any>} */
+const TableRowImpl = ({ className, ...props }, ref) => (
   <tr
     ref={ref}
     className={cn(
@@ -41,10 +50,12 @@ const TableRow = React.forwardRef(({ className, ...props }, ref) => (
       className
     )}
     {...props} />
-))
+)
+const TableRow = React.forwardRef(TableRowImpl)
 TableRow.displayName = "TableRow"
 
-const TableHead = React.forwardRef(({ className, ...props }, ref) => (
+/** @type {React.ForwardRefRenderFunction<any, any>} */
+const TableHeadImpl = ({ className, ...props }, ref) => (
   <th
     ref={ref}
     className={cn(
@@ -52,10 +63,12 @@ const TableHead = React.forwardRef(({ className, ...props }, ref) => (
       className
     )}
     {...props} />
-))
+)
+const TableHead = React.forwardRef(TableHeadImpl)
 TableHead.displayName = "TableHead"
 
-const TableCell = React.forwardRef(({ className, ...props }, ref) => (
+/** @type {React.ForwardRefRenderFunction<any, any>} */
+const TableCellImpl = ({ className, ...props }, ref) => (
   <td
     ref={ref}
     className={cn(
@@ -63,15 +76,18 @@ const TableCell = React.forwardRef(({ className, ...props }, ref) => (
       className
     )}
     {...props} />
-))
+)
+const TableCell = React.forwardRef(TableCellImpl)
 TableCell.displayName = "TableCell"
 
-const TableCaption = React.forwardRef(({ className, ...props }, ref) => (
+/** @type {React.ForwardRefRenderFunction<any, any>} */
+const TableCaptionImpl = ({ className, ...props }, ref) => (
   <caption
     ref={ref}
     className={cn("mt-4 text-sm text-muted-foreground", className)}
     {...props} />
-))
+)
+const TableCaption = React.forwardRef(TableCaptionImpl)
 TableCaption.displayName = "TableCaption"
 
 export {

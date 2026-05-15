@@ -16,7 +16,8 @@ const DropdownMenuSub = DropdownMenuPrimitive.Sub
 
 const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup
 
-const DropdownMenuSubTrigger = React.forwardRef(({ className, inset, children, ...props }, ref) => (
+/** @type {React.ForwardRefRenderFunction<any, any>} */
+const DropdownMenuSubTriggerImpl = ({ className, inset, children, ...props }, ref) => (
   <DropdownMenuPrimitive.SubTrigger
     ref={ref}
     className={cn(
@@ -28,11 +29,12 @@ const DropdownMenuSubTrigger = React.forwardRef(({ className, inset, children, .
     {children}
     <ChevronRight className="ml-auto" />
   </DropdownMenuPrimitive.SubTrigger>
-))
-DropdownMenuSubTrigger.displayName =
-  DropdownMenuPrimitive.SubTrigger.displayName
+)
+const DropdownMenuSubTrigger = React.forwardRef(DropdownMenuSubTriggerImpl)
+DropdownMenuSubTrigger.displayName = DropdownMenuPrimitive.SubTrigger.displayName
 
-const DropdownMenuSubContent = React.forwardRef(({ className, ...props }, ref) => (
+/** @type {React.ForwardRefRenderFunction<any, any>} */
+const DropdownMenuSubContentImpl = ({ className, ...props }, ref) => (
   <DropdownMenuPrimitive.SubContent
     ref={ref}
     className={cn(
@@ -40,11 +42,12 @@ const DropdownMenuSubContent = React.forwardRef(({ className, ...props }, ref) =
       className
     )}
     {...props} />
-))
-DropdownMenuSubContent.displayName =
-  DropdownMenuPrimitive.SubContent.displayName
+)
+const DropdownMenuSubContent = React.forwardRef(DropdownMenuSubContentImpl)
+DropdownMenuSubContent.displayName = DropdownMenuPrimitive.SubContent.displayName
 
-const DropdownMenuContent = React.forwardRef(({ className, sideOffset = 4, ...props }, ref) => (
+/** @type {React.ForwardRefRenderFunction<any, any>} */
+const DropdownMenuContentImpl = ({ className, sideOffset = 4, ...props }, ref) => (
   <DropdownMenuPrimitive.Portal>
     <DropdownMenuPrimitive.Content
       ref={ref}
@@ -56,10 +59,12 @@ const DropdownMenuContent = React.forwardRef(({ className, sideOffset = 4, ...pr
       )}
       {...props} />
   </DropdownMenuPrimitive.Portal>
-))
+)
+const DropdownMenuContent = React.forwardRef(DropdownMenuContentImpl)
 DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName
 
-const DropdownMenuItem = React.forwardRef(({ className, inset, ...props }, ref) => (
+/** @type {React.ForwardRefRenderFunction<any, any>} */
+const DropdownMenuItemImpl = ({ className, inset, ...props }, ref) => (
   <DropdownMenuPrimitive.Item
     ref={ref}
     className={cn(
@@ -68,10 +73,12 @@ const DropdownMenuItem = React.forwardRef(({ className, inset, ...props }, ref) 
       className
     )}
     {...props} />
-))
+)
+const DropdownMenuItem = React.forwardRef(DropdownMenuItemImpl)
 DropdownMenuItem.displayName = DropdownMenuPrimitive.Item.displayName
 
-const DropdownMenuCheckboxItem = React.forwardRef(({ className, children, checked, ...props }, ref) => (
+/** @type {React.ForwardRefRenderFunction<any, any>} */
+const DropdownMenuCheckboxItemImpl = ({ className, children, checked, ...props }, ref) => (
   <DropdownMenuPrimitive.CheckboxItem
     ref={ref}
     className={cn(
@@ -87,11 +94,12 @@ const DropdownMenuCheckboxItem = React.forwardRef(({ className, children, checke
     </span>
     {children}
   </DropdownMenuPrimitive.CheckboxItem>
-))
-DropdownMenuCheckboxItem.displayName =
-  DropdownMenuPrimitive.CheckboxItem.displayName
+)
+const DropdownMenuCheckboxItem = React.forwardRef(DropdownMenuCheckboxItemImpl)
+DropdownMenuCheckboxItem.displayName = DropdownMenuPrimitive.CheckboxItem.displayName
 
-const DropdownMenuRadioItem = React.forwardRef(({ className, children, ...props }, ref) => (
+/** @type {React.ForwardRefRenderFunction<any, any>} */
+const DropdownMenuRadioItemImpl = ({ className, children, ...props }, ref) => (
   <DropdownMenuPrimitive.RadioItem
     ref={ref}
     className={cn(
@@ -106,23 +114,28 @@ const DropdownMenuRadioItem = React.forwardRef(({ className, children, ...props 
     </span>
     {children}
   </DropdownMenuPrimitive.RadioItem>
-))
+)
+const DropdownMenuRadioItem = React.forwardRef(DropdownMenuRadioItemImpl)
 DropdownMenuRadioItem.displayName = DropdownMenuPrimitive.RadioItem.displayName
 
-const DropdownMenuLabel = React.forwardRef(({ className, inset, ...props }, ref) => (
+/** @type {React.ForwardRefRenderFunction<any, any>} */
+const DropdownMenuLabelImpl = ({ className, inset, ...props }, ref) => (
   <DropdownMenuPrimitive.Label
     ref={ref}
     className={cn("px-2 py-1.5 text-sm font-semibold", inset && "pl-8", className)}
     {...props} />
-))
+)
+const DropdownMenuLabel = React.forwardRef(DropdownMenuLabelImpl)
 DropdownMenuLabel.displayName = DropdownMenuPrimitive.Label.displayName
 
-const DropdownMenuSeparator = React.forwardRef(({ className, ...props }, ref) => (
+/** @type {React.ForwardRefRenderFunction<any, any>} */
+const DropdownMenuSeparatorImpl = ({ className, ...props }, ref) => (
   <DropdownMenuPrimitive.Separator
     ref={ref}
     className={cn("-mx-1 my-1 h-px bg-muted", className)}
     {...props} />
-))
+)
+const DropdownMenuSeparator = React.forwardRef(DropdownMenuSeparatorImpl)
 DropdownMenuSeparator.displayName = DropdownMenuPrimitive.Separator.displayName
 
 const DropdownMenuShortcut = ({

@@ -23,6 +23,7 @@ const badgeVariants = cva(
   }
 )
 
+/** @param {any} props */
 function Badge({
   className,
   variant,

@@ -3,6 +3,7 @@ import * as SliderPrimitive from "@radix-ui/react-slider"
 
 import { cn } from "@/lib/utils"
 
+/** @type {(props: any) => JSX.Element} */
 const Slider = ({ className, ...props }) => (
   <SliderPrimitive.Root
     className={cn("relative flex w-full touch-none select-none items-center", className)}

@@ -55,6 +55,24 @@ export default [
         { ignore: ["cmdk-input-wrapper", "toast-close"] },
       ],
       "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
+      "no-console": ["warn", { allow: ["warn", "error"] }],
+    },
+  },
+  {
+    files: ["src/hooks/**/*.{js,jsx}", "src/context/**/*.{js,jsx}"],
+    ...pluginJs.configs.recommended,
+    languageOptions: {
+      globals: globals.browser,
+      parserOptions: { ecmaVersion: 2022, sourceType: "module" },
+    },
+    plugins: {
+      "unused-imports": pluginUnusedImports,
+    },
+    rules: {
+      "no-unused-vars": "off",
+      "unused-imports/no-unused-imports": "error",
+      "unused-imports/no-unused-vars": ["warn", { vars: "all", varsIgnorePattern: "^_" }],
     },
   },
 ];

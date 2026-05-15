@@ -281,7 +281,7 @@ function ManualAssetForm({ isOpen, onClose, editingAsset, onSuccess }) {
     num_employees: "",
     condition: "",
   });
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState(/** @type {any} */ ({}));
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {

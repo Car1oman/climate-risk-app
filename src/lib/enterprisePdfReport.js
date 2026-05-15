@@ -310,7 +310,7 @@ export function exportEnterprisePdf({ assets, generatedReport }) {
   const addText = (text, { size = 9, style = "normal", color = [39, 39, 42], gap = 4 } = {}) => {
     doc.setFont("helvetica", style);
     doc.setFontSize(size);
-    doc.setTextColor(...color);
+    doc.setTextColor(.../** @type {[number, number, number]} */ (color));
     const lines = doc.splitTextToSize(String(text ?? ""), contentWidth);
     ensureSpace(lines.length * (size * 0.42) + gap);
     doc.text(lines, margin, y);

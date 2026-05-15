@@ -19,8 +19,6 @@ import {
   XCircle,
   AlertTriangle,
   Info,
-  Database,
-  Layers,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -409,7 +407,7 @@ export default function ClimateDataUpload() {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function StatBox({ label, value, color }) {
+function StatBox({ label, value, color = undefined }) {
   const colorClass =
     color === "green"
       ? "text-green-600 border-green-500/30"

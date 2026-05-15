@@ -15,7 +15,7 @@ export const useArchiveAlert = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id) => archiveAlert(id),
+    mutationFn: (/** @type {string} */ id) => archiveAlert(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alerts'] });
     },
