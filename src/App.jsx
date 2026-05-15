@@ -50,7 +50,8 @@ function App() {
   useEffect(() => {
     const pingBackend = async () => {
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'https://climate-risk-app-91ev.onrender.com';
+        const apiUrl = import.meta.env.VITE_API_URL;
+        if (!apiUrl) return;
         const response = await fetch(`${apiUrl}/api/test`);
         const data = await response.json();
         setBackendMessage(data.message);

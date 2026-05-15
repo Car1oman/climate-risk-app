@@ -1,4 +1,4 @@
-export const API_URL = import.meta.env.VITE_API_URL || 'https://climate-risk-app-91ev.onrender.com';
+export const API_URL = import.meta.env.VITE_API_URL ?? '';
 
 /** @returns {Promise<any[]>} */
 export const fetchAssets = async () => {

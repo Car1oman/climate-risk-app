@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { AlertTriangle, BookOpen, ExternalLink, Library } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -86,6 +85,9 @@ const REFERENCES = [
   },
 ];
 
+/**
+ * @param {{ item: { name: string, doi: string, url: string, confidence: string, description: string, limitation: string } }} props
+ */
 function ReferenceRow({ item }) {
   return (
     <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-3 space-y-2">
@@ -114,6 +116,7 @@ function ReferenceRow({ item }) {
   );
 }
 
+/** @returns {JSX.Element} */
 export default function ScientificReferencesModal() {
   return (
     <Dialog>
