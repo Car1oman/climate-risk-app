@@ -87,7 +87,7 @@ const GRI_BADGE = {
   alto:       "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/60 dark:text-red-200 dark:border-red-700",
   medio:      "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/60 dark:text-amber-200 dark:border-amber-700",
   bajo:       "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/60 dark:text-emerald-200 dark:border-emerald-700",
-  "sin data": "bg-slate-100 text-slate-600 border-slate-200 dark:bg-[hsl(222,40%,15%)] dark:text-slate-300 dark:border-slate-700",
+  "sin data": "bg-slate-100 text-slate-600 border-slate-200 dark:bg-secondary dark:text-secondary-foreground dark:border-border",
 };
 
 // ── Map sub-components ─────────────────────────────────────────────────────────
@@ -237,7 +237,7 @@ function SearchPanel({ onLocationSelect }) {
                 placeholder="Ej. Plaza Vea San Isidro"
                 value={registerForm.name}
                 onChange={(e) => setRegisterForm(f => ({ ...f, name: e.target.value }))}
-                className="h-8 text-sm text-slate-900 dark:text-slate-100 bg-white dark:bg-[hsl(222,43%,14%)]"
+                className="h-8 text-sm text-foreground bg-secondary"
               />
             </div>
             <div className="space-y-1">
@@ -246,7 +246,7 @@ function SearchPanel({ onLocationSelect }) {
                 placeholder="Ej. Supermercados"
                 value={registerForm.unidad_negocio}
                 onChange={(e) => setRegisterForm(f => ({ ...f, unidad_negocio: e.target.value }))}
-                className="h-8 text-sm text-slate-900 dark:text-slate-100 bg-white dark:bg-[hsl(222,43%,14%)]"
+                className="h-8 text-sm text-foreground bg-secondary"
               />
             </div>
             <div className="flex gap-2">
@@ -319,7 +319,7 @@ function UrgencyBadge({ urgency }) {
 const CONFIDENCE_BADGE = {
   high:   "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/60 dark:text-emerald-200 dark:border-emerald-700",
   medium: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/60 dark:text-amber-200 dark:border-amber-700",
-  low:    "bg-slate-100 text-slate-600 border-slate-200 dark:bg-[hsl(222,40%,15%)] dark:text-slate-300 dark:border-slate-700",
+  low:    "bg-slate-100 text-slate-600 border-slate-200 dark:bg-secondary dark:text-secondary-foreground dark:border-border",
 };
 
 function TraceBadges({ trace }) {
@@ -357,15 +357,15 @@ function TraceabilityDetails({ trace }) {
   ];
 
   return (
-    <div className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[hsl(222,43%,14%)] p-2.5 space-y-2">
-      <p className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+    <div className="rounded-md border border-border bg-secondary p-2.5 space-y-2">
+      <p className="text-[10px] font-semibold text-secondary-foreground">
         ¿Por qué se detectó este riesgo?
       </p>
       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5">
         {rows.map(([label, value]) => (
           <div key={label} className="min-w-0">
             <dt className="text-[9px] uppercase tracking-widest text-slate-400">{label}</dt>
-            <dd className="text-[10px] text-slate-600 dark:text-slate-300 break-words">{value ?? "No disponible"}</dd>
+            <dd className="text-[10px] text-secondary-foreground break-words">{value ?? "No disponible"}</dd>
           </div>
         ))}
       </dl>
@@ -378,10 +378,10 @@ function ScoreBar({ score }) {
   const color = pct >= 75 ? "bg-red-400" : pct >= 50 ? "bg-orange-400" : pct >= 25 ? "bg-yellow-400" : "bg-emerald-400";
   return (
     <div className="flex items-center gap-2 w-full">
-      <div className="flex-1 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+      <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
         <div className={`h-full rounded-full ${color} transition-all`} style={{ width: `${pct}%` }} />
       </div>
-      <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 w-7 text-right">{pct}</span>
+      <span className="text-[10px] font-mono text-muted-foreground w-7 text-right">{pct}</span>
     </div>
   );
 }
@@ -396,19 +396,19 @@ function NarrativePanel({ narrative, location, metadata }) {
   const distKm = location?.distanceKm ?? metadata?.distance_km;
 
   const urgencyBorderColor = {
-    "crítica": "border-red-300 dark:border-red-600",
-    alta:      "border-orange-300 dark:border-orange-600",
-    media:     "border-yellow-300 dark:border-yellow-600",
-    baja:      "border-emerald-300 dark:border-emerald-600",
+    "crítica": "border-red-500",
+    alta:      "border-orange-500",
+    media:     "border-yellow-500",
+    baja:      "border-emerald-500",
   }[urgency] ?? "border-primary/30";
 
   if (!summary) return null;
 
   return (
-    <Card className={`border-2 ${urgencyBorderColor} bg-white dark:bg-[hsl(222,45%,10%)] shadow-sm`}>
+    <Card className={`border-2 ${urgencyBorderColor} bg-card shadow-sm`}>
       <CardHeader className="pb-3 pt-4">
         <div className="flex items-start justify-between gap-3">
-          <CardTitle className="text-sm font-semibold text-slate-900 dark:text-slate-50 flex items-center gap-2">
+          <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-primary flex-shrink-0" />
             Evaluación de riesgo climático
           </CardTitle>
@@ -418,28 +418,28 @@ function NarrativePanel({ narrative, location, metadata }) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4 pb-4">
-        <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">{summary}</p>
+        <p className="text-sm leading-relaxed text-secondary-foreground">{summary}</p>
 
         {/* Key metrics strip */}
         {(metrics.total_señales > 0 || scoreTop != null || metrics.impacto_financiero_min != null) && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
             {metrics.total_señales > 0 && (
-              <div className="rounded-lg bg-slate-100 dark:bg-[hsl(222,43%,14%)] border border-slate-200 dark:border-slate-700 p-2.5 text-center">
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1">Señales</p>
-                <p className="text-lg font-bold text-slate-900 dark:text-slate-50">{metrics.total_señales}</p>
+              <div className="rounded-lg bg-secondary border border-border p-2.5 text-center">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">Señales</p>
+                <p className="text-lg font-bold text-foreground">{metrics.total_señales}</p>
               </div>
             )}
             {scoreTop != null && (
-              <div className="rounded-lg bg-slate-100 dark:bg-[hsl(222,43%,14%)] border border-slate-200 dark:border-slate-700 p-2.5 text-center">
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1">Score riesgo</p>
-                <p className="text-lg font-bold text-slate-900 dark:text-slate-50">{Math.round(scoreTop * 100)}<span className="text-xs font-normal text-slate-500 dark:text-slate-400">/100</span></p>
+              <div className="rounded-lg bg-secondary border border-border p-2.5 text-center">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">Score riesgo</p>
+                <p className="text-lg font-bold text-foreground">{Math.round(scoreTop * 100)}<span className="text-xs font-normal text-muted-foreground">/100</span></p>
               </div>
             )}
             {metrics.impacto_financiero_min != null && (
-              <div className="rounded-lg bg-slate-100 dark:bg-[hsl(222,43%,14%)] border border-slate-200 dark:border-slate-700 p-2.5 text-center col-span-2">
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1">Impacto financiero est.</p>
-                <p className="text-sm font-bold text-slate-900 dark:text-slate-50">
-                  {fmtUSD(metrics.impacto_financiero_min)} – {fmtUSD(metrics.impacto_financiero_max)}<span className="text-[10px] font-normal text-slate-500 dark:text-slate-400 ml-1">/año</span>
+              <div className="rounded-lg bg-secondary border border-border p-2.5 text-center col-span-2">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">Impacto financiero est.</p>
+                <p className="text-sm font-bold text-foreground">
+                  {fmtUSD(metrics.impacto_financiero_min)} – {fmtUSD(metrics.impacto_financiero_max)}<span className="text-[10px] font-normal text-muted-foreground ml-1">/año</span>
                 </p>
               </div>
             )}
@@ -456,7 +456,7 @@ function NarrativePanel({ narrative, location, metadata }) {
           </Alert>
         )}
 
-        <p className="text-[10px] text-slate-500 dark:text-slate-400">
+        <p className="text-[10px] text-muted-foreground">
           Fuentes: {(metadata?.data_sources ?? []).join(" · ") || "climate_cells · GRI · Open-Meteo · World Bank"}
           {metadata?.scenario && ` · ${metadata.scenario}`}
         </p>
@@ -486,11 +486,11 @@ function SignalRow({ signal }) {
     : `${sign}${fmtNum(v)}`;
 
   return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[hsl(222,43%,14%)] p-3 space-y-2">
+    <div className="rounded-lg border border-border bg-secondary p-3 space-y-2">
       <TraceBadges trace={trace} />
 
       <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-800 dark:text-slate-100">
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
           <span className="text-base leading-none">{meta.icon}</span>
           {meta.label}
           {isGRI && <span className="text-[9px] font-normal text-slate-400 ml-1">GRI</span>}
@@ -498,20 +498,20 @@ function SignalRow({ signal }) {
         <span className={`text-[10px] font-semibold ${confColor}`}>{conf}</span>
       </div>
 
-      <div className="flex items-center gap-2 font-mono text-xs text-slate-600 dark:text-slate-300">
+      <div className="flex items-center gap-2 font-mono text-xs text-secondary-foreground">
         <span className="tabular-nums">{fmtVal(signal.historical)}</span>
-        <span className="text-slate-300 dark:text-slate-700">→</span>
-        <span className="tabular-nums font-bold text-slate-900 dark:text-slate-50">{fmtVal(signal.projected)}</span>
-        {unit && <span className="text-slate-500 dark:text-slate-400 font-sans">{unit}</span>}
+        <span className="text-border">→</span>
+        <span className="tabular-nums font-bold text-foreground">{fmtVal(signal.projected)}</span>
+        {unit && <span className="text-muted-foreground font-sans">{unit}</span>}
         {signal.delta != null && (
-          <span className="ml-auto text-slate-500 dark:text-slate-400">({fmtDelta(signal.delta)})</span>
+          <span className="ml-auto text-muted-foreground">({fmtDelta(signal.delta)})</span>
         )}
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[10px] text-slate-500 dark:text-slate-400">{HORIZON_LABEL[signal.horizon] ?? signal.horizon}</p>
+        <p className="text-[10px] text-muted-foreground">{HORIZON_LABEL[signal.horizon] ?? signal.horizon}</p>
         {signal.threshold_reference && (
-          <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[55%] text-right" title={signal.threshold_reference}>
+          <p className="text-[10px] text-muted-foreground truncate max-w-[55%] text-right" title={signal.threshold_reference}>
             {signal.threshold_reference.slice(0, 45)}…
           </p>
         )}
@@ -527,16 +527,16 @@ function SignalsPanel({ signals }) {
   if (!list.length) return null;
 
   return (
-    <Card className="bg-white dark:bg-[hsl(222,45%,10%)] border-slate-200 dark:border-slate-700 shadow-sm">
+    <Card className="bg-card border-border shadow-sm">
       <CardHeader className="pb-3 pt-4">
         <CardTitle className="text-sm flex items-center gap-2">
           <Thermometer className="w-4 h-4 text-amber-500" />
-          <span className="font-semibold text-slate-900 dark:text-slate-50">
+          <span className="font-semibold text-foreground">
             Señales climáticas detectadas
-            <span className="ml-2 text-[11px] font-normal text-slate-500 dark:text-slate-400">({list.length})</span>
+            <span className="ml-2 text-[11px] font-normal text-muted-foreground">({list.length})</span>
           </span>
         </CardTitle>
-        <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
+        <p className="text-xs text-muted-foreground mt-1">
           Cuantitativas (IPCC AR6 / WRI Aqueduct) + cualitativas GRI · histórico vs. proyectado
         </p>
       </CardHeader>
@@ -554,16 +554,16 @@ function RiskCard({ risk }) {
   const signalMeta = SIGNAL_META[risk.signal?.signalType] ?? { icon: "⚠️", label: risk.signal?.signalType ?? "Riesgo" };
   const trace = risk.source_traceability ?? risk.signal?.source_traceability;
   return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[hsl(222,43%,14%)] overflow-hidden">
+    <div className="rounded-lg border border-border bg-secondary overflow-hidden">
       <div className="p-3 space-y-2.5">
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-slate-200 dark:bg-[hsl(222,40%,20%)] text-[10px] font-bold flex items-center justify-center text-slate-600 dark:text-slate-300">
+            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-muted text-[10px] font-bold flex items-center justify-center text-secondary-foreground">
               {risk.rank}
             </span>
             <span className="text-base leading-none flex-shrink-0">{signalMeta.icon}</span>
-            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">{signalMeta.label}</p>
+            <p className="text-xs font-semibold text-foreground truncate">{signalMeta.label}</p>
           </div>
           <UrgencyBadge urgency={risk.urgency} />
         </div>
@@ -577,8 +577,8 @@ function RiskCard({ risk }) {
         {risk.operational_impacts?.length > 0 && (
           <ul className="space-y-1">
             {risk.operational_impacts.slice(0, expanded ? undefined : 3).map((imp, j) => (
-              <li key={j} className="flex items-start gap-1.5 text-[11px] text-slate-600 dark:text-slate-300">
-                <span className="w-1 h-1 rounded-full bg-slate-400 dark:bg-slate-500 flex-shrink-0 mt-1.5" />
+              <li key={j} className="flex items-start gap-1.5 text-[11px] text-secondary-foreground">
+                <span className="w-1 h-1 rounded-full bg-muted-foreground flex-shrink-0 mt-1.5" />
                 {imp}
               </li>
             ))}
@@ -587,8 +587,8 @@ function RiskCard({ risk }) {
 
         {/* Financial impact */}
         {risk.financial_impact_range && (
-          <p className="text-[10px] text-slate-500 dark:text-slate-400">
-            Impacto estimado: <span className="font-semibold text-slate-700 dark:text-slate-200">
+          <p className="text-[10px] text-muted-foreground">
+            Impacto estimado: <span className="font-semibold text-secondary-foreground">
               {fmtUSD(risk.financial_impact_range.min_usd)} – {fmtUSD(risk.financial_impact_range.max_usd)}
             </span>/año
           </p>
@@ -597,10 +597,10 @@ function RiskCard({ risk }) {
 
       {/* Expandable: score components */}
       {risk.score_components && (
-        <div className="border-t border-slate-200 dark:border-slate-700">
+        <div className="border-t border-border">
           <button
             onClick={() => setExpanded(e => !e)}
-            className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+            className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
           >
             <span>Componentes del score</span>
             {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
@@ -609,8 +609,8 @@ function RiskCard({ risk }) {
             <div className="px-3 pb-3 grid grid-cols-3 gap-2">
               {Object.entries(risk.score_components).map(([k, v]) => (
                 <div key={k} className="text-center">
-                  <p className="text-[9px] text-slate-500 dark:text-slate-400 uppercase tracking-widest">{k}</p>
-                  <p className="text-xs font-mono font-bold text-slate-800 dark:text-slate-100">{(v * 100).toFixed(0)}</p>
+                  <p className="text-[9px] text-muted-foreground uppercase tracking-widest">{k}</p>
+                  <p className="text-xs font-mono font-bold text-foreground">{(v * 100).toFixed(0)}</p>
                 </div>
               ))}
               <div className="col-span-3">
@@ -627,13 +627,13 @@ function RiskCard({ risk }) {
 function RisksPanel({ risks }) {
   if (!risks?.length) return null;
   return (
-    <Card className="bg-white dark:bg-[hsl(222,45%,10%)] border-slate-200 dark:border-slate-700 shadow-sm">
+    <Card className="bg-card border-border shadow-sm">
       <CardHeader className="pb-3 pt-4">
         <CardTitle className="text-sm flex items-center gap-2">
           <ShieldAlert className="w-4 h-4 text-orange-500" />
-          <span className="font-semibold text-slate-900 dark:text-slate-50">Riesgos empresariales priorizados</span>
+          <span className="font-semibold text-foreground">Riesgos empresariales priorizados</span>
         </CardTitle>
-        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+        <p className="text-xs text-muted-foreground mt-1">
           Ordenados por score compuesto: probabilidad · intensidad · exposición · sensibilidad sectorial
         </p>
       </CardHeader>
@@ -657,13 +657,13 @@ function GRIThreatsPanel({ hazards }) {
   if (!filtered.length) return null;
 
   return (
-    <Card className="bg-white dark:bg-[hsl(222,45%,10%)] border-slate-200 dark:border-slate-700 shadow-sm">
+    <Card className="bg-card border-border shadow-sm">
       <CardHeader className="pb-3 pt-4">
         <CardTitle className="text-sm flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 text-amber-500" />
-          <span className="font-semibold text-slate-900 dark:text-slate-50">Exposición a amenazas</span>
+          <span className="font-semibold text-foreground">Exposición a amenazas</span>
         </CardTitle>
-        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">Fuente: GRI Infrastructure Resilience · probabilidad histórica y proyecciones</p>
+        <p className="text-xs text-muted-foreground mt-1">Fuente: GRI Infrastructure Resilience · probabilidad histórica y proyecciones</p>
       </CardHeader>
       <CardContent className="space-y-2 pb-4">
         {filtered.map(h => {
@@ -676,14 +676,14 @@ function GRIThreatsPanel({ hazards }) {
           return (
             <div
               key={h.hazard}
-              className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 flex items-center justify-between gap-3 bg-slate-50 dark:bg-[hsl(222,43%,14%)]"
+              className="rounded-lg border border-border p-3 flex items-center justify-between gap-3 bg-secondary"
             >
               <div className="flex items-center gap-3">
                 <span className="text-lg leading-none">{icon}</span>
                 <div>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">{h.hazard_name}</p>
+                  <p className="text-sm font-semibold text-foreground">{h.hazard_name}</p>
                   {hasChange && (
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                    <p className="text-[10px] text-muted-foreground">
                       Proyección: {h.baseline?.score} → {futureScore}
                     </p>
                   )}
@@ -707,13 +707,13 @@ function AdaptationPanel({ adaptations }) {
   if (!list.length) return null;
 
   return (
-    <Card className="bg-white dark:bg-[hsl(222,45%,10%)] border-slate-200 dark:border-slate-700 shadow-sm">
+    <Card className="bg-card border-border shadow-sm">
       <CardHeader className="pb-3 pt-4">
         <CardTitle className="text-sm flex items-center gap-2">
           <Leaf className="w-4 h-4 text-emerald-500" />
-          <span className="font-semibold text-slate-900 dark:text-slate-50">Medidas de adaptación</span>
+          <span className="font-semibold text-foreground">Medidas de adaptación</span>
         </CardTitle>
-        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">Priorizadas por riesgo detectado · incluye horizonte y costo estimado</p>
+        <p className="text-xs text-muted-foreground mt-1">Priorizadas por riesgo detectado · incluye horizonte y costo estimado</p>
       </CardHeader>
       <CardContent className="space-y-3 pb-4">
         {list.map((adapt, i) => {
@@ -722,22 +722,22 @@ function AdaptationPanel({ adaptations }) {
             <div key={i} className="space-y-2">
               <div className="flex items-center gap-2">
                 <span className="text-sm leading-none">{signalMeta.icon}</span>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                   {signalMeta.label}
                 </p>
                 <UrgencyBadge urgency={adapt.urgency} />
               </div>
               <div className="space-y-1.5 pl-1">
                 {(adapt.measures ?? []).slice(0, 3).map((m, j) => (
-                  <div key={j} className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[hsl(222,43%,14%)] p-2.5">
+                  <div key={j} className="flex items-start justify-between gap-3 rounded-lg border border-border bg-secondary p-2.5">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">{m.nombre}</p>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      <p className="text-xs font-semibold text-foreground">{m.nombre}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
                         {m.horizonte_implementacion} plazo
                         {m.costo_estimado_rango && ` · ${fmtUSD(m.costo_estimado_rango.min_usd)}–${fmtUSD(m.costo_estimado_rango.max_usd)}`}
                       </p>
                       {m.donde_impacta && (
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 italic">{m.donde_impacta}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5 italic">{m.donde_impacta}</p>
                       )}
                     </div>
                     <Badge
@@ -753,7 +753,7 @@ function AdaptationPanel({ adaptations }) {
                   </div>
                 ))}
               </div>
-              {i < list.length - 1 && <div className="border-t border-slate-200 dark:border-slate-700" />}
+              {i < list.length - 1 && <div className="border-t border-border" />}
             </div>
           );
         })}
@@ -767,18 +767,18 @@ function AdaptationPanel({ adaptations }) {
 function TerritorialContextPanel({ data }) {
   if (!data?.narrative?.length) return null;
   return (
-    <Card className="bg-white dark:bg-[hsl(222,45%,10%)] border-slate-200 dark:border-slate-700 shadow-sm">
+    <Card className="bg-card border-border shadow-sm">
       <CardHeader className="pb-2 pt-4">
         <CardTitle className="text-sm flex items-center gap-2">
           <Globe2 className="w-4 h-4 text-blue-500" />
-          <span className="font-semibold text-slate-900 dark:text-slate-50">Contexto del territorio</span>
+          <span className="font-semibold text-foreground">Contexto del territorio</span>
         </CardTitle>
-        <p className="text-xs text-slate-600 dark:text-slate-400">Fuente: Banco Mundial · indicadores socioeconómicos de Perú</p>
+        <p className="text-xs text-muted-foreground">Fuente: Banco Mundial · indicadores socioeconómicos de Perú</p>
       </CardHeader>
       <CardContent className="pb-4">
         <ul className="space-y-2">
           {data.narrative.map((msg, i) => (
-            <li key={i} className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-200">
+            <li key={i} className="flex items-start gap-2.5 text-sm text-secondary-foreground">
               <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0 mt-1.5" />
               {msg}
             </li>
@@ -847,16 +847,16 @@ Responde en español. Usa lenguaje claro y directo, sin términos técnicos cien
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold flex items-center gap-1.5 text-slate-900 dark:text-slate-50">
+          <p className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
             <Sparkles className="w-4 h-4 text-primary" />
             Recomendaciones con IA
           </p>
-          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+          <p className="text-xs text-muted-foreground mt-0.5">
             Análisis generado a partir de los datos de riesgo detectados.
           </p>
         </div>
         {docCount > 0 && (
-          <span className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-700 dark:border-slate-700 dark:bg-[hsl(222,43%,14%)] dark:text-slate-300">
+          <span className="inline-flex items-center gap-1 rounded-full border border-border bg-secondary px-3 py-1 text-[11px] font-semibold text-secondary-foreground">
             <BookOpen className="w-3.5 h-3.5" />
             {docCount} documento{docCount !== 1 ? "s" : ""}
           </span>
@@ -871,16 +871,16 @@ Responde en español. Usa lenguaje claro y directo, sin términos técnicos cien
         </Button>
       ) : (
         <div className="space-y-3">
-          <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[hsl(222,43%,14%)] p-4 shadow-sm">
+          <div className="rounded-xl border border-border bg-secondary p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3 mb-3">
-              <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">Análisis IA</p>
+              <p className="text-sm font-semibold text-foreground">Análisis IA</p>
               <span className="rounded-full bg-primary/15 dark:bg-primary/25 px-2.5 py-1 text-[11px] font-bold text-primary">IA</span>
             </div>
-            <div className="text-sm leading-6 text-slate-800 dark:text-slate-100 whitespace-pre-wrap">{text}</div>
+            <div className="text-sm leading-6 text-foreground whitespace-pre-wrap">{text}</div>
           </div>
           <div className="flex items-center justify-between gap-2">
             <Button size="sm" variant="secondary" onClick={() => setText(null)}>Regenerar</Button>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">Valida las acciones con tu equipo técnico.</p>
+            <p className="text-[11px] text-muted-foreground">Valida las acciones con tu equipo técnico.</p>
           </div>
         </div>
       )}
@@ -892,12 +892,12 @@ Responde en español. Usa lenguaje claro y directo, sin términos técnicos cien
 
 function AnalysisLoading() {
   return (
-    <Card className="bg-white dark:bg-[hsl(222,45%,10%)] border-slate-200 dark:border-slate-700">
+    <Card className="bg-card border-border">
       <CardContent className="py-6 flex flex-col items-center gap-3 text-center">
         <Loader2 className="w-6 h-6 animate-spin text-primary" />
         <div>
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Ejecutando análisis climático</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          <p className="text-sm font-medium text-secondary-foreground">Ejecutando análisis climático</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
             Consultando climate_cells · GRI · Open-Meteo · World Bank
           </p>
         </div>
@@ -1132,7 +1132,7 @@ export default function ClimateRiskLookup() {
 
           {/* Recomendaciones IA */}
           {hasResults && !loading && (
-            <Card className="bg-white dark:bg-[hsl(222,45%,10%)] border-slate-200 dark:border-slate-700 shadow-sm">
+            <Card className="bg-card border-border shadow-sm">
               <CardContent className="pt-4 pb-4">
                 <AIPanel analysis={analysis} docContext={docContext} />
               </CardContent>
@@ -1142,9 +1142,9 @@ export default function ClimateRiskLookup() {
           {/* Estado vacío */}
           {!hasResults && !loading && !error && (
             <div className="text-center py-12">
-              <MapPin className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-700" />
-              <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">Selecciona un punto en el mapa</p>
-              <p className="text-xs mt-1 text-slate-500 dark:text-slate-500">o ingresa coordenadas para analizar los riesgos climáticos</p>
+              <MapPin className="w-8 h-8 mx-auto mb-2 text-muted-foreground/30" />
+              <p className="text-sm font-semibold text-muted-foreground">Selecciona un punto en el mapa</p>
+              <p className="text-xs mt-1 text-muted-foreground">o ingresa coordenadas para analizar los riesgos climáticos</p>
             </div>
           )}
         </div>

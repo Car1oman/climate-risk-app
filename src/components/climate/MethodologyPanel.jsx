@@ -31,7 +31,7 @@ const SOURCE_BADGE = {
 const CONFIDENCE_BADGE = {
   high:   "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-200 dark:border-emerald-700",
   medium: "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-700",
-  low:    "bg-zinc-100 text-zinc-600 border-zinc-300 dark:bg-zinc-700/50 dark:text-zinc-300 dark:border-zinc-600",
+  low:    "bg-secondary text-muted-foreground border-border",
 };
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -42,19 +42,19 @@ function SectionToggle({ icon, title, expanded, onToggle }) {
       onClick={onToggle}
       className="w-full flex items-center justify-between py-2.5 text-left group"
     >
-      <span className="flex items-center gap-2 text-[11px] font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">
+      <span className="flex items-center gap-2 text-[11px] font-semibold text-secondary-foreground uppercase tracking-wider">
         <span>{icon}</span>
         {title}
       </span>
       {expanded
-        ? <ChevronUp   className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 flex-shrink-0" />
-        : <ChevronDown className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 flex-shrink-0" />}
+        ? <ChevronUp   className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground flex-shrink-0" />
+        : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground flex-shrink-0" />}
     </button>
   );
 }
 
 function Divider() {
-  return <div className="border-t border-zinc-100 dark:border-zinc-800" />;
+  return <div className="border-t border-border" />;
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -96,7 +96,7 @@ export default function MethodologyPanel({ metadata }) {
     (DATA_SOURCES[id]?.type === "scenario" && !scenarioKey);
 
   return (
-    <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm">
+    <Card className="bg-card border-border shadow-sm">
       {/* ── Header (always visible) ── */}
       <CardHeader className="pb-0 pt-4">
         <button
@@ -106,18 +106,18 @@ export default function MethodologyPanel({ metadata }) {
           <div className="flex-1 text-left">
             <CardTitle className="text-sm flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-blue-500 flex-shrink-0" />
-              <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+              <span className="font-semibold text-foreground">
                 Panel de Metodología y Fuentes
               </span>
             </CardTitle>
-            <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Fuentes, escenarios, fórmulas y limitaciones del análisis climático
             </p>
           </div>
           <span className="flex-shrink-0 mt-0.5">
             {open
-              ? <ChevronUp   className="w-4 h-4 text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300" />
-              : <ChevronDown className="w-4 h-4 text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300" />}
+              ? <ChevronUp   className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
+              : <ChevronDown className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />}
           </span>
         </button>
 
@@ -164,14 +164,14 @@ export default function MethodologyPanel({ metadata }) {
                 .map((src) => (
                   <div
                     key={src.id}
-                    className={`rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-3 space-y-1.5 transition-opacity ${
+                    className={`rounded-lg border border-border bg-secondary p-3 space-y-1.5 transition-opacity ${
                       activeKeys.length > 0 && !activeKeys.includes(src.id)
                         ? "opacity-35"
                         : "opacity-100"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+                      <span className="text-xs font-semibold text-foreground">
                         {src.icon} {src.label}
                       </span>
                       <Badge
@@ -181,10 +181,10 @@ export default function MethodologyPanel({ metadata }) {
                         {src.confidence}
                       </Badge>
                     </div>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
                       {src.description}
                     </p>
-                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 italic">
+                    <p className="text-[10px] text-muted-foreground/60 italic">
                       {src.institution}
                     </p>
                   </div>
@@ -204,17 +204,17 @@ export default function MethodologyPanel({ metadata }) {
           {sections.scoring && (
             <div className="space-y-3 pb-3">
               {/* Composite score */}
-              <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-3 space-y-2.5">
-                <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+              <div className="rounded-lg border border-border bg-secondary p-3 space-y-2.5">
+                <p className="text-xs font-semibold text-foreground">
                   {COMPOSITE_SCORE_FORMULA.title}
                 </p>
-                <p className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                <p className="text-[10px] text-muted-foreground/60">
                   Referencia: {COMPOSITE_SCORE_FORMULA.reference}
                 </p>
-                <div className="rounded bg-zinc-100 dark:bg-zinc-900/70 px-3 py-2 font-mono text-[11px] text-zinc-700 dark:text-zinc-300 leading-relaxed break-words">
+                <div className="rounded bg-muted px-3 py-2 font-mono text-[11px] text-secondary-foreground leading-relaxed break-words">
                   {COMPOSITE_SCORE_FORMULA.formula}
                 </div>
-                <p className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                <p className="text-[10px] text-muted-foreground/60">
                   Escala: {COMPOSITE_SCORE_FORMULA.scale}
                 </p>
                 <div className="space-y-1.5">
@@ -222,12 +222,12 @@ export default function MethodologyPanel({ metadata }) {
                     <div key={c.key} className="flex items-start gap-2">
                       <Badge
                         variant="outline"
-                        className="text-[9px] px-1.5 py-0 flex-shrink-0 border-zinc-300 dark:border-zinc-600 text-zinc-600 dark:text-zinc-400 font-mono"
+                        className="text-[9px] px-1.5 py-0 flex-shrink-0 border-border text-muted-foreground font-mono"
                       >
                         {c.weight}
                       </Badge>
-                      <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
-                        <span className="font-semibold text-zinc-700 dark:text-zinc-300">{c.label}: </span>
+                      <p className="text-[11px] text-muted-foreground">
+                        <span className="font-semibold text-secondary-foreground">{c.label}: </span>
                         {c.description}
                       </p>
                     </div>
@@ -237,19 +237,19 @@ export default function MethodologyPanel({ metadata }) {
 
               {/* Urgency levels */}
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-2">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-2">
                   Significado del score — niveles de urgencia
                 </p>
                 <div className="grid grid-cols-2 gap-1.5">
                   {COMPOSITE_SCORE_FORMULA.urgency_levels.map((u) => (
                     <div
                       key={u.level}
-                      className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-2"
+                      className="rounded-lg border border-border bg-secondary p-2"
                     >
-                      <p className="text-[11px] font-bold text-zinc-800 dark:text-zinc-200 capitalize">
+                      <p className="text-[11px] font-bold text-foreground capitalize">
                         {u.level} · {u.threshold}
                       </p>
-                      <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">
+                      <p className="text-[10px] text-muted-foreground/60 mt-0.5">
                         {u.action}
                       </p>
                     </div>
@@ -258,14 +258,14 @@ export default function MethodologyPanel({ metadata }) {
               </div>
 
               {/* H×E×I formula */}
-              <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-3 space-y-2.5">
-                <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+              <div className="rounded-lg border border-border bg-secondary p-3 space-y-2.5">
+                <p className="text-xs font-semibold text-foreground">
                   {HXE_FORMULA.title}
                 </p>
-                <p className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                <p className="text-[10px] text-muted-foreground/60">
                   Referencia: {HXE_FORMULA.reference}
                 </p>
-                <div className="rounded bg-zinc-100 dark:bg-zinc-900/70 px-3 py-2 font-mono text-[11px] text-zinc-700 dark:text-zinc-300">
+                <div className="rounded bg-muted px-3 py-2 font-mono text-[11px] text-secondary-foreground">
                   {HXE_FORMULA.formula}
                 </div>
                 <div className="space-y-1.5">
@@ -273,12 +273,12 @@ export default function MethodologyPanel({ metadata }) {
                     <div key={c.key} className="flex items-start gap-2">
                       <Badge
                         variant="outline"
-                        className="text-[9px] px-1.5 py-0 flex-shrink-0 border-zinc-300 dark:border-zinc-600 text-zinc-600 dark:text-zinc-400 font-mono"
+                        className="text-[9px] px-1.5 py-0 flex-shrink-0 border-border text-muted-foreground font-mono"
                       >
                         {c.weight}
                       </Badge>
-                      <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
-                        <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+                      <p className="text-[11px] text-muted-foreground">
+                        <span className="font-semibold text-secondary-foreground">
                           {c.key} — {c.label}:{" "}
                         </span>
                         {c.description}
@@ -306,15 +306,15 @@ export default function MethodologyPanel({ metadata }) {
                 return (
                   <div
                     key={s.code}
-                    className={`rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-3 space-y-2 transition-opacity ${
+                    className={`rounded-lg border border-border bg-secondary p-3 space-y-2 transition-opacity ${
                       scenarioKey && scenarioKey !== key ? "opacity-35" : "opacity-100"
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                      <p className="text-xs font-bold text-foreground">
                         {s.code} — {s.name}
                       </p>
-                      <span className="text-[10px] text-zinc-400 dark:text-zinc-500 italic">
+                      <span className="text-[10px] text-muted-foreground/60 italic">
                         {s.nickname}
                       </span>
                     </div>
@@ -326,11 +326,11 @@ export default function MethodologyPanel({ metadata }) {
                       ].map((m) => (
                         <div key={m.label} className="text-center">
                           <p className="text-[9px] text-zinc-400 uppercase tracking-widest">{m.label}</p>
-                          <p className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">{m.value}</p>
+                          <p className="text-[11px] font-bold text-secondary-foreground">{m.value}</p>
                         </div>
                       ))}
                     </div>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400">{s.description}</p>
+                    <p className="text-[11px] text-muted-foreground">{s.description}</p>
                     <div>
                       <p className="text-[9px] font-semibold uppercase tracking-widest text-zinc-400 mb-1">
                         Impactos en Perú
@@ -339,9 +339,9 @@ export default function MethodologyPanel({ metadata }) {
                         {s.peru_impacts.map((imp, i) => (
                           <li
                             key={i}
-                            className="flex items-start gap-1.5 text-[11px] text-zinc-500 dark:text-zinc-400"
+                            className="flex items-start gap-1.5 text-[11px] text-muted-foreground"
                           >
-                            <span className="w-1 h-1 rounded-full bg-zinc-400 flex-shrink-0 mt-1.5" />
+                            <span className="w-1 h-1 rounded-full bg-muted-foreground flex-shrink-0 mt-1.5" />
                             {imp}
                           </li>
                         ))}
@@ -367,13 +367,13 @@ export default function MethodologyPanel({ metadata }) {
               {TEMPORAL_HORIZONS.map((h) => (
                 <div
                   key={h.code}
-                  className="flex items-start gap-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-2.5"
+                  className="flex items-start gap-3 rounded-lg border border-border bg-secondary p-2.5"
                 >
                   <div className="flex-shrink-0 w-24 text-right">
-                    <p className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">{h.label}</p>
+                    <p className="text-[11px] font-bold text-secondary-foreground">{h.label}</p>
                     <p className="text-[10px] text-zinc-400 font-mono">{h.period}</p>
                   </div>
-                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
                     {h.description}
                   </p>
                 </div>
@@ -395,11 +395,11 @@ export default function MethodologyPanel({ metadata }) {
               {RESPONSIBLE_INSTITUTIONS.map((inst) => (
                 <div
                   key={inst.name}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-2.5"
+                  className="flex items-center justify-between gap-3 rounded-lg border border-border bg-secondary p-2.5"
                 >
                   <div>
-                    <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">{inst.name}</p>
-                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500">{inst.role}</p>
+                    <p className="text-xs font-semibold text-foreground">{inst.name}</p>
+                    <p className="text-[10px] text-muted-foreground/60">{inst.role}</p>
                   </div>
                   <a
                     href={inst.url}
@@ -430,7 +430,7 @@ export default function MethodologyPanel({ metadata }) {
                 {ANALYSIS_LIMITATIONS.map((lim, i) => (
                   <li
                     key={i}
-                    className="flex items-start gap-2 text-[11px] text-zinc-500 dark:text-zinc-400"
+                    className="flex items-start gap-2 text-[11px] text-muted-foreground"
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0 mt-1.5" />
                     {lim}
