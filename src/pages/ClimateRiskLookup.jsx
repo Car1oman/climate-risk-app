@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { API_URL, fetchTerritorialContext, fetchDocumentContext, analyzeClimateRisk } from "@/lib/api";
 import MethodologyPanel from "@/components/climate/MethodologyPanel";
+import ClimateAnalysisTechnicalModal from "@/components/climate/ClimateAnalysisTechnicalModal";
 import {
   Search, MapPin, Loader2, AlertTriangle,
   Sparkles, Building2, Plus, Globe2, BookOpen, ChevronDown, ChevronUp,
@@ -388,7 +389,7 @@ function ScoreBar({ score }) {
 
 // ── Panel 1: Resumen ejecutivo (Layer 6 narrative) ────────────────────────────
 
-function NarrativePanel({ narrative, location, metadata }) {
+function NarrativePanel({ narrative, location, metadata, analysis }) {
   const summary = narrative?.executive_summary;
   const metrics = narrative?.key_metrics ?? {};
   const urgency = metrics.urgencia_top_riesgo ?? null;
@@ -460,6 +461,12 @@ function NarrativePanel({ narrative, location, metadata }) {
           Fuentes: {(metadata?.data_sources ?? []).join(" · ") || "climate_cells · GRI · Open-Meteo · World Bank"}
           {metadata?.scenario && ` · ${metadata.scenario}`}
         </p>
+
+        {analysis && (
+          <div className="flex justify-end pt-1">
+            <ClimateAnalysisTechnicalModal analysis={analysis} />
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -1108,6 +1115,7 @@ export default function ClimateRiskLookup() {
                 narrative={analysis.narrative}
                 location={analysis.location}
                 metadata={analysis.metadata}
+                analysis={analysis}
               />
 
               {/* Layer 2: Señales climáticas */}
