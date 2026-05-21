@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { useAssets } from "@/hooks/useAssets";
 import { useAlerts } from "@/hooks/useAlerts";
-import { formatCurrency } from "@/lib/riskEngine";
-import { Building2, DollarSign, AlertTriangle, TrendingUp } from "lucide-react";
+import { Building2, Database, CloudSun, BookOpen } from "lucide-react";
 import StatCard from "@/components/dashboard/StatCard";
-import RiskDistributionChart from "@/components/dashboard/RiskDistributionChart";
-import FinancialImpactChart from "@/components/dashboard/FinancialImpactChart";
 import TopRisksTable from "@/components/dashboard/TopRisksTable";
 import AlertsFeed from "@/components/dashboard/AlertsFeed";
+import ClimateStoryCard from "@/components/climate/ClimateStoryCard";
+import ProjectionScenarioCard from "@/components/climate/ProjectionScenarioCard";
+import ScientificEvidenceCard from "@/components/climate/ScientificEvidenceCard";
 
 export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
@@ -20,12 +20,9 @@ export default function Dashboard() {
   }, []);
 
   const totalAssets = assets.length;
-  const criticalCount = assets.filter((a) => a.risk_level === "critico").length;
-  const highCount = assets.filter((a) => a.risk_level === "alto").length;
-  const totalImpact = assets.reduce((s, a) => s + (a.financial_impact || 0), 0);
-  const avgScore = totalAssets > 0
-    ? assets.reduce((s, a) => s + (a.risk_score || 0), 0) / totalAssets
-    : 0;
+  const locatedAssets = assets.filter((a) => a.lat && a.lng).length;
+  const districts = new Set(assets.map((a) => a.district).filter(Boolean)).size;
+  const observedSignals = assets.filter((a) => a.top_risk || a.risk_level).length;
 
   if (isLoading || assetsLoading) {
     return (
@@ -37,71 +34,90 @@ export default function Dashboard() {
 
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Panel de Control</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Plataforma de Inteligencia Climática — Intercorp Retail
+          Plataforma de inteligencia climatica basada en evidencia y trazabilidad
         </p>
       </div>
 
-      {/* KPI Row */}
       {assetsError && (
         <div className="bg-destructive/10 border border-destructive rounded-xl p-4 text-sm text-destructive">
-          Error cargando activos desde backend. Verifica la conexión.
+          Error cargando activos desde backend. Verifica la conexion.
         </div>
       )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Activos"
           value={totalAssets}
-          subtitle="Monitoreados en tiempo real"
+          subtitle="Con trazabilidad operativa"
           icon={Building2}
           trend={0}
           trendUp={false}
           className=""
         />
         <StatCard
-          title="Riesgo Crítico / Alto"
-          value={`${criticalCount + highCount}`}
-          subtitle={`${criticalCount} críticos · ${highCount} altos`}
-          icon={AlertTriangle}
+          title="Activos Georreferenciados"
+          value={locatedAssets}
+          subtitle="Listos para mapa y terreno"
+          icon={CloudSun}
           trend={0}
           trendUp={false}
           className=""
         />
         <StatCard
-          title="Impacto Financiero Est."
-          value={formatCurrency(totalImpact)}
-          subtitle="Pérdida potencial agregada"
-          icon={DollarSign}
+          title="Distritos Cubiertos"
+          value={districts}
+          subtitle="Cobertura territorial del portafolio"
+          icon={Database}
           trend={0}
           trendUp={false}
           className=""
         />
         <StatCard
-          title="Score Promedio"
-          value={(avgScore * 100).toFixed(1)}
-          subtitle="Índice de riesgo portafolio"
-          icon={TrendingUp}
+          title="Senales Observadas"
+          value={observedSignals}
+          subtitle="Contexto descriptivo disponible"
+          icon={BookOpen}
           trend={0}
           trendUp={false}
           className=""
         />
       </div>
 
-      {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <RiskDistributionChart assets={assets} />
-        <FinancialImpactChart assets={assets} />
+        <ClimateStoryCard
+          evidence={{
+            summary: "El portafolio se interpreta desde senales climaticas, contexto territorial y trazabilidad de fuentes",
+            confidence: "medium",
+          }}
+          traceability={{
+            source: "CMIP6, IPCC AR6, GRI, Open-Meteo",
+            period: "1980-2014 / 2020-2059",
+            scenario: "SSP245 / SSP585",
+            metadata: "fuente, periodo, escenario y confianza",
+          }}
+        />
+        <ProjectionScenarioCard
+          scenario="SSP245 / SSP585"
+          traceability={{
+            source: "CMIP6 via Open-Meteo",
+            period: "2020-2059",
+            confidence: "medium",
+            metadata: "ensamble climatico y horizonte temporal",
+          }}
+        />
       </div>
 
-      {/* Bottom Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
           <TopRisksTable assets={assets} />
         </div>
-        <AlertsFeed alerts={alerts} />
+        <div className="space-y-4">
+          <ScientificEvidenceCard />
+          <AlertsFeed alerts={alerts} />
+        </div>
       </div>
     </div>
   );

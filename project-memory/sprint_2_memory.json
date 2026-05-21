@@ -1,0 +1,80 @@
+{
+  "sprint": 2,
+  "date": "2026-05-21",
+  "title": "Limpieza de UI Heuristica",
+  "build_status": "PASS",
+  "lint_status": "PASS",
+  "typecheck_status": "PASS",
+  "test_status": "PASS (113/113 activos)",
+  "scope_note": "Se uso project-memory/sprint_1_memory.json y sprint_1_dependency_map.md. No se re-audito todo el proyecto.",
+  "completed": [
+    "FASE_A: Uso real identificado desde sprint_1_dependency_map.md y busquedas puntuales",
+    "FASE_B: Dashboard, AssetDetail, Assets, RiskMap, Report, ClimateRiskLookup, AppSettings y PDF enterprise migrados a narrativa/evidencia descriptiva",
+    "FASE_B: RiskGauge, FinancialImpactChart, RiskDistributionChart, HazardBreakdown, ImpactBreakdown, RiskModel y Simulator retirados de UI activa",
+    "FASE_C: Nuevos componentes seguros creados: ClimateStoryCard, HistoricalEventsCard, ProjectionScenarioCard, ScientificEvidenceCard, TerrainContextCard",
+    "FASE_D: Props/superficies visuales score, urgency, financialImpact, riskDistribution y priorityLevel eliminadas de UI activa",
+    "FASE_E: build, lint, typecheck y tests activos validados",
+    "FASE_F: Memoria y validacion Sprint 2 generadas"
+  ],
+  "removed_active_ui": [
+    "src/components/assets/RiskGauge.jsx",
+    "src/components/assets/HazardBreakdown.jsx",
+    "src/components/assets/ImpactBreakdown.jsx",
+    "src/components/dashboard/RiskModel.jsx",
+    "src/components/dashboard/FinancialImpactChart.jsx",
+    "src/components/dashboard/RiskDistributionChart.jsx",
+    "src/components/climate/ClimateAnalysisTechnicalModal.jsx",
+    "src/pages/Simulator.jsx"
+  ],
+  "new_safe_components": [
+    "src/components/climate/ClimateStoryCard.jsx",
+    "src/components/climate/HistoricalEventsCard.jsx",
+    "src/components/climate/ProjectionScenarioCard.jsx",
+    "src/components/climate/ScientificEvidenceCard.jsx",
+    "src/components/climate/TerrainContextCard.jsx"
+  ],
+  "updated_pages": [
+    "src/pages/Dashboard.jsx",
+    "src/pages/AssetDetail.jsx",
+    "src/pages/Assets.jsx",
+    "src/pages/RiskMap.jsx",
+    "src/pages/Report.jsx",
+    "src/pages/ClimateRiskLookup.jsx",
+    "src/pages/AppSettings.jsx",
+    "src/pages/DataManagement.jsx"
+  ],
+  "safe_data_contract": {
+    "kept": [
+      "signals",
+      "climateData",
+      "scenarios",
+      "traceability",
+      "evidence",
+      "source",
+      "period",
+      "scenario SSP",
+      "confidence"
+    ],
+    "removed_from_visual_ui": [
+      "risk_score",
+      "composite_score",
+      "urgency",
+      "financial_impact",
+      "financialImpact",
+      "riskDistribution",
+      "priorityLevel",
+      "H x E x I"
+    ]
+  },
+  "validation_commands": [
+    "npm run build",
+    "npm run lint",
+    "npm run typecheck",
+    "npm test"
+  ],
+  "known_remaining_backend_scope": [
+    "server Layer4 y tests baseline siguen validando composite_score/urgency por dependencia backend heredada marcada en Sprint 1",
+    "src/lib/methodologyConfig.js conserva constantes de metodologia historica no conectadas a UI activa",
+    "src/lib/constants.js y src/lib/riskEngine.js siguen como wrappers deprecados para compatibilidad, sin importadores UI activos"
+  ]
+}

@@ -1,8 +1,6 @@
 import {
   ANALYSIS_LIMITATIONS,
-  COMPOSITE_SCORE_FORMULA,
   DATA_SOURCES,
-  HXE_FORMULA,
   RESPONSIBLE_INSTITUTIONS,
   SSP_SCENARIOS,
 } from "@/lib/methodologyConfig";
@@ -38,14 +36,6 @@ function fmtNumber(value, decimals = 0) {
   });
 }
 
-function fmtCurrency(value) {
-  return `S/ ${fmtNumber(value)}`;
-}
-
-function fmtScore(value) {
-  return `${Math.round((Number(value ?? 0)) * 100)}/100`;
-}
-
 function riskBadgeClass(level) {
   if (level === "critico") return "critical";
   if (level === "alto") return "high";
@@ -56,16 +46,14 @@ function riskBadgeClass(level) {
 function computePortfolio(assets) {
   const list = Array.isArray(assets) ? assets : [];
   const totalAssets = list.length;
-  const totalImpact = list.reduce((sum, asset) => sum + Number(asset.financial_impact || 0), 0);
-  const averageScore = totalAssets
-    ? list.reduce((sum, asset) => sum + Number(asset.risk_score || 0), 0) / totalAssets
-    : 0;
-  const criticalHigh = list.filter((asset) => ["critico", "alto"].includes(asset.risk_level)).length;
+  const georeferenced = list.filter((asset) => asset.lat && asset.lng).length;
+  const districts = new Set(list.map((asset) => asset.district).filter(Boolean)).size;
+  const signalCount = list.filter((asset) => asset.top_risk || asset.risk_level).length;
   const topRisks = [...list]
-    .sort((a, b) => Number(b.risk_score || 0) - Number(a.risk_score || 0))
+    .sort((a, b) => String(a.district || "").localeCompare(String(b.district || "")))
     .slice(0, 8);
 
-  return { totalAssets, totalImpact, averageScore, criticalHigh, topRisks };
+  return { totalAssets, georeferenced, districts, signalCount, topRisks };
 }
 
 function markdownToHtml(markdown) {
@@ -91,8 +79,8 @@ function renderTopRiskRows(topRisks) {
       <td><strong>${escapeHtml(asset.name || "Activo sin nombre")}</strong><br /><span>${escapeHtml(asset.district || "Sin distrito")}</span></td>
       <td>${escapeHtml(asset.top_risk || "No especificado")}</td>
       <td><span class="risk ${riskBadgeClass(asset.risk_level)}">${escapeHtml(RISK_LABELS[asset.risk_level] || asset.risk_level || "Bajo")}</span></td>
-      <td>${fmtScore(asset.risk_score)}</td>
-      <td>${fmtCurrency(asset.financial_impact || 0)}</td>
+      <td>CMIP6 / GRI</td>
+      <td>SSP245 / SSP585</td>
     </tr>
   `).join("");
 }
@@ -217,26 +205,26 @@ export function buildEnterprisePdfHtml({ assets, generatedReport }) {
       <h2>Resumen ejecutivo</h2>
       <div class="metrics">
         <div class="metric"><span>Activos evaluados</span><strong>${portfolio.totalAssets}</strong></div>
-        <div class="metric"><span>Critico / alto</span><strong>${portfolio.criticalHigh}</strong></div>
-        <div class="metric"><span>Score climatico</span><strong>${fmtScore(portfolio.averageScore)}</strong></div>
-        <div class="metric"><span>Impacto financiero</span><strong>${fmtCurrency(portfolio.totalImpact)}</strong></div>
+        <div class="metric"><span>Georreferenciados</span><strong>${portfolio.georeferenced}</strong></div>
+        <div class="metric"><span>Distritos</span><strong>${portfolio.districts}</strong></div>
+        <div class="metric"><span>Senales</span><strong>${portfolio.signalCount}</strong></div>
       </div>
       <div class="callout">
-        El portafolio se interpreta mediante un enfoque de riesgo fisico: peligros climaticos, exposicion, sensibilidad operacional, horizonte temporal y magnitud esperada del impacto financiero.
+        El portafolio se interpreta mediante evidencia fisica: senales climaticas, exposicion territorial, fuente, periodo, escenario SSP y nivel de confianza.
       </div>
     </section>
 
     <section class="section">
       <h2>Como interpretar este reporte</h2>
       <p>Los resultados son estimaciones probabilisticas y escenarios de decision. No son predicciones exactas para una fecha especifica ni sustituyen estudios hidrologicos, geotecnicos o de ingenieria de detalle.</p>
-      <p>El score climatico resume severidad relativa del portafolio en escala 0-100. Debe usarse para priorizar revision, CAPEX de adaptacion, planes de continuidad y validacion tecnica local.</p>
+      <p>La lectura descriptiva debe usarse para orientar revision tecnica local, planes de continuidad y medidas de adaptacion verificables.</p>
     </section>
 
     <section class="section">
       <h2>Riesgos priorizados</h2>
       <table>
         <thead>
-          <tr><th>#</th><th>Activo</th><th>Riesgo principal</th><th>Nivel</th><th>Score</th><th>Impacto</th></tr>
+          <tr><th>#</th><th>Activo</th><th>Senal observada</th><th>Estado</th><th>Fuente</th><th>Escenario</th></tr>
         </thead>
         <tbody>${renderTopRiskRows(portfolio.topRisks)}</tbody>
       </table>
@@ -254,15 +242,17 @@ export function buildEnterprisePdfHtml({ assets, generatedReport }) {
 
     <section class="section">
       <h2>Metodologia</h2>
-      <p><strong>${escapeHtml(HXE_FORMULA.title)}:</strong> ${escapeHtml(HXE_FORMULA.formula)}. ${escapeHtml(HXE_FORMULA.reference)}.</p>
-      <ul>${renderMethodologyList(HXE_FORMULA)}</ul>
-      <p><strong>${escapeHtml(COMPOSITE_SCORE_FORMULA.title)}:</strong> ${escapeHtml(COMPOSITE_SCORE_FORMULA.formula)}. Escala ${escapeHtml(COMPOSITE_SCORE_FORMULA.scale)}.</p>
-      <ul>${renderMethodologyList(COMPOSITE_SCORE_FORMULA)}</ul>
+      <p><strong>Lectura climatica descriptiva:</strong> senales observadas, fuente cientifica, periodo de referencia, escenario SSP, horizonte temporal, confianza y trazabilidad.</p>
+      <ul>
+        <li><strong>Fuente:</strong> CMIP6, IPCC AR6, GRI, WRI Aqueduct, World Bank y Open-Meteo.</li>
+        <li><strong>Periodo:</strong> historico 1980-2014 y proyecciones 2020-2059.</li>
+        <li><strong>Escenarios:</strong> SSP245 y SSP585 para comparar trayectorias plausibles.</li>
+      </ul>
     </section>
 
     <section class="section">
       <h2>Nivel de confianza</h2>
-      <p>La confianza del reporte es alta para fuentes institucionales y moderada para inferencias de negocio, porque los impactos financieros dependen de datos internos, supuestos operativos y controles existentes.</p>
+      <p>La confianza del reporte es alta para fuentes institucionales y moderada para inferencias territoriales que requieren validacion tecnica local.</p>
       <p>La trazabilidad tecnica se documenta por fuente, modelo y umbral; cuando una fuente opera como fallback, debe interpretarse como screening y no como veredicto local definitivo.</p>
     </section>
 
@@ -378,16 +368,16 @@ export function exportEnterprisePdf({ assets, generatedReport }) {
   const metricWidth = (contentWidth - (metricGap * 3)) / 4;
   ensureSpace(25);
   addMetric("Activos", portfolio.totalAssets, margin, metricWidth);
-  addMetric("Critico / Alto", portfolio.criticalHigh, margin + metricWidth + metricGap, metricWidth);
-  addMetric("Score climatico", fmtScore(portfolio.averageScore), margin + (metricWidth + metricGap) * 2, metricWidth);
-  addMetric("Impacto", fmtCurrency(portfolio.totalImpact), margin + (metricWidth + metricGap) * 3, metricWidth);
+  addMetric("Georreferenciados", portfolio.georeferenced, margin + metricWidth + metricGap, metricWidth);
+  addMetric("Distritos", portfolio.districts, margin + (metricWidth + metricGap) * 2, metricWidth);
+  addMetric("Senales", portfolio.signalCount, margin + (metricWidth + metricGap) * 3, metricWidth);
   y += 27;
-  addText("El portafolio se interpreta mediante riesgo fisico: peligros climaticos, exposicion, sensibilidad operacional, horizonte temporal e impacto financiero estimado.", { size: 9 });
+  addText("El portafolio se interpreta mediante evidencia fisica: senales climaticas, exposicion territorial, fuentes, escenarios SSP y confianza.", { size: 9 });
 
   addHeading("Como interpretar este reporte");
   addBullets([
     "Los resultados son estimaciones probabilisticas y escenarios de decision, no predicciones exactas por fecha.",
-    "El score climatico resume severidad relativa en escala 0-100 para priorizar validacion tecnica, CAPEX y continuidad operativa.",
+    "La lectura descriptiva orienta validacion tecnica, continuidad operativa y adaptacion sin producir un score unico.",
     "Los escenarios SSP comparan trayectorias climaticas plausibles; no expresan probabilidad de ocurrencia.",
   ]);
 
@@ -409,7 +399,7 @@ export function exportEnterprisePdf({ assets, generatedReport }) {
       doc.text(`${asset.district || "Sin distrito"} | ${asset.top_risk || "Riesgo no especificado"}`, margin + 3, y + 10);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(15, 118, 110);
-      doc.text(`${fmtScore(asset.risk_score)} | ${fmtCurrency(asset.financial_impact || 0)}`, pageWidth - margin - 46, y + 8);
+      doc.text("CMIP6 / GRI | SSP245 / SSP585", pageWidth - margin - 58, y + 8);
       y += 17;
     });
   }
@@ -428,10 +418,7 @@ export function exportEnterprisePdf({ assets, generatedReport }) {
   });
 
   addHeading("Metodologia");
-  addText(`${HXE_FORMULA.title}: ${HXE_FORMULA.formula}. Referencia: ${HXE_FORMULA.reference}.`, { size: 8, style: "bold" });
-  addBullets(HXE_FORMULA.components, 5);
-  addText(`${COMPOSITE_SCORE_FORMULA.title}: ${COMPOSITE_SCORE_FORMULA.formula}. Escala: ${COMPOSITE_SCORE_FORMULA.scale}.`, { size: 8, style: "bold" });
-  addBullets(COMPOSITE_SCORE_FORMULA.components, 5);
+  addText("Metodologia descriptiva: fuente, periodo, escenario SSP, horizonte, confianza y trazabilidad cientifica.", { size: 8, style: "bold" });
 
   addHeading("Nivel de confianza");
   addText("La confianza es alta para fuentes institucionales y moderada para inferencias de negocio. La trazabilidad tecnica debe revisarse por fuente, modelo, umbral y periodo temporal.", { size: 8 });

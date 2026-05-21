@@ -3,7 +3,6 @@ import {
   LayoutDashboard,
   Map,
   Building2,
-  Waves,
   Bell,
   FileText,
   Settings,
@@ -37,7 +36,6 @@ const comingSoonItems = [
   { icon: Map, label: "Mapa de Riesgos" },
   { icon: Building2, label: "Activos" },
   { icon: Database, label: "Gestión de Datos" },
-  { icon: Waves, label: "Simulador El Niño" },
   { icon: Bell, label: "Alertas" },
   { icon: FileText, label: "Reporte TCFD" },
 ];

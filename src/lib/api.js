@@ -136,18 +136,3 @@ export const archiveAlert = async (id) => {
   }
 };
 
-// POST /api/risk-model — modelo H×E×I calculado en backend
-// Retorna el mismo shape que getCompleteRiskModel() del frontend
-export const getRiskModelFromBackend = async (asset) => {
-  try {
-    const res = await apiFetch('/api/risk-model', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ asset }),
-    });
-    if (!res.ok) return null;
-    return await res.json();
-  } catch {
-    return null;
-  }
-};

@@ -1,28 +1,35 @@
-// @ts-nocheck — react-leaflet prop types break due to leaflet module stub; runtime is correct
+// @ts-nocheck - react-leaflet prop types break due to leaflet module stub; runtime is correct
 import { useState, useEffect } from "react";
-import { API_URL, fetchAssetDetail, getRiskModelFromBackend } from "@/lib/api";
-import { formatCurrency, getRiskColor } from "@/lib/riskEngine";
+import { API_URL, fetchAssetDetail } from "@/lib/api";
+import { formatCurrency, getRiskColor, cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
 import { ArrowLeft, MapPin, Sparkles, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import RiskGauge from "@/components/assets/RiskGauge";
-import HazardBreakdown from "@/components/assets/HazardBreakdown";
-import ImpactBreakdown from "@/components/assets/ImpactBreakdown";
-import RiskModel from "@/components/dashboard/RiskModel";
 import { useToast } from "@/components/ui/use-toast";
 import { MapContainer, TileLayer, CircleMarker } from "react-leaflet";
+import ClimateStoryCard from "@/components/climate/ClimateStoryCard";
+import HistoricalEventsCard from "@/components/climate/HistoricalEventsCard";
+import ProjectionScenarioCard from "@/components/climate/ProjectionScenarioCard";
+import ScientificEvidenceCard from "@/components/climate/ScientificEvidenceCard";
+import TerrainContextCard from "@/components/climate/TerrainContextCard";
 import "leaflet/dist/leaflet.css";
 
 const TYPE_LABELS = {
   supermercado_grande: "Supermercado Grande",
   supermercado_mediano: "Supermercado Mediano",
-  centro_distribucion: "Centro de Distribución",
+  centro_distribucion: "Centro de Distribucion",
   tienda_express: "Tienda Express",
 };
 
-const RISK_LABELS = { critico: "Crítico", alto: "Alto", medio: "Medio", bajo: "Bajo" };
+const STATUS_LABELS = {
+  critico: "Observacion alta",
+  alto: "Observacion alta",
+  medio: "Monitoreo",
+  bajo: "Seguimiento",
+};
+
+const STATUS_FILL = { critico: "#ef4444", alto: "#f97316", medio: "#eab308", bajo: "#22c55e" };
 
 export default function AssetDetail() {
   const pathParts = window.location.pathname.split("/");
@@ -34,7 +41,6 @@ export default function AssetDetail() {
   const [aiResponse, setAiResponse] = useState("");
   const [climate, setClimate] = useState(null);
   const [climateLoading, setClimateLoading] = useState(false);
-  const [backendRiskModel, setBackendRiskModel] = useState(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -48,74 +54,53 @@ export default function AssetDetail() {
     loadAsset();
   }, [assetId]);
 
-  // Llama al backend para el modelo H×E×I; si falla, el fallback frontend sigue activo
-  useEffect(() => {
-    if (!asset) return;
-    getRiskModelFromBackend(asset).then(result => {
-      if (result) setBackendRiskModel(result);
-    });
-  }, [asset?.id]);
-
   const fetchClimate = async () => {
-    if (climateLoading) return;
+    if (climateLoading || !asset?.lat || !asset?.lng) return;
 
     setClimateLoading(true);
     try {
       const res = await fetch(`${API_URL}/api/climate?lat=${asset.lat}&lng=${asset.lng}`);
-
-      if (!res.ok) {
-        throw new Error('Error en la API');
-      }
-
-      const data = await res.json();
-
-      if (data.fallback) {
-        console.warn("Usando datos fallback de clima");
-      }
-
-      setClimate(data);
+      if (!res.ok) throw new Error("Error en la API");
+      setClimate(await res.json());
     } catch (error) {
-      console.error('Error obteniendo datos climáticos:', error);
+      console.error("Error obteniendo datos climaticos:", error);
     } finally {
       setClimateLoading(false);
     }
   };
 
   useEffect(() => {
-    if (asset?.lat && asset?.lng && !climate) {
-      fetchClimate();
-    }
+    if (asset?.lat && asset?.lng && !climate) fetchClimate();
   }, [asset?.lat, asset?.lng, climate]);
 
   const generateRecommendations = async () => {
     if (!asset) return;
     setAiLoading(true);
-    const prompt = `Eres un experto en gestión de riesgo climático para retail en Perú.
+    const prompt = `Eres un experto en gestion de riesgo climatico para retail en Peru.
 
 Tienda: ${asset.name}
 Tipo: ${TYPE_LABELS[asset.type] || asset.type}
 Distrito: ${asset.district}
-Score de Riesgo: ${((asset.risk_score || 0) * 100).toFixed(0)}/100
-Nivel: ${RISK_LABELS[asset.risk_level] || asset.risk_level}
-Riesgo Principal: ${asset.top_risk || "Inundación"}
-Ventas Mensuales: S/ ${(asset.monthly_sales || 0).toLocaleString()}
-Área: ${asset.area_m2 || 0} m²
-Condición: ${asset.condition || "propio"}
-Impacto Financiero Estimado: S/ ${(asset.financial_impact || 0).toLocaleString()}
+Senal observada: ${asset.top_risk || "contexto climatico por revisar"}
+Fuente esperada: CMIP6, IPCC AR6, GRI y Open-Meteo
+Escenarios: SSP245 y SSP585
+Ventas mensuales: ${formatCurrency(asset.monthly_sales || 0)}
+Area: ${asset.area_m2 || 0} m2
+Condicion: ${asset.condition || "propio"}
 
-Genera exactamente 3 recomendaciones de adaptación climática específicas para esta tienda, priorizadas por costo-beneficio, para incluir en el plan ESG 2025–2026. Sé concreto y cuantifica beneficio esperado. Formato Markdown con bullets.`;
+Genera exactamente 3 recomendaciones de adaptacion climatica especificas para esta tienda. No uses scores, urgencias numericas ni impacto financiero estimado. Enfocate en evidencia, senales observadas, trazabilidad y medidas operativas verificables. Formato Markdown con bullets.`;
 
     try {
       const res = await fetch(`${API_URL}/api/ai`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt }),
       });
       const data = await res.json();
       setAiResponse(data.response);
-      toast({ title: "Recomendaciones generadas", description: "La IA ha analizado el perfil de riesgo del activo." });
+      toast({ title: "Recomendaciones generadas", description: "La IA uso senales climaticas y trazabilidad." });
     } catch (error) {
-      console.error('Error generando recomendaciones:', error);
+      console.error("Error generando recomendaciones:", error);
       toast({ title: "Error", description: "No se pudieron generar las recomendaciones." });
     } finally {
       setAiLoading(false);
@@ -131,18 +116,23 @@ Genera exactamente 3 recomendaciones de adaptación climática específicas para
   }
 
   const rc = getRiskColor(asset.risk_level);
-  const RISK_FILL = { critico: "#ef4444", alto: "#f97316", medio: "#eab308", bajo: "#22c55e" };
+  const traceability = {
+    source: "CMIP6, IPCC AR6, GRI, Open-Meteo",
+    period: "1980-2014 / 2020-2059",
+    scenario: "SSP245 / SSP585",
+    confidence: "medium",
+    metadata: `lat ${asset.lat || "s/d"}, lng ${asset.lng || "s/d"}, distrito ${asset.district || "s/d"}`,
+  };
 
   return (
     <div className="p-6 max-w-[1400px] mx-auto space-y-6">
-      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <Link to="/assets" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-3 transition-colors">
             <ArrowLeft className="w-3 h-3" /> Volver a activos
           </Link>
           <h1 className="text-2xl font-bold tracking-tight">{asset.name}</h1>
-          <div className="flex items-center gap-3 mt-1">
+          <div className="flex flex-wrap items-center gap-3 mt-1">
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <MapPin className="w-3 h-3" /> {asset.district}
             </div>
@@ -153,123 +143,89 @@ Genera exactamente 3 recomendaciones de adaptación climática específicas para
               </div>
             ) : climate ? (
               <div className="text-xs text-muted-foreground">
-                🌡 {climate.temperature}°C | 🌧 {climate.precipitation} mm
+                Temp. {climate.temperature} C | Lluvia {climate.precipitation} mm
               </div>
             ) : null}
             <Badge variant="outline" className="text-xs">{TYPE_LABELS[asset.type] || asset.type}</Badge>
             <Badge variant="outline" className={cn("text-xs", rc.bg, rc.text, rc.border)}>
-              {RISK_LABELS[asset.risk_level]}
+              {STATUS_LABELS[asset.risk_level] || "Sin clasificar"}
             </Badge>
           </div>
         </div>
       </div>
 
-      {/* Top Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Risk Gauge */}
-        <div className="bg-card border border-border rounded-xl p-6 flex flex-col items-center justify-center">
-          <RiskGauge score={asset.risk_score || 0} level={asset.risk_level || "bajo"} label={asset.name} size="lg" />
-          <div className="grid grid-cols-3 gap-4 mt-6 w-full">
-            <div className="text-center">
-              <p className="text-xs text-muted-foreground">Amenaza</p>
-              <p className="text-lg font-mono font-bold">{((asset.hazard_score || 0) * 100).toFixed(0)}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs text-muted-foreground">Exposición</p>
-              <p className="text-lg font-mono font-bold">{((asset.exposure_score || 0) * 100).toFixed(0)}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs text-muted-foreground">Impacto</p>
-              <p className="text-lg font-mono font-bold">{((asset.impact_score || 0) * 100).toFixed(0)}</p>
-            </div>
-          </div>
+        <div className="lg:col-span-2">
+          <ClimateStoryCard
+            asset={asset}
+            climateData={climate}
+            evidence={{ summary: asset.top_risk || "Senales climaticas del entorno requieren lectura contextual", confidence: "medium" }}
+            traceability={traceability}
+          />
         </div>
 
-        {/* Mini Map */}
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          {asset.lat && asset.lng ? (
-            <MapContainer center={[asset.lat, asset.lng]} zoom={15} className="h-full min-h-[250px]" zoomControl={false}>
-              <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
-              <CircleMarker
-                center={[asset.lat, asset.lng]}
-                radius={12}
-                pathOptions={{ color: RISK_FILL[asset.risk_level] || "#22c55e", fillColor: RISK_FILL[asset.risk_level] || "#22c55e", fillOpacity: 0.4, weight: 2 }}
-              />
-            </MapContainer>
-          ) : (
-            <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-              Sin coordenadas
-            </div>
-          )}
-        </div>
-
-        {/* Key Metrics */}
         <div className="bg-card border border-border rounded-xl p-6 space-y-4">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Datos del Activo</h3>
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Datos del activo</h3>
           <div className="space-y-3">
             {[
-              { label: "Ventas Mensuales", value: formatCurrency(asset.monthly_sales || 0) },
-              { label: "Área", value: `${(asset.area_m2 || 0).toLocaleString()} m²` },
-              { label: "Colaboradores", value: asset.num_employees || "—" },
-              { label: "Condición", value: asset.condition === "alquilado" ? "Alquilado" : "Propio" },
-              { label: "Impacto Financiero", value: formatCurrency(asset.financial_impact || 0) },
-              { label: "Riesgo Principal", value: asset.top_risk || "—" },
+              { label: "Ventas mensuales", value: formatCurrency(asset.monthly_sales || 0) },
+              { label: "Area", value: `${(asset.area_m2 || 0).toLocaleString()} m2` },
+              { label: "Colaboradores", value: asset.num_employees || "-" },
+              { label: "Condicion", value: asset.condition === "alquilado" ? "Alquilado" : "Propio" },
+              { label: "Senal observada", value: asset.top_risk || "-" },
+              { label: "Fuente", value: "GRI / CMIP6" },
             ].map((item) => (
-              <div key={item.label} className="flex items-center justify-between">
+              <div key={item.label} className="flex items-center justify-between gap-4">
                 <span className="text-sm text-muted-foreground">{item.label}</span>
-                <span className="text-sm font-medium font-mono">{item.value}</span>
+                <span className="text-sm font-medium text-right">{item.value}</span>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Bottom Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="bg-card border border-border rounded-xl overflow-hidden lg:col-span-1">
+          {asset.lat && asset.lng ? (
+            <MapContainer center={[asset.lat, asset.lng]} zoom={15} className="h-full min-h-[320px]" zoomControl={false}>
+              <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+              <CircleMarker
+                center={[asset.lat, asset.lng]}
+                radius={12}
+                pathOptions={{
+                  color: STATUS_FILL[asset.risk_level] || "#22c55e",
+                  fillColor: STATUS_FILL[asset.risk_level] || "#22c55e",
+                  fillOpacity: 0.4,
+                  weight: 2,
+                }}
+              />
+            </MapContainer>
+          ) : (
+            <div className="h-full min-h-[320px] flex items-center justify-center text-muted-foreground text-sm">
+              Sin coordenadas
+            </div>
+          )}
+        </div>
+        <div className="lg:col-span-2">
+          <TerrainContextCard asset={asset} traceability={traceability} />
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Hazard Breakdown */}
-        <div className="bg-card border border-border rounded-xl p-6">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-4">
-            Desglose de Amenazas
-          </h3>
-          <HazardBreakdown asset={asset} />
-        </div>
-
-        {/* Impact Breakdown */}
-        <div className="bg-card border border-border rounded-xl p-6">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-4">
-            Desglose de Impacto Financiero
-          </h3>
-          <ImpactBreakdown asset={asset} />
-        </div>
+        <HistoricalEventsCard asset={asset} traceability={traceability} />
+        <ProjectionScenarioCard scenario="SSP245 / SSP585" climateData={climate} traceability={traceability} />
       </div>
 
-      {/* Risk Model Section */}
-      <div className="bg-card border border-border rounded-xl p-6">
-        {backendRiskModel ? (
-          <RiskModel riskData={backendRiskModel} asset={asset} />
-        ) : (
-          <div className="flex items-center justify-center py-8 text-muted-foreground text-sm gap-2">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            Calculando modelo de riesgo...
-          </div>
-        )}
-      </div>
+      <ScientificEvidenceCard traceability={traceability} evidence={{ confidence: "medium" }} />
 
-      {/* AI Recommendations */}
       <div className="bg-card border border-border rounded-xl p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Recomendaciones IA
           </h3>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={generateRecommendations}
-            disabled={aiLoading}
-            className="gap-2"
-          >
+          <Button size="sm" variant="outline" onClick={generateRecommendations} disabled={aiLoading} className="gap-2">
             {aiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-            {aiLoading ? "Analizando..." : "Generar Recomendaciones"}
+            {aiLoading ? "Analizando..." : "Generar recomendaciones"}
           </Button>
         </div>
         {aiResponse ? (
@@ -278,7 +234,7 @@ Genera exactamente 3 recomendaciones de adaptación climática específicas para
           </div>
         ) : (
           <p className="text-sm text-muted-foreground text-center py-8">
-            Haz clic en "Generar Recomendaciones" para obtener análisis IA personalizado.
+            Genera recomendaciones basadas en evidencia climatica, fuente y escenario SSP.
           </p>
         )}
       </div>

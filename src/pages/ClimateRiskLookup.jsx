@@ -12,7 +12,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { API_URL, fetchTerritorialContext, fetchDocumentContext, analyzeClimateRisk } from "@/lib/api";
 import MethodologyPanel from "@/components/climate/MethodologyPanel";
-import ClimateAnalysisTechnicalModal from "@/components/climate/ClimateAnalysisTechnicalModal";
 import {
   Search, MapPin, Loader2, AlertTriangle,
   Sparkles, Building2, Plus, Globe2, BookOpen, ChevronDown, ChevronUp,
@@ -55,13 +54,6 @@ const SECTORS = [
   { value: "entretenimiento", label: "Entretenimiento" },
   { value: "otros",           label: "Otro sector" },
 ];
-
-const URGENCY_STYLES = {
-  "crítica": { badge: "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/60 dark:text-red-200 dark:border-red-700",    dot: "bg-red-400"     },
-  alta:      { badge: "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/60 dark:text-orange-200 dark:border-orange-700", dot: "bg-orange-400" },
-  media:     { badge: "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/60 dark:text-yellow-200 dark:border-yellow-700", dot: "bg-yellow-400" },
-  baja:      { badge: "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/60 dark:text-emerald-200 dark:border-emerald-700", dot: "bg-emerald-400" },
-};
 
 const SIGNAL_META = {
   extreme_heat:    { icon: "🌡️", label: "Calor extremo (>35°C)",        unit: "días/año" },
@@ -308,15 +300,6 @@ function fmtNum(v, decimals = 1) {
   return Number.isInteger(v) ? String(v) : v.toFixed(decimals);
 }
 
-function UrgencyBadge({ urgency }) {
-  const s = URGENCY_STYLES[urgency] ?? URGENCY_STYLES.baja;
-  return (
-    <Badge variant="outline" className={`text-[10px] py-0 px-2 font-semibold border ${s.badge}`}>
-      {urgency}
-    </Badge>
-  );
-}
-
 const CONFIDENCE_BADGE = {
   high:   "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/60 dark:text-emerald-200 dark:border-emerald-700",
   medium: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/60 dark:text-amber-200 dark:border-amber-700",
@@ -374,76 +357,46 @@ function TraceabilityDetails({ trace }) {
   );
 }
 
-function ScoreBar({ score }) {
-  const pct = Math.round((score ?? 0) * 100);
-  const color = pct >= 75 ? "bg-red-400" : pct >= 50 ? "bg-orange-400" : pct >= 25 ? "bg-yellow-400" : "bg-emerald-400";
-  return (
-    <div className="flex items-center gap-2 w-full">
-      <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-        <div className={`h-full rounded-full ${color} transition-all`} style={{ width: `${pct}%` }} />
-      </div>
-      <span className="text-[10px] font-mono text-muted-foreground w-7 text-right">{pct}</span>
-    </div>
-  );
-}
-
 // ── Panel 1: Resumen ejecutivo (Layer 6 narrative) ────────────────────────────
 
-function NarrativePanel({ narrative, location, metadata, analysis }) {
+function NarrativePanel({ narrative, location, metadata }) {
   const summary = narrative?.executive_summary;
   const metrics = narrative?.key_metrics ?? {};
-  const urgency = metrics.urgencia_top_riesgo ?? null;
-  const scoreTop = metrics.composite_score_top;
   const distKm = location?.distanceKm ?? metadata?.distance_km;
-
-  const urgencyBorderColor = {
-    "crítica": "border-red-500",
-    alta:      "border-orange-500",
-    media:     "border-yellow-500",
-    baja:      "border-emerald-500",
-  }[urgency] ?? "border-primary/30";
 
   if (!summary) return null;
 
   return (
-    <Card className={`border-2 ${urgencyBorderColor} bg-card shadow-sm`}>
+    <Card className="border-2 border-primary/30 bg-card shadow-sm">
       <CardHeader className="pb-3 pt-4">
         <div className="flex items-start justify-between gap-3">
           <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-primary flex-shrink-0" />
             Evaluación de riesgo climático
           </CardTitle>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {urgency && <UrgencyBadge urgency={urgency} />}
-          </div>
+          <Badge variant="outline" className="text-[10px] py-0 px-2">Evidencia descriptiva</Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-4 pb-4">
         <p className="text-sm leading-relaxed text-secondary-foreground">{summary}</p>
 
         {/* Key metrics strip */}
-        {(metrics.total_señales > 0 || scoreTop != null || metrics.impacto_financiero_min != null) && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+        {(metrics.total_señales > 0 || metadata?.scenario || metadata?.data_sources?.length > 0) && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
             {metrics.total_señales > 0 && (
               <div className="rounded-lg bg-secondary border border-border p-2.5 text-center">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">Señales</p>
                 <p className="text-lg font-bold text-foreground">{metrics.total_señales}</p>
               </div>
             )}
-            {scoreTop != null && (
-              <div className="rounded-lg bg-secondary border border-border p-2.5 text-center">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">Score riesgo</p>
-                <p className="text-lg font-bold text-foreground">{Math.round(scoreTop * 100)}<span className="text-xs font-normal text-muted-foreground">/100</span></p>
-              </div>
-            )}
-            {metrics.impacto_financiero_min != null && (
-              <div className="rounded-lg bg-secondary border border-border p-2.5 text-center col-span-2">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">Impacto financiero est.</p>
-                <p className="text-sm font-bold text-foreground">
-                  {fmtUSD(metrics.impacto_financiero_min)} – {fmtUSD(metrics.impacto_financiero_max)}<span className="text-[10px] font-normal text-muted-foreground ml-1">/año</span>
-                </p>
-              </div>
-            )}
+            <div className="rounded-lg bg-secondary border border-border p-2.5 text-center">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">Escenario</p>
+              <p className="text-sm font-bold text-foreground">{metadata?.scenario || "SSP245 / SSP585"}</p>
+            </div>
+            <div className="rounded-lg bg-secondary border border-border p-2.5 text-center">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">Confianza</p>
+              <p className="text-sm font-bold text-foreground">{metadata?.confidence || "medium"}</p>
+            </div>
           </div>
         )}
 
@@ -461,12 +414,6 @@ function NarrativePanel({ narrative, location, metadata, analysis }) {
           Fuentes: {(metadata?.data_sources ?? []).join(" · ") || "climate_cells · GRI · Open-Meteo · World Bank"}
           {metadata?.scenario && ` · ${metadata.scenario}`}
         </p>
-
-        {analysis && (
-          <div className="flex justify-end pt-1">
-            <ClimateAnalysisTechnicalModal analysis={analysis} />
-          </div>
-        )}
       </CardContent>
     </Card>
   );
@@ -572,13 +519,10 @@ function RiskCard({ risk }) {
             <span className="text-base leading-none flex-shrink-0">{signalMeta.icon}</span>
             <p className="text-xs font-semibold text-foreground truncate">{signalMeta.label}</p>
           </div>
-          <UrgencyBadge urgency={risk.urgency} />
+          <Badge variant="outline" className="text-[10px] py-0 px-2">Senal observada</Badge>
         </div>
 
         <TraceBadges trace={trace} />
-
-        {/* Score bar */}
-        <ScoreBar score={risk.composite_score} />
 
         {/* Operational impacts (top 3) */}
         {risk.operational_impacts?.length > 0 && (
@@ -592,37 +536,20 @@ function RiskCard({ risk }) {
           </ul>
         )}
 
-        {/* Financial impact */}
-        {risk.financial_impact_range && (
-          <p className="text-[10px] text-muted-foreground">
-            Impacto estimado: <span className="font-semibold text-secondary-foreground">
-              {fmtUSD(risk.financial_impact_range.min_usd)} – {fmtUSD(risk.financial_impact_range.max_usd)}
-            </span>/año
-          </p>
-        )}
       </div>
 
-      {/* Expandable: score components */}
-      {risk.score_components && (
+      {trace && (
         <div className="border-t border-border">
           <button
             onClick={() => setExpanded(e => !e)}
             className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
           >
-            <span>Componentes del score</span>
+            <span>Metadata cientifica</span>
             {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
           </button>
           {expanded && (
-            <div className="px-3 pb-3 grid grid-cols-3 gap-2">
-              {Object.entries(risk.score_components).map(([k, v]) => (
-                <div key={k} className="text-center">
-                  <p className="text-[9px] text-muted-foreground uppercase tracking-widest">{k}</p>
-                  <p className="text-xs font-mono font-bold text-foreground">{(v * 100).toFixed(0)}</p>
-                </div>
-              ))}
-              <div className="col-span-3">
-                <TraceabilityDetails trace={trace} />
-              </div>
+            <div className="px-3 pb-3">
+              <TraceabilityDetails trace={trace} />
             </div>
           )}
         </div>
@@ -638,10 +565,10 @@ function RisksPanel({ risks }) {
       <CardHeader className="pb-3 pt-4">
         <CardTitle className="text-sm flex items-center gap-2">
           <ShieldAlert className="w-4 h-4 text-orange-500" />
-          <span className="font-semibold text-foreground">Riesgos empresariales priorizados</span>
+          <span className="font-semibold text-foreground">Senales climaticas para revisar</span>
         </CardTitle>
         <p className="text-xs text-muted-foreground mt-1">
-          Ordenados por score compuesto: probabilidad · intensidad · exposición · sensibilidad sectorial
+          Lectura descriptiva con fuente, periodo, escenario SSP y trazabilidad cientifica
         </p>
       </CardHeader>
       <CardContent className="space-y-2.5 pb-4">
@@ -732,7 +659,9 @@ function AdaptationPanel({ adaptations }) {
                 <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                   {signalMeta.label}
                 </p>
-                <UrgencyBadge urgency={adapt.urgency} />
+                <Badge variant="outline" className="text-[10px] py-0 px-2">
+                  Confianza {adapt.confidence ?? "medium"}
+                </Badge>
               </div>
               <div className="space-y-1.5 pl-1">
                 {(adapt.measures ?? []).slice(0, 3).map((m, j) => (
@@ -811,7 +740,7 @@ function AIPanel({ analysis, docContext }) {
       const { narrative, risks, signals, metadata } = analysis;
       const summary = narrative?.executive_summary ?? "";
       const topRisks = (risks ?? []).slice(0, 3).map(r =>
-        `- ${r.signal?.signalType ?? "riesgo"} (urgencia: ${r.urgency}, score: ${Math.round((r.composite_score ?? 0) * 100)}/100): ${(r.operational_impacts ?? []).slice(0, 2).join(", ")}`
+        `- ${r.signal?.signalType ?? "senal climatica"}: ${(r.operational_impacts ?? []).slice(0, 2).join(", ")}`
       ).join("\n");
       const sigCount = signals?.signals_count ?? 0;
 

@@ -1,8 +1,8 @@
-// @ts-nocheck — react-leaflet prop types break due to leaflet module stub; runtime is correct
+// @ts-nocheck - react-leaflet prop types break due to leaflet module stub; runtime is correct
 import { useState, useEffect } from "react";
 import { useAssets } from "@/hooks/useAssets";
 import { MapContainer, TileLayer, CircleMarker, Popup } from "react-leaflet";
-import { getRiskColor, formatCurrency } from "@/lib/riskEngine";
+import { getRiskColor } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
 import { ExternalLink } from "lucide-react";
@@ -16,10 +16,10 @@ const RISK_FILL = {
 };
 
 const LABELS = {
-  critico: "Crítico",
-  alto: "Alto",
-  medio: "Medio",
-  bajo: "Bajo",
+  critico: "Observacion alta",
+  alto: "Observacion alta",
+  medio: "Monitoreo",
+  bajo: "Seguimiento",
 };
 
 export default function RiskMap() {
@@ -44,11 +44,10 @@ export default function RiskMap() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Toolbar */}
       <div className="px-6 py-3 border-b border-border flex items-center justify-between bg-card/50 backdrop-blur-sm">
         <div>
-          <h1 className="text-lg font-bold tracking-tight">Mapa de Riesgos</h1>
-          <p className="text-xs text-muted-foreground">{filtered.length} activos visualizados</p>
+          <h1 className="text-lg font-bold tracking-tight">Mapa Climatico</h1>
+          <p className="text-xs text-muted-foreground">{filtered.length} activos visualizados con contexto descriptivo</p>
         </div>
         <div className="flex items-center gap-2">
           {["all", "critico", "alto", "medio", "bajo"].map((level) => (
@@ -68,19 +67,14 @@ export default function RiskMap() {
         </div>
       </div>
 
-      {/* Map */}
       {assetsError && (
         <div className="mx-6 mb-4 rounded-xl border border-destructive bg-destructive/10 p-4 text-sm text-destructive">
-          No se pudieron cargar los activos. Verifica la conexión al backend.
+          No se pudieron cargar los activos. Verifica la conexion al backend.
         </div>
       )}
+
       <div className="flex-1 relative">
-        <MapContainer
-          center={[-12.046, -77.043]}
-          zoom={12}
-          className="h-full w-full"
-          zoomControl={true}
-        >
+        <MapContainer center={[-12.046, -77.043]} zoom={12} className="h-full w-full" zoomControl>
           <TileLayer
             url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
@@ -93,37 +87,32 @@ export default function RiskMap() {
               <CircleMarker
                 key={asset.id}
                 center={[asset.lat, asset.lng]}
-                radius={8 + (asset.risk_score || 0) * 12}
-                pathOptions={{
-                  color,
-                  fillColor: color,
-                  fillOpacity: 0.5,
-                  weight: 2,
-                  opacity: 0.8,
-                }}
+                radius={10}
+                pathOptions={{ color, fillColor: color, fillOpacity: 0.5, weight: 2, opacity: 0.8 }}
               >
                 <Popup>
-                  <div className="min-w-[200px]">
+                  <div className="min-w-[220px]">
                     <p className="font-bold text-sm mb-1">{asset.name}</p>
                     <p className="text-xs opacity-70 mb-2">{asset.district}</p>
                     <div className="space-y-1 text-xs">
-                      <div className="flex justify-between">
-                        <span className="opacity-70">Risk Score</span>
-                        <span className="font-mono font-bold">{((asset.risk_score || 0) * 100).toFixed(0)}</span>
+                      <div className="flex justify-between gap-3">
+                        <span className="opacity-70">Estado</span>
+                        <span className={cn("font-semibold", rc.color)}>{LABELS[asset.risk_level] || "Sin clasificar"}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="opacity-70">Impacto</span>
-                        <span className="font-mono">{formatCurrency(asset.financial_impact || 0)}</span>
+                      <div className="flex justify-between gap-3">
+                        <span className="opacity-70">Senal</span>
+                        <span>{asset.top_risk || "Contexto climatico"}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="opacity-70">Riesgo Principal</span>
-                        <span>{asset.top_risk || "—"}</span>
+                      <div className="flex justify-between gap-3">
+                        <span className="opacity-70">Fuente</span>
+                        <span>GRI / CMIP6</span>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <span className="opacity-70">Escenarios</span>
+                        <span>SSP245 / SSP585</span>
                       </div>
                     </div>
-                    <Link
-                      to={`/assets/${asset.id}`}
-                      className="mt-2 flex items-center gap-1 text-xs text-blue-400 hover:underline"
-                    >
+                    <Link to={`/assets/${asset.id}`} className="mt-2 flex items-center gap-1 text-xs text-blue-400 hover:underline">
                       Ver detalle <ExternalLink className="w-3 h-3" />
                     </Link>
                   </div>
@@ -133,9 +122,8 @@ export default function RiskMap() {
           })}
         </MapContainer>
 
-        {/* Legend */}
         <div className="absolute bottom-6 left-6 bg-card/90 backdrop-blur-sm border border-border rounded-xl p-3 z-[1000]">
-          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Nivel de Riesgo</p>
+          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Lectura descriptiva</p>
           <div className="space-y-1.5">
             {Object.entries(LABELS).map(([key, label]) => (
               <div key={key} className="flex items-center gap-2">

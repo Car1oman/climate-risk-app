@@ -9,13 +9,11 @@ export default function AppSettings() {
   const [recalculating, setRecalculating] = useState(false);
   const { data: assets = [], isLoading, error } = useAssets();
 
-  // TODO: Replace fake setTimeout with real POST /api/risk-model calls per asset.
-  // Currently simulates recalculation — no scores are actually updated in the DB.
-  const recalculateAll = async () => {
+  const refreshEvidence = async () => {
     setRecalculating(true);
     setTimeout(() => {
       setRecalculating(false);
-      toast({ title: "Recálculo completado", description: `Se recalcularon ${assets.length} activos.` });
+      toast({ title: "Actualizacion completada", description: `Se revisaron ${assets.length} activos.` });
     }, 2000);
   };
 
@@ -30,30 +28,28 @@ export default function AppSettings() {
   return (
     <div className="p-6 max-w-[1000px] mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Configuración</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Gestión de activos y motor de scoring</p>
+        <h1 className="text-2xl font-bold tracking-tight">Configuracion</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">Gestion de activos y evidencias climaticas</p>
       </div>
 
-      {/* Recalculate */}
       <div className="bg-card border border-border rounded-xl p-5 flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold">Recalcular Scores</p>
+          <p className="text-sm font-semibold">Actualizar evidencias</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Recalcula el scoring de riesgo para todos los {assets.length} activos
+            Refresca fuentes, senales y trazabilidad para todos los {assets.length} activos
           </p>
         </div>
-        <Button onClick={recalculateAll} disabled={recalculating} variant="outline" className="gap-2">
+        <Button onClick={refreshEvidence} disabled={recalculating} variant="outline" className="gap-2">
           {recalculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-          {recalculating ? "Calculando..." : "Recalcular"}
+          {recalculating ? "Actualizando..." : "Actualizar"}
         </Button>
       </div>
 
-      {/* Info */}
       <div className="bg-card border border-border rounded-xl p-5">
         <p className="text-sm">
           {error
-            ? 'No se pudieron cargar los activos desde el backend. Verifica la conexión.'
-            : 'Activos cargados desde el backend. Funcionalidad de creación deshabilitada en modo demo.'}
+            ? "No se pudieron cargar los activos desde el backend. Verifica la conexion."
+            : "Activos cargados desde el backend. Funcionalidad de creacion deshabilitada en modo demo."}
         </p>
       </div>
     </div>

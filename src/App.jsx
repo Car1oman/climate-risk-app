@@ -12,7 +12,6 @@ import Dashboard from './pages/Dashboard';
 import RiskMap from './pages/RiskMap';
 import Assets from './pages/Assets';
 import AssetDetail from './pages/AssetDetail';
-import Simulator from './pages/Simulator';
 import Alerts from './pages/Alerts';
 import Report from './pages/Report';
 import AppSettings from './pages/AppSettings';
@@ -30,7 +29,6 @@ const AuthenticatedApp = () => {
         <Route path="/map" element={<RiskMap />} />
         <Route path="/assets" element={<Assets />} />
         <Route path="/assets/:id" element={<AssetDetail />} />
-        <Route path="/simulator" element={<Simulator />} />
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/report" element={<Report />} />
         <Route path="/data-management" element={<DataManagement />} />

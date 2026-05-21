@@ -13,7 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Plus, Edit, Trash2, FileText, Database } from "lucide-react";
-import { formatCurrency } from "@/lib/riskEngine";
+import { formatCurrency } from "@/lib/utils";
 import BulkAssetUpload from "@/components/BulkAssetUpload";
 import BulkClimateUpload from "@/components/BulkClimateUpload";
 

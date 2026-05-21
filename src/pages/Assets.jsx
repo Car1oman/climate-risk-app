@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAssets } from "@/lib/api";
-import { getRiskColor, formatCurrency } from "@/lib/riskEngine";
+import { getRiskColor } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
@@ -140,12 +140,12 @@ export default function Assets() {
                 </div>
               </div>
               <div className="flex items-center gap-4 flex-shrink-0">
-                <div className="text-right hidden sm:block">
-                  <p className="text-xs text-muted-foreground">Impacto</p>
-                  <p className="text-sm font-mono font-semibold">{formatCurrency(asset.financial_impact || 0)}</p>
+                <div className="text-right hidden sm:block max-w-44">
+                  <p className="text-xs text-muted-foreground">Senal observada</p>
+                  <p className="text-sm font-semibold truncate">{asset.top_risk || "Contexto climatico"}</p>
                 </div>
                 <Badge variant="outline" className={cn("text-xs px-2.5 py-1", rc.bg, rc.text, rc.border)}>
-                  {((asset.risk_score || 0) * 100).toFixed(0)}
+                  {RISK_LABELS[asset.risk_level] || "Sin clasificar"}
                 </Badge>
                 <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
               </div>
