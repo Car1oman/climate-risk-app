@@ -45,24 +45,6 @@ const HORIZON_LABELS = {
   long_term:  '2060+',
 };
 
-// Etiquetas de urgencia
-const URGENCY_LABELS = {
-  'crítica': 'crítica',
-  alta:      'alta',
-  media:     'media',
-  baja:      'baja',
-};
-
-/**
- * Formatea un número con separadores de miles y símbolo de moneda.
- */
-function formatUSD(value) {
-  if (value == null) return 'N/D';
-  if (value >= 1_000_000) return `USD ${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000)     return `USD ${Math.round(value / 1_000)}K`;
-  return `USD ${value}`;
-}
-
 /**
  * Construye un resumen informativo cuando ninguna señal supera umbrales IPCC.
  * En lugar de decir "no hay datos", enumera las amenazas GRI presentes y
@@ -100,17 +82,15 @@ function buildFallbackSummary(fusedData) {
 }
 
 /**
- * Genera la oración principal del executive_summary basada en el top_risk.
- * Incluye siempre: señal + valor numérico + horizonte + impacto financiero.
+ * Genera la oración principal del executive_summary basada en una señal observada.
+ * Incluye señal + valor numérico + horizonte, sin ranking ni puntajes.
  */
-function buildMainSentence(topRisk, lat, lon) {
-  if (!topRisk) return null;
+function buildMainSentence(contextualRisk, lat, lon) {
+  if (!contextualRisk) return null;
 
-  const signal      = topRisk.signal;
+  const signal      = contextualRisk.signal;
   const signalLabel = SIGNAL_LABELS[signal.signalType] ?? signal.signalType;
   const horizonLabel = HORIZON_LABELS[signal.horizon] ?? signal.horizon;
-  const financialMin = topRisk.financial_impact_range?.min_usd;
-  const financialMax = topRisk.financial_impact_range?.max_usd;
 
   // Construir descripción del delta numérico según tipo de señal
   let deltaDesc = '';
@@ -171,43 +151,38 @@ function buildMainSentence(topRisk, lat, lon) {
     }
   }
 
-  const financialDesc = (financialMin != null && financialMax != null)
-    ? ` El impacto financiero estimado es de ${formatUSD(financialMin)}–${formatUSD(financialMax)} anuales.`
-    : '';
-
-  return `Para esta ubicación (${lat.toFixed(4)}, ${lon.toFixed(4)}), el análisis proyecta ${signalLabel} con ${deltaDesc} hacia ${horizonLabel}.${financialDesc}`;
+  return `Para esta ubicación (${lat.toFixed(4)}, ${lon.toFixed(4)}), el análisis identifica ${signalLabel} con ${deltaDesc} hacia ${horizonLabel}.`;
 }
 
 /**
- * Genera la segunda oración con contexto de urgencia y adaptación disponible.
+ * Genera la segunda oración con evidencia, incertidumbre y adaptación disponible.
  */
-function buildContextSentence(topRisk, adaptations) {
-  if (!topRisk) return null;
+function buildContextSentence(contextualRisk, adaptations) {
+  if (!contextualRisk) return null;
 
-  const urgency = URGENCY_LABELS[topRisk.urgency] ?? topRisk.urgency;
-  const score   = topRisk.composite_score != null
-    ? ` (score de riesgo: ${(topRisk.composite_score * 100).toFixed(0)}/100)`
-    : '';
-
+  const trace = contextualRisk.source_traceability ?? contextualRisk.signal?.source_traceability ?? {};
+  const confidence = contextualRisk.confidence ?? contextualRisk.signal?.confidence ?? trace.confidence_level ?? 'low';
+  const source = trace.source_origin ?? 'fuente documentada';
+  const threshold = trace.threshold_applied ? ` contra el umbral ${trace.threshold_applied}` : '';
   const numMeasures = adaptations?.adaptations?.[0]?.measures?.length ?? 0;
   const adaptDesc = numMeasures > 0
     ? ` Se identificaron ${numMeasures} medidas de adaptación aplicables.`
     : '';
 
-  return `La urgencia de acción es ${urgency}${score}.${adaptDesc}`;
+  return `La evidencia proviene de ${source}${threshold}, con confianza ${confidence}; la incertidumbre depende de la resolución espacial, el escenario SSP y la disponibilidad de datos locales.${adaptDesc}`;
 }
 
 /**
  * Función principal exportada.
  * @param {Object} params - { fusedData, signalOutput, businessRiskOutput,
- *                            prioritizationOutput, adaptationOutput, sector, lat, lon }
+ *                            contextualRisks, adaptationOutput, sector, lat, lon }
  * @returns {{ executive_summary: string, key_metrics: Object, generated_from: Object }}
  */
 export function generateNarrative({
   fusedData,
   signalOutput,
   businessRiskOutput,
-  prioritizationOutput,
+  contextualRisks,
   adaptationOutput,
   sector,
   lat,
@@ -216,7 +191,7 @@ export function generateNarrative({
   const latNum = Number(lat);
   const lonNum = Number(lon);
 
-  const topRisk        = prioritizationOutput?.top_risk ?? null;
+  const contextualRisk = contextualRisks?.risks?.[0] ?? businessRiskOutput?.risks?.[0] ?? null;
   const dominantSignal = signalOutput?.dominant_signal  ?? null;
   const signals        = signalOutput?.signals          ?? [];
 
@@ -225,8 +200,8 @@ export function generateNarrative({
   const terrainData = fusedData?.terrainData ?? null;  // Sprint 6
 
   // Construir executive_summary con datos numéricos reales
-  const sentence1 = buildMainSentence(topRisk, latNum, lonNum);
-  const sentence2 = buildContextSentence(topRisk, adaptationOutput);
+  const sentence1 = buildMainSentence(contextualRisk, latNum, lonNum);
+  const sentence2 = buildContextSentence(contextualRisk, adaptationOutput);
 
   // Sprint 5: ENSO narrative enrichment (appended, never replaces existing sentences)
   const ensoSentence    = buildEnsoNarrative(enso);
@@ -238,17 +213,14 @@ export function generateNarrative({
     .join(' ') || buildFallbackSummary(fusedData);
 
   // key_metrics: métricas clave extraídas de los outputs anteriores
-  const topSignal = topRisk?.signal ?? null;
+  const primarySignal = contextualRisk?.signal ?? null;
   const key_metrics = {
     señal_dominante:        dominantSignal ? (SIGNAL_LABELS[dominantSignal] ?? dominantSignal) : null,
-    delta_principal:        topSignal?.delta     != null ? topSignal.delta     : topSignal?.projected ?? null,
-    delta_pct_principal:    topSignal?.delta_pct != null ? topSignal.delta_pct : null,
-    indicador_principal:    topSignal?.indicator ?? null,
-    horizonte:              topSignal?.horizon   != null ? HORIZON_LABELS[topSignal.horizon] ?? topSignal.horizon : null,
-    urgencia_top_riesgo:    topRisk?.urgency     ?? null,
-    composite_score_top:    topRisk?.composite_score ?? null,
-    impacto_financiero_min: topRisk?.financial_impact_range?.min_usd ?? null,
-    impacto_financiero_max: topRisk?.financial_impact_range?.max_usd ?? null,
+    delta_principal:        primarySignal?.delta     != null ? primarySignal.delta     : primarySignal?.projected ?? null,
+    delta_pct_principal:    primarySignal?.delta_pct != null ? primarySignal.delta_pct : null,
+    indicador_principal:    primarySignal?.indicator ?? null,
+    horizonte:              primarySignal?.horizon   != null ? HORIZON_LABELS[primarySignal.horizon] ?? primarySignal.horizon : null,
+    confianza_principal:    contextualRisk?.confidence ?? primarySignal?.confidence ?? null,
     total_señales:          signals.length,
     exposicion_general:     businessRiskOutput?.overall_exposure ?? null,
     sector,
@@ -283,9 +255,27 @@ export function generateNarrative({
     scenario:        fusedData?.scenario        ?? null,
   };
 
+  const confidence = contextualRisk?.confidence ?? primarySignal?.confidence ?? 'low';
+  const evidence = {
+    signal_type: primarySignal?.signalType ?? null,
+    indicator: primarySignal?.indicator ?? null,
+    historical: primarySignal?.historical ?? null,
+    projected: primarySignal?.projected ?? null,
+    delta: primarySignal?.delta ?? null,
+    delta_pct: primarySignal?.delta_pct ?? null,
+    traceability: contextualRisk?.source_traceability ?? primarySignal?.source_traceability ?? null,
+  };
+  const uncertainty = {
+    confidence_level: confidence,
+    note: 'Narrativa descriptiva: no prioriza, rankea ni asigna puntajes; resume senales, tendencias, evidencia e incertidumbre.',
+  };
+
   return {
     executive_summary,
     key_metrics,
     generated_from,
+    confidence,
+    evidence,
+    uncertainty,
   };
 }

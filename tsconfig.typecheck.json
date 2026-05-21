@@ -3,6 +3,9 @@
   "exclude": [
     "node_modules",
     "dist",
+    "src/deprecated",
+    "server/deprecated",
+    "tests/deprecated",
     "src/vite-plugins",
     "src/components/ui/**"
   ]

@@ -134,90 +134,23 @@ export const TEMPORAL_HORIZONS = [
     label: "Corto plazo",
     period: "2020–2039",
     description:
-      "Horizon factor: 1.0 (urgencia máxima). Relevante para decisiones de inversión y operación inmediata. Datos completos SSP2-4.5 y SSP5-8.5.",
+      "Horizonte cercano para decisiones de inversion y operacion inmediata. Datos completos SSP2-4.5 y SSP5-8.5.",
   },
   {
     code: "mid_term",
     label: "Mediano plazo",
     period: "2040–2059",
     description:
-      "Horizon factor: 0.75 (urgencia alta). Relevante para CAPEX y activos de larga vida. Datos completos SSP2-4.5 y SSP5-8.5.",
+      "Horizonte intermedio para CAPEX y activos de larga vida. Datos completos SSP2-4.5 y SSP5-8.5.",
   },
   {
     code: "long_term",
     label: "Largo plazo",
     period: "2060–2100",
     description:
-      "Horizon factor: 0.50 (urgencia de planificación). Datos extrapolados linealmente desde SSP5-8.5 2040-2059. Incertidumbre mayor.",
+      "Horizonte de planificacion. Datos extrapolados linealmente desde SSP5-8.5 2040-2059. Incertidumbre mayor.",
   },
 ];
-
-export const COMPOSITE_SCORE_FORMULA = {
-  title: "Score Compuesto Geoespacial (Layer 4)",
-  reference: "UNDP Disaster Risk Index + DARA Climate Vulnerability Monitor",
-  formula:
-    "Score = (Probabilidad × 0.30) + (Intensidad × 0.25) + (Exposición × 0.25) + (Sensibilidad × 0.10) + (Factor temporal × 0.10)",
-  scale: "0–100 · convertido desde [0, 1] × 100",
-  components: [
-    {
-      key: "probability",
-      label: "Probabilidad",
-      weight: "30%",
-      description:
-        "Probabilidad de ocurrencia del peligro. Fuente: GRI Oxford. alto=0.80, medio=0.60, bajo=0.40.",
-    },
-    {
-      key: "intensity",
-      label: "Intensidad",
-      weight: "25%",
-      description:
-        "Magnitud del cambio proyectado vs. histórico (delta normalizado). Fuente: índices CMIP6 (hd35, cdd, rx5day, tas).",
-    },
-    {
-      key: "exposure",
-      label: "Exposición",
-      weight: "25%",
-      description:
-        "Nivel de exposición física del sector. Retail/Salud: 1.0 (alto). Educación/Entretenimiento: 0.5 (medio).",
-    },
-    {
-      key: "sensitivity",
-      label: "Sensibilidad sectorial",
-      weight: "10%",
-      description:
-        "Calibrada por Layer 3 (BusinessRiskEngine) según impactos históricos observados por sector.",
-    },
-    {
-      key: "horizon_factor",
-      label: "Factor temporal",
-      weight: "10%",
-      description:
-        "Urgencia temporal: corto plazo=1.0 (2020-2039), mediano=0.75 (2040-2059), largo=0.50 (2060+).",
-    },
-  ],
-  urgency_levels: [
-    {
-      level: "crítica",
-      threshold: "≥ 75 / 100",
-      action: "Acción inmediata. Inversión en adaptación urgente.",
-    },
-    {
-      level: "alta",
-      threshold: "≥ 50 / 100",
-      action: "Plan de acción en 1–3 años.",
-    },
-    {
-      level: "media",
-      threshold: "≥ 25 / 100",
-      action: "Monitoreo y planificación a 5 años.",
-    },
-    {
-      level: "baja",
-      threshold: "< 25 / 100",
-      action: "Revisión periódica. Sin acción urgente.",
-    },
-  ],
-};
 
 export const HXE_FORMULA = {
   title: "Fórmula H×E×I — Portfolio de Activos Registrados",
@@ -250,14 +183,14 @@ export const HXE_FORMULA = {
 };
 
 export const ANALYSIS_LIMITATIONS = [
-  "Pesos del composite score son expertos, no calibrados estadísticamente sobre datos históricos de pérdidas.",
-  "Fórmula lineal: no modela interacciones no lineales (ej. calor + sequía simultáneos).",
+  "La plataforma describe señales y tendencias; no calcula prioridad, ranking ni puntaje agregado.",
+  "La interpretación contextual no modela interacciones no lineales (ej. calor + sequía simultáneos).",
   "No incluye riesgos en cascada (inundación → interrupción logística → recesión).",
   "Datos World Bank son nacionales (Perú); sin desagregación regional o departamental.",
   "SRTM (terreno) de año 2000; no refleja cambios de uso del suelo posteriores.",
   "Open-Meteo cubre hasta ~2049; horizonte long_term (2060+) se extrapola linealmente.",
   "Resolución CMIP6 de ~25 km no captura microclimas urbanos ni efecto de isla de calor.",
-  "El score es un valor puntual del ensemble; no expone intervalos de confianza.",
+  "La confianza se reporta como metadato cualitativo según fuente y disponibilidad; no equivale a probabilidad de pérdida.",
 ];
 
 export const RESPONSIBLE_INSTITUTIONS = [

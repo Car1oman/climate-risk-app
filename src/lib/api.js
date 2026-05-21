@@ -91,14 +91,14 @@ export const fetchClimateDB = async (lat, lng) => {
   return res.json();
 };
 
-// POST /api/v2/climate-risk-analysis — Layers 1-6 en secuencia
+// POST /api/v2/climate-risk-analysis — señales, interpretación contextual y narrativa
 // Retorna: { location, signals, risks, adaptations, narrative, metadata }
-export const analyzeClimateRisk = async ({ lat, lon, sector, asset_type }) => {
+export const analyzeClimateRisk = async ({ lat, lon, sector, asset_type, scenario }) => {
   try {
     const res = await apiFetch('/api/v2/climate-risk-analysis', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lat, lon, sector, asset_type }),
+      body: JSON.stringify({ lat, lon, sector, asset_type, scenario }),
     });
     if (!res.ok) return null;
     return await res.json();

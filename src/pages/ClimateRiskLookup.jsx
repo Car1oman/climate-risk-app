@@ -501,7 +501,7 @@ function SignalsPanel({ signals }) {
   );
 }
 
-// ── Panel 3: Riesgos priorizados (Layer 3 + 4) ───────────────────────────────
+// ── Panel 3: Señales e impactos contextuales ─────────────────────────────────
 
 function RiskCard({ risk }) {
   const [expanded, setExpanded] = useState(false);
@@ -513,9 +513,6 @@ function RiskCard({ risk }) {
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-muted text-[10px] font-bold flex items-center justify-center text-secondary-foreground">
-              {risk.rank}
-            </span>
             <span className="text-base leading-none flex-shrink-0">{signalMeta.icon}</span>
             <p className="text-xs font-semibold text-foreground truncate">{signalMeta.label}</p>
           </div>
@@ -647,7 +644,7 @@ function AdaptationPanel({ adaptations }) {
           <Leaf className="w-4 h-4 text-emerald-500" />
           <span className="font-semibold text-foreground">Medidas de adaptación</span>
         </CardTitle>
-        <p className="text-xs text-muted-foreground mt-1">Priorizadas por riesgo detectado · incluye horizonte y costo estimado</p>
+        <p className="text-xs text-muted-foreground mt-1">Sugeridas por señal detectada · incluye horizonte y costo estimado</p>
       </CardHeader>
       <CardContent className="space-y-3 pb-4">
         {list.map((adapt, i) => {
@@ -1050,7 +1047,7 @@ export default function ClimateRiskLookup() {
               {/* Layer 2: Señales climáticas */}
               <SignalsPanel signals={analysis.signals} />
 
-              {/* Layer 3+4: Riesgos priorizados */}
+              {/* Interpretacion contextual: señales e impactos */}
               <RisksPanel risks={analysis.risks} />
 
               {/* GRI: Amenazas por tipo */}

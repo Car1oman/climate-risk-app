@@ -3,8 +3,8 @@
  *
  * Each scenario contains:
  *  - fusedData: synthetic Layer1 output with realistic CMIP6-derived values
- *  - businessRisks: synthetic Layer3 output (used for Layer4 tests)
- *  - expected: frozen expected outputs (signals, scores, metadata)
+ *  - businessRisks: synthetic Layer3 output for contextual interpretation tests
+ *  - expected: frozen expected outputs (signals and metadata)
  *
  * Values are based on published CMIP6 projections for each location under the
  * specified SSP scenario. They represent plausible mid-range ensemble values,
@@ -99,13 +99,6 @@ export const LIMA_RETAIL_SSP585 = {
     // Signal types that must NOT be present
     absent_signal_types: ['enso_phase', 'landslide_risk', 'huayco_risk'],
 
-    // Layer4 composite score for extreme_heat short_term retail
-    // probability=0.80 (high), intensity=min(1,133.33/60)=1.0
-    // exposure=1.0(alto), sensitivity=0.5(medio), horizon=1.0(short)
-    // R = 0.80×0.30 + 1.0×0.25 + 1.0×0.25 + 0.5×0.10 + 1.0×0.10 = 0.890
-    composite_score: 0.890,
-    urgency:         'crítica',
-
     // Traceability expectations
     traceability: {
       scenario_ssp:          'SSP585',
@@ -196,15 +189,6 @@ export const ICA_HEALTHCARE_SSP245 = {
       'flood_risk',     // no flood in griData and no quantitative flood signal
       'enso_phase', 'landslide_risk', 'huayco_risk',
     ],
-
-    // Layer4: drought cdd mid_term healthcare
-    // confidence='high' → prob=0.80
-    // drought: useValue=|delta|=45, maxRef=45 → intensity=1.0
-    // exposure=1.0(alto), sensitivity=1.0(alto), horizon=0.75(mid_term)
-    // R = 0.80×0.30 + 1.0×0.25 + 1.0×0.25 + 1.0×0.10 + 0.75×0.10
-    // R = 0.240 + 0.250 + 0.250 + 0.100 + 0.075 = 0.915
-    composite_score: 0.915,
-    urgency:         'crítica',
 
     traceability: {
       scenario_ssp:        'SSP245',
@@ -308,16 +292,6 @@ export const CUSCO_LOGISTICS_SSP585 = {
       'tropical_nights', // too cold at altitude
       'flood_risk',      // griData has empty hazards
     ],
-
-    // Layer4: drought cdd mid_term logistics
-    // confidence='high' → prob=0.80
-    // drought: delta=70, delta_pct=73.68 → useValue=|delta|=70 (drought uses absolute)
-    //          maxRef=45 → intensity=min(1, 70/45)=1.0 (capped)
-    // exposure=1.0(alto), sensitivity=1.0(alto), horizon=0.75(mid_term)
-    // R = 0.80×0.30 + 1.0×0.25 + 1.0×0.25 + 1.0×0.10 + 0.75×0.10
-    // R = 0.240 + 0.250 + 0.250 + 0.100 + 0.075 = 0.915
-    composite_score: 0.915,
-    urgency:         'crítica',
 
     traceability: {
       scenario_ssp:          'SSP585',

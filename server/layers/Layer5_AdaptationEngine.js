@@ -1,6 +1,6 @@
 /**
  * Layer 5 — Adaptation Engine
- * Mapea cada riesgo priorizado a medidas de adaptación concretas
+ * Mapea cada señal contextual a medidas de adaptación concretas
  * basadas en el catálogo documental de Intercorp Retail.
  */
 
@@ -208,18 +208,18 @@ const ADAPTATION_CATALOG = {
 
 /**
  * Función principal exportada.
- * @param {Object} prioritizationOutput - Output de Layer 4
+ * @param {Object} contextualRiskOutput - Output descriptivo de interpretacion contextual
  * @param {string} sector - Sector del activo
  * @returns {{ adaptations: Array }}
  */
-export function getAdaptations(prioritizationOutput, sector) {
-  const { prioritized_risks } = prioritizationOutput;
+export function getAdaptations(contextualRiskOutput, sector) {
+  const risks = contextualRiskOutput?.risks ?? [];
 
   // Agrupar por tipo de señal para evitar duplicar medidas
   const seenSignalTypes = new Set();
   const adaptations = [];
 
-  for (const risk of prioritized_risks) {
+  for (const risk of risks) {
     const signalType = risk.signal?.signalType;
     if (!signalType || seenSignalTypes.has(signalType)) continue;
     seenSignalTypes.add(signalType);
@@ -228,9 +228,11 @@ export function getAdaptations(prioritizationOutput, sector) {
 
     adaptations.push({
       risk_type:       signalType,
-      rank:            risk.rank,
-      urgency:         risk.urgency,
-      composite_score: risk.composite_score,
+      confidence:      risk.confidence ?? risk.signal?.confidence ?? 'low',
+      evidence:        risk.evidence ?? null,
+      scenario:        risk.scenario ?? null,
+      provenance:      risk.provenance ?? null,
+      uncertainty:     risk.uncertainty ?? null,
       measures,
     });
   }

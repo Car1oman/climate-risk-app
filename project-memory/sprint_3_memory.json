@@ -1,0 +1,89 @@
+{
+  "sprint": 3,
+  "date": "2026-05-21",
+  "title": "Eliminacion de Layer4 y Scores Heuristicos",
+  "build_status": "PASS",
+  "lint_status": "PASS",
+  "typecheck_status": "PASS",
+  "test_status": "PASS (105/105 activos)",
+  "objective": "Eliminar Layer4_PrioritizationEngine, composite_score, urgency, WEIGHTS heuristicos y respuestas API basadas en ranking/puntaje.",
+  "completed": [
+    "FASE_A: Dependencias restantes ubicadas con rg sobre composite_score, urgency, prioritizeRisks, WEIGHTS, LEVEL_TO_NUM y MAX_DELTAS",
+    "FASE_B: Pipeline v2 cambiado de Layer2 -> Layer3 -> Layer4 -> Layer5 -> Layer6 a Layer2 -> interpretacion contextual -> narrativa",
+    "FASE_C: Narrativa ajustada para describir senales, tendencias, evidencia e incertidumbre sin priorizar, rankear ni puntuar",
+    "FASE_D: API v2 elimina risks priorizados y agrega confidence, evidence, scenario, provenance y uncertainty",
+    "FASE_D: Endpoint /api/risk-model y wrappers activos HxExI eliminados para evitar exposicion de score heuristicos",
+    "FASE_E: frontend ClimateRiskLookup conserva storytelling, senales, trazabilidad, adaptaciones y escenarios SSP sin lenguaje de prioridad",
+    "FASE_F: memoria Sprint 3 generada"
+  ],
+  "deleted_active_files": [
+    "server/layers/Layer4_PrioritizationEngine.js",
+    "server/deprecated/layers/Layer4_PrioritizationEngine.js",
+    "server/services/riskModelService.js",
+    "server/shared/riskConstants.js",
+    "src/lib/riskEngine.js",
+    "src/lib/constants.js",
+    "tests/regression/layer4-prioritization-engine.test.js",
+    "tests/deprecated/layer4-prioritization-engine.test.js",
+    "tests/regression/risk-engine.test.js",
+    "tests/regression/risk-model-service.test.js",
+    "tests/regression/formula-consistency.test.js"
+  ],
+  "updated_files": [
+    "server/routes/climate.js",
+    "server/layers/Layer5_AdaptationEngine.js",
+    "server/layers/Layer6_NarrativeEngine.js",
+    "src/pages/ClimateRiskLookup.jsx",
+    "src/lib/api.js",
+    "src/lib/methodologyConfig.js",
+    "tests/baselines/baseline-validation.test.js",
+    "tests/baselines/scenarios.js",
+    "tsconfig.typecheck.json",
+    "README.md",
+    "package.json"
+  ],
+  "safe_data_contract": {
+    "removed": [
+      "Layer4_PrioritizationEngine",
+      "prioritizeRisks",
+      "composite_score",
+      "urgency",
+      "priority",
+      "risk_score",
+      "WEIGHTS",
+      "LEVEL_TO_NUM",
+      "MAX_DELTAS"
+    ],
+    "added_or_preserved": [
+      "confidence",
+      "evidence",
+      "scenario",
+      "provenance",
+      "uncertainty",
+      "source_traceability",
+      "signals",
+      "adaptations",
+      "narrative"
+    ]
+  },
+  "validation_commands": [
+    "node --check server/server.js",
+    "node --check server/routes/climate.js",
+    "node --check server/layers/Layer5_AdaptationEngine.js",
+    "node --check server/layers/Layer6_NarrativeEngine.js",
+    "npm test",
+    "npm run typecheck",
+    "npm run build",
+    "npm run lint",
+    "rg active audit for removed terms"
+  ],
+  "validation_notes": [
+    "npm test required escalated execution because sandbox blocked Node test runner child process spawning with EPERM.",
+    "Active audit excludes project-memory historical notes and deprecated folders when checking removed runtime terms.",
+    "tsconfig.typecheck.json now excludes deprecated folders so deleted active wrappers are not required by archived UI/components."
+  ],
+  "known_remaining_scope": [
+    "Deprecated folders still contain archived heuristic artifacts except the removed Layer4 file; they are excluded from active validation.",
+    "Historical project-memory files still mention removed terms as sprint audit history."
+  ]
+}

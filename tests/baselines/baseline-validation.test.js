@@ -1,7 +1,7 @@
 /**
  * Baseline validation tests — reproducible scenario snapshots
  *
- * Detects silent regressions by running the full Layer2 + Layer4 pipeline
+ * Detects silent regressions by running the Layer2 signal pipeline
  * against frozen synthetic inputs and verifying the outputs match known
  * expected values.
  *
@@ -18,7 +18,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { detectSignals }   from '../../server/layers/Layer2_SignalEngine.js';
-import { prioritizeRisks } from '../../server/layers/Layer4_PrioritizationEngine.js';
 import {
   LIMA_RETAIL_SSP585,
   ICA_HEALTHCARE_SSP245,
@@ -30,11 +29,6 @@ import {
 
 function runLayer2(scenario) {
   return detectSignals(scenario.fusedData);
-}
-
-function runLayer4(scenario, layer2Output) {
-  const fusedData = scenario.fusedData;
-  return prioritizeRisks(scenario.businessRisks, fusedData);
 }
 
 // ─── SCENARIO 1: Lima / Retail / SSP585 ─────────────────────────────────────
@@ -108,20 +102,6 @@ describe('Baseline: Lima / Retail / SSP585', () => {
     if (!layer2) layer2 = runLayer2(scenario);
     const s = layer2.signals.find(x => x.signalType === 'flood_risk');
     assert.ok(s.source_traceability.responsible_endpoint.includes('GRI'));
-  });
-
-  it('Layer4 — composite_score matches expected baseline', () => {
-    if (!layer2) layer2 = runLayer2(scenario);
-    const layer4 = runLayer4(scenario, layer2);
-    const top = layer4.top_risk;
-    assert.ok(top, 'top_risk should not be null');
-    assert.ok(Math.abs(top.composite_score - scenario.expected.composite_score) <= 0.001,
-      `Expected composite_score ~${scenario.expected.composite_score}, got ${top.composite_score}`);
-  });
-
-  it('Layer4 — urgency matches expected baseline', () => {
-    const layer4 = runLayer4(scenario, null);
-    assert.equal(layer4.top_risk.urgency, scenario.expected.urgency);
   });
 
   it('Layer2 — no quantitative drought signal for short_term (prpercnt=86, cdd delta=15)', () => {
@@ -210,18 +190,6 @@ describe('Baseline: Ica / Healthcare / SSP245', () => {
     assert.equal(s.source_traceability.scenario_ssp, 'SSP245');
   });
 
-  it('Layer4 — composite_score matches expected baseline (0.915)', () => {
-    const layer4 = runLayer4(scenario, null);
-    const top = layer4.top_risk;
-    assert.ok(top);
-    assert.ok(Math.abs(top.composite_score - scenario.expected.composite_score) <= 0.001,
-      `Expected ~${scenario.expected.composite_score}, got ${top.composite_score}`);
-  });
-
-  it('Layer4 — urgency is "crítica"', () => {
-    const layer4 = runLayer4(scenario, null);
-    assert.equal(layer4.top_risk.urgency, 'crítica');
-  });
 });
 
 // ─── SCENARIO 3: Cusco / Logistics / SSP585 ──────────────────────────────────
@@ -328,18 +296,6 @@ describe('Baseline: Cusco / Logistics / SSP585', () => {
     assert.ok(landslide.source_traceability.source_origin.includes('INGEMMET'));
   });
 
-  it('Layer4 — composite_score matches expected baseline (0.915)', () => {
-    const layer4 = runLayer4(scenario, null);
-    const top = layer4.top_risk;
-    assert.ok(top);
-    assert.ok(Math.abs(top.composite_score - scenario.expected.composite_score) <= 0.001,
-      `Expected ~${scenario.expected.composite_score}, got ${top.composite_score}`);
-  });
-
-  it('Layer4 — urgency is "crítica"', () => {
-    const layer4 = runLayer4(scenario, null);
-    assert.equal(layer4.top_risk.urgency, 'crítica');
-  });
 });
 
 // ─── Cross-scenario consistency ───────────────────────────────────────────────
@@ -369,21 +325,6 @@ describe('Cross-scenario consistency', () => {
     // This validates that scenario severity affects signal detection
     assert.ok(limaCount >= icaCount,
       `Lima/SSP585 (${limaCount}) should produce >= signals than Ica/SSP245 (${icaCount})`);
-  });
-
-  it('all Layer4 results have non-null top_risk', () => {
-    for (const scenario of ALL_SCENARIOS) {
-      const { top_risk } = runLayer4(scenario, null);
-      assert.ok(top_risk !== null, `${scenario.label}: top_risk should not be null`);
-    }
-  });
-
-  it('all baseline scenarios classify as "crítica" urgency (high-risk inputs)', () => {
-    for (const scenario of ALL_SCENARIOS) {
-      const { top_risk } = runLayer4(scenario, null);
-      assert.equal(top_risk.urgency, 'crítica',
-        `${scenario.label}: expected "crítica" urgency, got "${top_risk.urgency}"`);
-    }
   });
 
   it('Cusco scenario correctly uses high-emissions SSP585 label in traceability', () => {

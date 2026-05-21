@@ -14,7 +14,6 @@ import {
 } from '../services/climateImportService.js';
 import { getGriRiskByLocation } from '../services/griRiskService.js';
 import { getTerritorialContext } from '../services/worldBankService.js';
-import { getCompleteRiskModel } from '../services/riskModelService.js';
 import { supabase } from '../supabaseClient.js';
 import { climateCache, CACHE_TTL } from '../shared/cache.js';
 
@@ -22,7 +21,6 @@ import { climateCache, CACHE_TTL } from '../shared/cache.js';
 import { fusionClimateData }  from '../layers/Layer1_ClimateDataFusion.js';
 import { detectSignals }      from '../layers/Layer2_SignalEngine.js';
 import { assessBusinessRisk } from '../layers/Layer3_BusinessRiskEngine.js';
-import { prioritizeRisks }    from '../layers/Layer4_PrioritizationEngine.js';
 import { getAdaptations }     from '../layers/Layer5_AdaptationEngine.js';
 import { generateNarrative }  from '../layers/Layer6_NarrativeEngine.js';
 
@@ -278,28 +276,6 @@ router.post('/climate-cells/upload', requireAuth, strictLimiter, async (req, res
       message: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
-  }
-});
-
-// -----------------------------------------------
-// POST /api/risk-model
-// Calcula modelo de riesgo H×E×I en el backend.
-// Body: { asset: {...}, maxArea?: number, elNinoMultiplier?: number }
-// -----------------------------------------------
-router.post('/risk-model', requireAuth, (req, res) => {
-  try {
-    const { asset, maxArea, elNinoMultiplier } = req.body;
-    if (!asset || typeof asset !== 'object') {
-      return res.status(400).json({ error: 'Se requiere el objeto "asset" en el body.' });
-    }
-    const result = getCompleteRiskModel(asset, {
-      maxArea:         maxArea         ?? 5000,
-      elNinoMultiplier: elNinoMultiplier ?? 1.0,
-    });
-    return res.json(result);
-  } catch (err) {
-    console.error('Error en /api/risk-model:', err.message);
-    return res.status(500).json({ error: 'Error al calcular el modelo de riesgo.' });
   }
 });
 
@@ -707,21 +683,45 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
       businessRiskOutput = { risks: [], overall_exposure: 'bajo', sector_key: 'otros' };
     }
 
-    // ── Capa 4: Priorización ────────────────────────────────────────────────
-    let prioritizationOutput;
-    try {
-      prioritizationOutput = prioritizeRisks(businessRiskOutput, fusedData);
-      partialResult.layer4 = 'ok';
-    } catch (err) {
-      console.error('[v2] Layer4 falló:', err.message);
-      errors.layer4 = err.message;
-      prioritizationOutput = { prioritized_risks: [], top_risk: null };
-    }
+    // ── Interpretacion contextual: riesgos descriptivos sin ranking ni scores ──
+    const contextualRisks = {
+      risks: businessRiskOutput.risks.map(risk => {
+        const trace = risk.source_traceability ?? risk.signal?.source_traceability ?? {};
+        return {
+          ...risk,
+          confidence: risk.signal?.confidence ?? trace.confidence_level ?? 'low',
+          evidence: {
+            signal_type: risk.signal?.signalType ?? null,
+            indicator: risk.signal?.indicator ?? null,
+            historical: risk.signal?.historical ?? null,
+            projected: risk.signal?.projected ?? null,
+            delta: risk.signal?.delta ?? null,
+            delta_pct: risk.signal?.delta_pct ?? null,
+            threshold: trace.threshold_applied ?? null,
+            transformation: trace.transformation_applied ?? null,
+          },
+          scenario: trace.scenario_ssp ?? (fusedData.scenario ? String(fusedData.scenario).toUpperCase() : null),
+          provenance: {
+            source_origin: trace.source_origin ?? null,
+            responsible_endpoint: trace.responsible_endpoint ?? null,
+            climate_model_badge: trace.climate_model_badge ?? null,
+            provenance_badges: trace.provenance_badges ?? [],
+          },
+          uncertainty: {
+            confidence_level: trace.confidence_level ?? risk.signal?.confidence ?? 'low',
+            note: 'Interpretacion descriptiva basada en senales detectadas; no expresa prioridad, ranking ni probabilidad de perdida.',
+          },
+        };
+      }),
+      overall_exposure: businessRiskOutput.overall_exposure,
+      sector_key: businessRiskOutput.sector_key,
+    };
+    partialResult.contextual_interpretation = 'ok';
 
     // ── Capa 5: Adaptaciones ────────────────────────────────────────────────
     let adaptationOutput;
     try {
-      adaptationOutput = getAdaptations(prioritizationOutput, sector);
+      adaptationOutput = getAdaptations(contextualRisks, sector);
       partialResult.layer5 = 'ok';
     } catch (err) {
       console.error('[v2] Layer5 falló:', err.message);
@@ -736,7 +736,7 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
         fusedData,
         signalOutput,
         businessRiskOutput,
-        prioritizationOutput,
+        contextualRisks,
         adaptationOutput,
         sector,
         lat: latNum,
@@ -757,17 +757,24 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
         distanceKm: fusedData.distanceKm,
       },
       signals:     signalOutput,
-      risks:       prioritizationOutput.prioritized_risks,
+      risks:       contextualRisks.risks,
       adaptations: adaptationOutput,
       narrative:   {
         executive_summary: narrativeOutput.executive_summary,
         key_metrics:       narrativeOutput.key_metrics,
       },
+      confidence:        narrativeOutput.confidence,
+      evidence:          narrativeOutput.evidence,
+      scenario:          fusedData.scenario,
+      provenance:        narrativeOutput.generated_from,
+      uncertainty:       narrativeOutput.uncertainty,
       gri_hazards:       fusedData.griData?.hazards ?? [],
       territorial:       fusedData.territorialData ?? null,
       metadata: {
         sector,
         scenario:     fusedData.scenario,
+        confidence:   narrativeOutput.confidence,
+        uncertainty:  narrativeOutput.uncertainty,
         generated_at: fusedData.generated_at,
         distance_km:  fusedData.distanceKm,
         data_sources: Object.entries(narrativeOutput.generated_from)

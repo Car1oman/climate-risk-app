@@ -32,7 +32,6 @@ climate-risk-app/
 │   ├── components/       # Componentes reutilizables + shadcn/ui
 │   ├── lib/
 │   │   ├── api.js        # Cliente HTTP hacia el backend
-│   │   └── riskEngine.js # Modelo H×E×I (frontend, Simulator)
 │   └── hooks/            # React Query hooks
 ├── server/
 │   ├── server.js         # Express + todas las rutas
@@ -78,16 +77,10 @@ R = (H × 0.40) + (E × 0.30) + (I × 0.30)
 | **I** (Impact) | Impacto financiero estimado | 30% |
 | **R** (Risk) | Score final normalizado 0–1 | — |
 
-### Clasificación de Riesgo
+### Interpretacion Contextual
 
-| Nivel | Rango R | Acción |
-|-------|---------|--------|
-| **Crítico** | ≥ 0.75 | Atención inmediata |
-| **Alto** | ≥ 0.50 | Implementar adaptaciones |
-| **Medio** | ≥ 0.25 | Monitoreo continuo |
-| **Bajo** | < 0.25 | Medidas estándar |
-
-**Implementación:** `server/services/riskModelService.js` (backend) y `src/lib/riskEngine.js` (frontend)
+La plataforma describe senales, tendencias, evidencia, procedencia e incertidumbre.
+No calcula rankings, prioridades ni puntajes agregados de riesgo.
 
 ---
 
@@ -144,13 +137,12 @@ POST   /api/v2/climate-risk-analysis
 Body: { "lat": -12.04, "lon": -77.03, "sector": "retail", "asset_type": "supermercado_grande" }
 ```
 
-Pipeline de 6 capas:
+Pipeline descriptivo:
 1. **Layer1**: Fusión de datos climáticos (climate_cells + GRI + Open-Meteo + World Bank)
 2. **Layer2**: Detección de señales de riesgo
-3. **Layer3**: Evaluación de riesgo de negocio (H×E×I)
-4. **Layer4**: Priorización de riesgos
-5. **Layer5**: Recomendaciones de adaptación
-6. **Layer6**: Generación de narrativa ejecutiva
+3. **Interpretacion contextual**: impactos operacionales, evidencia, procedencia e incertidumbre
+4. **Layer5**: Medidas de adaptacion descriptivas
+5. **Layer6**: Generacion de narrativa ejecutiva
 
 ### Datos Climáticos CMIP6
 
@@ -282,11 +274,9 @@ Retorna análisis completo con riesgos por horizonte
 |---------|-------|
 | `server/layers/Layer1_ClimateDataFusion.js` | Core data fusion |
 | `server/layers/Layer2_SignalEngine.js` | CMIP6 signal detection |
-| `server/layers/Layer3_BusinessRiskEngine.js` | H×E×I business risk |
-| `server/layers/Layer4_PrioritizationEngine.js` | Risk ranking |
-| `server/layers/Layer5_AdaptationEngine.js` | Adaptation recommendations |
+| `server/layers/Layer3_BusinessRiskEngine.js` | Contextual business interpretation |
+| `server/layers/Layer5_AdaptationEngine.js` | Descriptive adaptation measures |
 | `server/layers/Layer6_NarrativeEngine.js` | Executive narrative |
-| `server/services/riskModelService.js` | H×E×I scoring source of truth |
 | `server/services/climateImportService.js` | ETL pipeline |
 | `server/services/ensoService.js` | ENSO (El Niño/La Niña) data service |
 | `server/services/terrainService.js` | Terrain slope analysis service |
