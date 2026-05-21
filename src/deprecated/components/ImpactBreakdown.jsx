@@ -1,7 +1,7 @@
 /**
  * @deprecated — Sprint 1 — 2026-05-21
- * NOT_ALIGNED: Desglose financiero inventado (lostSales, staffCost, rehabCost).
- * Copia archivada en: src/deprecated/components/ImpactBreakdown.jsx
+ * NOT_ALIGNED: Muestra desglose financiero inventado (lostSales, staffCost, rehabCost).
+ * Ver: project-memory/CLEANUP_ANALYSIS.md — ImpactBreakdown.jsx — DEPRECATE
  * Eliminación física: Sprint 2 o posterior.
  */
 import { formatCurrency, calculateFinancialImpact } from "@/lib/riskEngine";
@@ -44,7 +44,6 @@ export default function ImpactBreakdown({ asset }) {
   const total = impact.total;
   const closureDays = impact.closureDays;
 
-  // Narrativa del impacto total
   const getTotalNarrative = () => {
     if (total === 0) return "No se esperan impactos financieros significativos.";
     if (total < 100000) return "Impacto financiero manejable con planes de contingencia adecuados.";

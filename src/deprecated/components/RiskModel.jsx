@@ -1,7 +1,7 @@
 /**
  * @deprecated — Sprint 1 — 2026-05-21
- * NOT_ALIGNED: Muestra R/100 del modelo H×E×I como dato científico.
- * Copia archivada en: src/deprecated/components/RiskModel.jsx
+ * NOT_ALIGNED: Muestra R/100 del modelo H×E×I como dato científico. Impacto financiero inventado.
+ * Ver: project-memory/CLEANUP_ANALYSIS.md — RiskModel.jsx — DEPRECATE
  * Eliminación física: Sprint 2 o posterior.
  */
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +24,6 @@ export default function RiskModel({ riskData, asset }) {
 
   return (
     <div className="space-y-6">
-      {/* Título Principal - Menos Técnico */}
       <div className="flex items-center gap-3">
         <AlertCircle className={cn("w-6 h-6", levelInfo.color)} />
         <div>
@@ -33,12 +32,7 @@ export default function RiskModel({ riskData, asset }) {
         </div>
       </div>
 
-      {/* Nivel de Riesgo Principal - Destacado */}
-      <div className={cn(
-        "rounded-lg p-6 border space-y-3",
-        levelInfo.bg,
-        levelInfo.border
-      )}>
+      <div className={cn("rounded-lg p-6 border space-y-3", levelInfo.bg, levelInfo.border)}>
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Nivel de Riesgo Total</p>
@@ -46,12 +40,7 @@ export default function RiskModel({ riskData, asset }) {
             <p className="text-xs text-muted-foreground mt-2">de 100 (escala de riesgo)</p>
           </div>
           <div className="text-right">
-            <Badge variant="outline" className={cn(
-              "px-4 py-2 text-sm font-semibold border",
-              levelInfo.bg,
-              levelInfo.color,
-              levelInfo.border
-            )}>
+            <Badge variant="outline" className={cn("px-4 py-2 text-sm font-semibold border", levelInfo.bg, levelInfo.color, levelInfo.border)}>
               {levelInfo.label}
             </Badge>
             <p className="text-xs text-muted-foreground mt-3">{levelInfo.advice}</p>
@@ -59,7 +48,6 @@ export default function RiskModel({ riskData, asset }) {
         </div>
       </div>
 
-      {/* Explicación: ¿Cómo se calcula? */}
       <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-4 space-y-3">
         <div className="flex items-start gap-3">
           <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
@@ -86,11 +74,9 @@ export default function RiskModel({ riskData, asset }) {
         </div>
       </div>
 
-      {/* Desglose de Factores - Amigable */}
       <div className="space-y-3">
         <p className="text-sm font-semibold text-foreground">¿Qué compone este riesgo?</p>
-        
-        {/* Factor 1: Amenazas */}
+
         <div className="bg-card border border-border rounded-lg p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Cloud className="w-5 h-5 text-sky-400" />
@@ -109,10 +95,7 @@ export default function RiskModel({ riskData, asset }) {
                     <div className="flex items-center gap-2">
                       <span className="font-semibold">{hazard.level}/4</span>
                       <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-sky-500 transition-all"
-                          style={{ width: `${(hazard.level / 4) * 100}%` }}
-                        />
+                        <div className="h-full bg-sky-500 transition-all" style={{ width: `${(hazard.level / 4) * 100}%` }} />
                       </div>
                     </div>
                   </div>
@@ -124,7 +107,6 @@ export default function RiskModel({ riskData, asset }) {
           </div>
         </div>
 
-        {/* Factor 2: Exposición */}
         <div className="bg-card border border-border rounded-lg p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Building2 className="w-5 h-5 text-amber-400" />
@@ -142,7 +124,7 @@ export default function RiskModel({ riskData, asset }) {
             </p>
             <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
               <li>Tamaño: {asset.area_m2?.toLocaleString() || "1000"} m²</li>
-              <li>Tipo: {asset.type === "Centro distribución" ? "Centro de Distribución (Alto volumen)" : 
+              <li>Tipo: {asset.type === "Centro distribución" ? "Centro de Distribución (Alto volumen)" :
                         asset.type === "supermercado_grande" ? "Supermercado Grande (Gran volumen)" :
                         asset.type === "supermercado_mediano" ? "Supermercado Mediano" : "Tienda Express"}</li>
               <li>Volumen de ventas: {asset.monthly_sales ? `S/ ${(asset.monthly_sales / 1000000).toFixed(1)}M mensuales` : "No especificado"}</li>
@@ -150,7 +132,6 @@ export default function RiskModel({ riskData, asset }) {
           </div>
         </div>
 
-        {/* Factor 3: Impacto Financiero */}
         <div className="bg-card border border-border rounded-lg p-4 space-y-3">
           <div className="flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-emerald-400" />
@@ -171,12 +152,7 @@ export default function RiskModel({ riskData, asset }) {
         </div>
       </div>
 
-      {/* Insight Narrativo - Consultivo */}
-      <div className={cn(
-        "rounded-lg p-4 border",
-        levelInfo.bg,
-        levelInfo.border
-      )}>
+      <div className={cn("rounded-lg p-4 border", levelInfo.bg, levelInfo.border)}>
         <div className="flex gap-3">
           <AlertCircle className={cn("w-5 h-5 flex-shrink-0 mt-0.5", levelInfo.color)} />
           <div className="space-y-2">
@@ -186,7 +162,6 @@ export default function RiskModel({ riskData, asset }) {
         </div>
       </div>
 
-      {/* Recomendaciones - Enfocadas en Acción */}
       {riskData.recommendations.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
@@ -221,7 +196,6 @@ export default function RiskModel({ riskData, asset }) {
         </div>
       )}
 
-      {/* Indicador de Confianza */}
       <div className="bg-muted/50 border border-border rounded-lg p-3">
         <div className="flex gap-2">
           <Info className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
@@ -231,7 +205,6 @@ export default function RiskModel({ riskData, asset }) {
         </div>
       </div>
 
-      {/* Trazabilidad metodológica */}
       <div className="flex justify-end">
         <TechnicalDetailModal asset={asset} riskData={riskData} />
       </div>

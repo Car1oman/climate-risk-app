@@ -1,9 +1,9 @@
 /**
  * @deprecated — Sprint 1 — 2026-05-21
- * NOT_ALIGNED: Simulador de escenarios H×E×I. Produce falsa precisión.
- * Copia archivada en: src/deprecated/components/Simulator.jsx
- * Exploración de escenarios futura debe basarse en SSP selector de Layer 1.
- * Eliminación física (incluyendo ruta y sidebar): Sprint 2 o posterior.
+ * NOT_ALIGNED: Simulador de escenarios H×E×I. Produce falsa precisión numérica.
+ * Ver: project-memory/CLEANUP_ANALYSIS.md — Simulator.jsx — DEPRECATE
+ * La exploración de escenarios futura debe basarse en SSP selector de Layer 1.
+ * Eliminación física: Sprint 2 o posterior.
  */
 import { useState, useEffect, useMemo } from "react";
 import { useAssets } from "@/hooks/useAssets";
@@ -87,7 +87,6 @@ export default function Simulator() {
         </p>
       </div>
 
-      {/* Slider Card */}
       {assetsError && (
         <div className="rounded-xl border border-destructive bg-destructive/10 p-4 text-sm text-destructive">
           No se pudieron cargar los activos. Comprueba la conexión con el backend.
@@ -107,14 +106,7 @@ export default function Simulator() {
           </Badge>
         </div>
         <div className="mt-4">
-          <Slider
-            value={intensity}
-            onValueChange={setIntensity}
-            min={1.0}
-            max={4.0}
-            step={0.1}
-            className="mt-2"
-          />
+          <Slider value={intensity} onValueChange={setIntensity} min={1.0} max={4.0} step={0.1} className="mt-2" />
           <div className="flex justify-between mt-2 text-[10px] text-muted-foreground">
             <span>Normal (1.0x)</span>
             <span>Moderado (1.5x)</span>
@@ -124,7 +116,6 @@ export default function Simulator() {
         </div>
       </div>
 
-      {/* Impact KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-card border border-border rounded-xl p-5">
           <p className="text-xs text-muted-foreground uppercase tracking-wider">Impacto Base</p>
@@ -142,9 +133,7 @@ export default function Simulator() {
         </div>
       </div>
 
-      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Distribution */}
         <div className="bg-card border border-border rounded-xl p-5">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-4">
             Distribución Simulada
@@ -155,9 +144,7 @@ export default function Simulator() {
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(222 30% 14%)" vertical={false} />
                 <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(210 40% 80%)" }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 10, fill: "hsl(215 20% 55%)" }} axisLine={false} tickLine={false} />
-                <Tooltip
-                  contentStyle={{ background: "hsl(222 44% 10%)", border: "1px solid hsl(222 30% 16%)", borderRadius: "8px", fontSize: "12px", color: "hsl(210 40% 96%)" }}
-                />
+                <Tooltip contentStyle={{ background: "hsl(222 44% 10%)", border: "1px solid hsl(222 30% 16%)", borderRadius: "8px", fontSize: "12px", color: "hsl(210 40% 96%)" }} />
                 <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={32}>
                   {chartData.map((entry, idx) => (
                     <Cell key={idx} fill={entry.fill} />
@@ -168,7 +155,6 @@ export default function Simulator() {
           </div>
         </div>
 
-        {/* Most Affected */}
         <div className="bg-card border border-border rounded-xl p-5">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-4">
             Activos Más Afectados

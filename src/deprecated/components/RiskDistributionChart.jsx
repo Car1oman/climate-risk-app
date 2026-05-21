@@ -1,7 +1,7 @@
 /**
  * @deprecated — Sprint 1 — 2026-05-21
- * NOT_ALIGNED: Pie chart de distribución por risk_level calculado con H×E×I.
- * Copia archivada en: src/deprecated/components/RiskDistributionChart.jsx
+ * NOT_ALIGNED: Pie chart de distribución por risk_level calculado con H×E×I. Narrativa alarmista.
+ * Ver: project-memory/CLEANUP_ANALYSIS.md — RiskDistributionChart.jsx — DEPRECATE
  * Eliminación física: Sprint 2 o posterior.
  */
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
@@ -41,7 +41,6 @@ export default function RiskDistributionChart({ assets }) {
   const criticalPercent = ((distribution.critico / total) * 100).toFixed(0);
   const highPercent = ((distribution.alto / total) * 100).toFixed(0);
 
-  // Narrativa basada en la distribución
   const getNarrative = () => {
     if (distribution.critico > 0) {
       return `Se han identificado ${distribution.critico} activo${distribution.critico > 1 ? 's' : ''} en riesgo crítico (${criticalPercent}%), lo que requiere atención inmediata para prevenir interrupciones operativas graves.`;
@@ -63,16 +62,7 @@ export default function RiskDistributionChart({ assets }) {
         <div className="w-32 h-32">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
-              <Pie
-                data={data}
-                cx="50%"
-                cy="50%"
-                innerRadius={35}
-                outerRadius={55}
-                paddingAngle={3}
-                dataKey="value"
-                strokeWidth={0}
-              >
+              <Pie data={data} cx="50%" cy="50%" innerRadius={35} outerRadius={55} paddingAngle={3} dataKey="value" strokeWidth={0}>
                 {data.map((entry, idx) => (
                   <Cell key={idx} fill={entry.color} />
                 ))}

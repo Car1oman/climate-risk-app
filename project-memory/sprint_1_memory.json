@@ -1,0 +1,100 @@
+{
+  "sprint": 1,
+  "date": "2026-05-21",
+  "build_status": "PASS",
+  "test_status": "PASS (113/113 activos)",
+  "completed": [
+    "FASE_A: Baseline documentado — build 0, lint 0, typecheck 0, tests 250/250",
+    "FASE_B: Directorios deprecated/ creados (src, server, tests)",
+    "FASE_C: Módulos heurísticos copiados a deprecated/ con wrappers re-export en originales",
+    "FASE_C: package.json actualizado — test:deprecated script creado, heurísticos excluidos de npm test",
+    "FASE_D: Mapa de dependencias generado en sprint_1_dependency_map.md",
+    "FASE_E: Validación post-move — build 0, lint 0, typecheck 0, tests activos 113/113",
+    "FASE_F: Este archivo"
+  ],
+  "moved_to_deprecated": {
+    "backend_layers": [
+      "server/deprecated/layers/Layer4_PrioritizationEngine.js"
+    ],
+    "backend_services": [
+      "server/deprecated/services/riskModelService.js"
+    ],
+    "backend_shared": [
+      "server/deprecated/shared/riskConstants.js"
+    ],
+    "frontend_lib": [
+      "src/deprecated/lib/riskEngine.js",
+      "src/deprecated/lib/constants.js"
+    ],
+    "frontend_components": [
+      "src/deprecated/components/RiskGauge.jsx",
+      "src/deprecated/components/HazardBreakdown.jsx",
+      "src/deprecated/components/ImpactBreakdown.jsx",
+      "src/deprecated/components/RiskModel.jsx",
+      "src/deprecated/components/FinancialImpactChart.jsx",
+      "src/deprecated/components/RiskDistributionChart.jsx",
+      "src/deprecated/components/Simulator.jsx"
+    ],
+    "tests": [
+      "tests/deprecated/layer4-prioritization-engine.test.js",
+      "tests/deprecated/risk-engine.test.js",
+      "tests/deprecated/risk-model-service.test.js",
+      "tests/deprecated/formula-consistency.test.js"
+    ]
+  },
+  "active_wrappers": {
+    "server/layers/Layer4_PrioritizationEngine.js": "re-export → deprecated/layers/Layer4_PrioritizationEngine.js",
+    "server/services/riskModelService.js": "re-export → deprecated/services/riskModelService.js",
+    "server/shared/riskConstants.js": "re-export → deprecated/shared/riskConstants.js",
+    "src/lib/riskEngine.js": "re-export → deprecated/lib/riskEngine.js",
+    "src/lib/constants.js": "re-export → deprecated/lib/constants.js"
+  },
+  "remaining_imports": {
+    "riskEngine_consumers_active": [
+      "src/pages/RiskMap.jsx (getRiskColor, formatCurrency) — ALIGNED, necesita migrar a utils.js",
+      "src/pages/DataManagement.jsx (formatCurrency) — ALIGNED, necesita migrar a utils.js",
+      "src/pages/Report.jsx (formatCurrency) — PARTIAL/REFACTOR",
+      "src/pages/Dashboard.jsx (formatCurrency) — REFACTOR pendiente",
+      "src/pages/Assets.jsx (getRiskColor, formatCurrency) — REFACTOR pendiente",
+      "src/pages/AssetDetail.jsx (formatCurrency, getRiskColor) — REFACTOR pendiente",
+      "src/components/dashboard/TopRisksTable.jsx (getRiskColor, formatCurrency) — REFACTOR pendiente",
+      "src/components/assets/RiskGauge.jsx (getRiskColor) — DEPRECATED (marcado)",
+      "src/components/assets/ImpactBreakdown.jsx (formatCurrency, calculateFinancialImpact) — DEPRECATED",
+      "src/components/dashboard/FinancialImpactChart.jsx (formatCurrency) — DEPRECATED"
+    ],
+    "constants_consumers_active": [
+      "src/components/assets/HazardBreakdown.jsx (HAZARD_LABELS, HAZARD_WEIGHTS, HORIZON, HORIZON_LABELS) — DEPRECATED",
+      "src/components/climate/TechnicalDetailModal.jsx (HAZARD_LABELS, HAZARD_WEIGHTS) — ALIGNED! Debe revisarse en Sprint 2"
+    ],
+    "layer4_pipeline_consumers": [
+      "server/routes/climate.js:25 — prioritizeRisks en pipeline v2 (Layer3→Layer4→Layer5→Layer6)"
+    ],
+    "riskModelService_consumers": [
+      "server/routes/climate.js:17,295 — getCompleteRiskModel en GET /api/climate-risks/lookup"
+    ]
+  },
+  "blocked_by": [
+    "Layer4 físicamente no puede eliminarse hasta refactorizar el pipeline v2 (Layer5 y Layer6 dependen)",
+    "src/lib/riskEngine.js wrapper no puede eliminarse hasta migrar formatCurrency y getRiskColor a utils.js",
+    "src/lib/constants.js wrapper no puede eliminarse hasta revisar TechnicalDetailModal.jsx (ALIGNED)",
+    "Simulator.jsx aún presente en router y sidebar — pendiente para Sprint 2"
+  ],
+  "next_sprint_targets": [
+    "Migrar formatCurrency y getRiskColor a src/lib/utils.js",
+    "Actualizar todos los importadores activos de riskEngine (RiskMap, DataManagement, Report, Dashboard, Assets, AssetDetail, TopRisksTable) para usar utils.js",
+    "Resolver TechnicalDetailModal.jsx — remover dependencia de HAZARD_WEIGHTS o alimentar desde datos Layer2",
+    "Eliminar Simulator.jsx del router (src/App.jsx) y del Sidebar",
+    "Añadir _heuristic_warning en respuesta de POST /api/v2/climate-risk-analysis (Layer4)",
+    "Añadir _deprecated: true en GET /api/climate-risks/lookup",
+    "Refactorizar Dashboard.jsx — eliminar FinancialImpactChart y RiskDistributionChart, reemplazar KPIs heurísticos",
+    "Refactorizar Assets.jsx — eliminar columna financial_impact",
+    "Refactorizar AssetDetail.jsx — eliminar RiskGauge, HazardBreakdown, ImpactBreakdown, RiskModel",
+    "Refactorizar TopRisksTable.jsx — eliminar score numérico y financial_impact"
+  ],
+  "known_issues": [
+    "TechnicalDetailModal.jsx (ALIGNED) importa HAZARD_WEIGHTS de constants.js (DEPRECATED) — acoplamiento no detectado en auditoría inicial",
+    "RiskMap.jsx (ALIGNED) importa de riskEngine.js (DEPRECATED) — solo usa formatCurrency/getRiskColor (utilidades puras)",
+    "DataManagement.jsx (ALIGNED) importa de riskEngine.js (DEPRECATED) — solo usa formatCurrency",
+    "tests/baselines/baseline-validation.test.js sigue probando Layer4 composite_score — los tests pasan porque Layer4 wrapper funciona; actualizar en Sprint 2 para remover referencias a Layer4"
+  ]
+}

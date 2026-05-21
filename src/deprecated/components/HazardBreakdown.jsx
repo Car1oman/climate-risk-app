@@ -1,7 +1,7 @@
 /**
  * @deprecated — Sprint 1 — 2026-05-21
- * NOT_ALIGNED: Muestra pesos H×E×I como si fueran datos científicos.
- * Copia archivada en: src/deprecated/components/HazardBreakdown.jsx
+ * NOT_ALIGNED: Muestra pesos H×E×I y niveles 0-4 como si fueran datos científicos.
+ * Ver: project-memory/CLEANUP_ANALYSIS.md — HazardBreakdown.jsx — DEPRECATE
  * Eliminación física: Sprint 2 o posterior.
  */
 import { HAZARD_LABELS, HAZARD_WEIGHTS, HORIZON, HORIZON_LABELS } from "@/lib/constants";
@@ -43,7 +43,6 @@ export default function HazardBreakdown({ asset }) {
         const horizon = HORIZON[key];
         const description = HAZARD_DESCRIPTIONS[key] || "Amenaza climática identificada";
 
-        // Narrativa basada en el nivel
         const getNarrative = () => {
           if (level === 0) return "No representa un riesgo significativo para esta ubicación.";
           if (level === 1) return "Riesgo bajo pero presente. Mantener monitoreo básico.";

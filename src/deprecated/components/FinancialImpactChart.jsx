@@ -1,7 +1,7 @@
 /**
  * @deprecated — Sprint 1 — 2026-05-21
  * NOT_ALIGNED: Visualiza financial_impact por distrito (campo heurístico H×E×I).
- * Copia archivada en: src/deprecated/components/FinancialImpactChart.jsx
+ * Ver: project-memory/CLEANUP_ANALYSIS.md — FinancialImpactChart.jsx — DEPRECATE
  * Eliminación física: Sprint 2 o posterior.
  */
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
@@ -23,7 +23,6 @@ export default function FinancialImpactChart({ assets }) {
   const topDistrict = data[0]?.name || "N/A";
   const topImpact = data[0]?.value || 0;
 
-  // Narrativa
   const getNarrative = () => {
     if (totalImpact === 0) {
       return "No se han identificado impactos financieros significativos en el portafolio actual.";

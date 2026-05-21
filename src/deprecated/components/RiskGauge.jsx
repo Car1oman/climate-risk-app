@@ -1,7 +1,7 @@
 /**
  * @deprecated — Sprint 1 — 2026-05-21
- * NOT_ALIGNED: SVG gauge 0-100 basado en modelo H×E×I.
- * Copia archivada en: src/deprecated/components/RiskGauge.jsx
+ * NOT_ALIGNED: SVG gauge 0-100 basado en R del modelo H×E×I — scoring corporativo con precisión falsa.
+ * Ver: project-memory/CLEANUP_ANALYSIS.md — RiskGauge.jsx — DEPRECATE
  * Eliminación física: Sprint 2 o posterior.
  */
 import { cn } from "@/lib/utils";
