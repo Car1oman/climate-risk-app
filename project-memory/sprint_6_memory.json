@@ -1,0 +1,168 @@
+{
+  "sprint": 6,
+  "date": "2026-05-22",
+  "title": "Scientific Domain Model — Climate Intelligence Platform",
+  "build_status": "PASS",
+  "typecheck_status": "PASS",
+  "objective": "Crear el modelo de dominio científico oficial de la plataforma: entidades tipadas, estructura canónica de señal, taxonomía de tipos de señal y registro de evidencia con trazabilidad completa.",
+
+  "completed_phases": {
+    "FASE_A": {
+      "title": "Definición de 8 entidades científicas",
+      "file": "src/types/domain.d.ts",
+      "description": "Reemplaza el antiguo ClimateRisk heurístico con 8 entidades científicas documentadas, más tipos de taxonomía y el shape de respuesta API v2.",
+      "entities_defined": [
+        "UncertaintyMetadata — spread_type, p10, p90, spread_note, model_count",
+        "ScientificEvidence — id, dataset, institution, citation, temporal_coverage, spatial_resolution, scientific_validity, limitations[]",
+        "ClimateSignal — estructura canónica FASE B + campos extendidos Layer2 (backward-compatible)",
+        "SignalTraceability — shape completo del source_traceability de Layer2",
+        "HistoricalEvent — baseline observado con evidencia adjunta",
+        "ClimateProjection — valor proyectado + incertidumbre + evidencia por horizonte/escenario",
+        "TopographicContext — SRTM terrain intelligence: elevación, pendiente, susceptibilidad",
+        "NarrativeFragment — texto narrativo estructurado por sección con data_basis",
+        "AdaptationMeasure — medida concreta con id estable, referencias IPCC AR6 WG2/TCFD",
+        "ClimateAnalysisResponse — shape oficial del response de POST /api/v2/climate-risk-analysis"
+      ],
+      "taxonomy_types_added": [
+        "SignalType — union literal de 10 tipos canónicos",
+        "SignalCategory — temperature | precipitation | hydrology | terrain | climate_mode",
+        "ObservationMode — observed | projected",
+        "TemporalHorizon — historical | short_term | mid_term | long_term",
+        "SSPScenario — SSP1-2.6 | SSP2-4.5 | SSP5-8.5 | N/A",
+        "ConfidenceLevel — high | medium | low",
+        "ValidationStatus — validated | provisional | experimental"
+      ]
+    },
+
+    "FASE_B": {
+      "title": "Estructura canónica de señal (standard signal structure)",
+      "file": "server/scientific/domain.js — buildCanonicalSignal()",
+      "description": "buildCanonicalSignal() mapea un signal de Layer2 a la estructura FASE B: signal_type, category, observed_or_projected, value, unit, temporal_window, scenario, source, confidence, uncertainty, threshold_reference, geographic_scope. Backward-compatible: preserva todos los campos originales de Layer2.",
+      "canonical_fields": [
+        "signal_type — clave canónica de taxonomía (e.g. 'extreme_heat')",
+        "category — agrupación temática (temperature / precipitation / hydrology / terrain / climate_mode)",
+        "observed_or_projected — origen del valor ('observed' | 'projected')",
+        "value — valor proyectado (o observado) del indicador primario",
+        "unit — unidad física (days/year, °C, mm, probability)",
+        "temporal_window — horizonte temporal (historical / short_term / mid_term / long_term)",
+        "scenario — escenario SSP (SSP1-2.6 / SSP2-4.5 / SSP5-8.5 / N/A)",
+        "source — nombre corto de la fuente (e.g. 'CMIP6 CCKP', 'NOAA CPC')",
+        "confidence — high / medium / low",
+        "uncertainty — UncertaintyMetadata con p10/p90/spread_note/model_count",
+        "threshold_reference — definición científica del umbral excedido",
+        "geographic_scope — alcance geográfico del dato subyacente"
+      ]
+    },
+
+    "FASE_C": {
+      "title": "Taxonomía de tipos de señal — sin duplicidades semánticas",
+      "file": "server/scientific/domain.js — SIGNAL_TAXONOMY",
+      "description": "10 tipos canónicos cubriendo todos los fenómenos reales detectados por Layer2. Una entrada = un fenómeno real. Resuelve la ambigüedad landslide_risk (Layer2 legacy) → landslide_susceptibility (canónico).",
+      "signal_types": {
+        "temperature": [
+          "extreme_heat — hd35 > 35°C: +10d/+20d vs baseline (IPCC AR6 WG1 Table 11.1)",
+          "severe_heat — hd40 > 40°C: +5d vs baseline (IPCC AR6 WG1 SPM B.2)",
+          "tropical_nights — Tmin > 20°C: +10d/+20d vs baseline (IPCC AR6 WG1 Ch.11.3/ETCCDI)",
+          "temp_increase — delta tas > 1.5°C / 2.5°C (Paris Agreement / IPCC AR6 SPM A.1)"
+        ],
+        "precipitation": [
+          "drought — CDD +15d o prpercnt < -15% (IPCC AR6 WG2 Ch.4.2 / WMO 2023)",
+          "extreme_rain — Rx5day +20% o Rx1day > 50mm (IPCC AR6 WG1 Ch.11.4 / WMO 2023)"
+        ],
+        "hydrology": [
+          "flood_risk — GRI+WRI probabilidad > 0.35 (GRI Oxford / WRI Aqueduct 4.0)"
+        ],
+        "terrain": [
+          "landslide_susceptibility — slope > 15°-30° (INGEMMET 2021; Layer2 legacy key: landslide_risk)",
+          "huayco_risk — slope > 20° en zonas de drenaje convergente (SENAMHI / INGEMMET)"
+        ],
+        "climate_mode": [
+          "enso_phase — ONI > ±0.5°C por ≥3 temporadas (NOAA CPC; Layer2 key: enso_phase)"
+        ]
+      },
+      "helpers_exported": [
+        "getSignalMeta(signalType) — devuelve entrada de taxonomía (acepta keys canónicos y legacy)",
+        "getSignalsByCategory(category) — lista de signal types por categoría",
+        "isKnownSignalType(signalType) — validación contra taxonomía"
+      ]
+    },
+
+    "FASE_D": {
+      "title": "Evidence Registry — proveniencia completa por fuente",
+      "file": "server/scientific/domain.js — EVIDENCE_REGISTRY",
+      "description": "7 registros de evidencia con todos los campos requeridos. Cada limitación es explícita y específica al contexto de la plataforma (Perú/costa andina).",
+      "evidence_sources": [
+        "CMIP6_CCKP — World Bank CCKP / PCMDI; 49+ GCMs; 1980-2059; ~25km; validated",
+        "GRI_OXFORD — Oxford OPSIS / GRI Consortium; 1980-2080 ISIMIP2b; ~1km; validated",
+        "WRI_AQUEDUCT — WRI/Deltares/Utrecht; 1980-2080 RCP8.5; ~1km; validated",
+        "NOAA_ENSO — NOAA CPC / NCEI; 1950-present; basin-scale ONI; validated",
+        "NASA_SRTM — NASA/JPL/NGA; 2000 single acquisition; 30m; provisional",
+        "OPEN_METEO — Open-Meteo/CMIP6; 1950-2050; ~25km; provisional (fallback only)",
+        "WORLD_BANK — World Bank Development Indicators; 1960-present; country/subnational; validated"
+      ],
+      "fields_per_source": [
+        "id, dataset, institution, citation, temporal_coverage{start_year,end_year?,label}, spatial_resolution, scientific_validity, limitations[]"
+      ],
+      "helpers_exported": [
+        "getEvidence(evidenceId) — lookup por ID",
+        "getEvidenceForSignal(signalType) — primary + secondary evidence para un tipo de señal"
+      ]
+    }
+  },
+
+  "files_created": [
+    "server/scientific/domain.js — módulo de dominio científico del servidor (SIGNAL_TAXONOMY + EVIDENCE_REGISTRY + buildCanonicalSignal + helpers)"
+  ],
+
+  "files_modified": [
+    "src/types/domain.d.ts — reemplazado ClimateRisk heurístico; 8 entidades científicas + tipos de taxonomía + ClimateAnalysisResponse"
+  ],
+
+  "architecture_additions": {
+    "server_scientific_domain": {
+      "path": "server/scientific/domain.js",
+      "role": "Fuente de verdad para la semántica del dominio. Ninguna capa computa — solo referencia.",
+      "pattern": "Pure data module — no I/O, no side effects, fully importable by any layer",
+      "exports": [
+        "SIGNAL_TAXONOMY (const)",
+        "EVIDENCE_REGISTRY (const)",
+        "buildCanonicalSignal(layer2Signal, fusedData)",
+        "getSignalMeta(signalType)",
+        "getEvidence(evidenceId)",
+        "getEvidenceForSignal(signalType)",
+        "getSignalsByCategory(category)",
+        "isKnownSignalType(signalType)"
+      ]
+    },
+    "typescript_domain": {
+      "path": "src/types/domain.d.ts",
+      "role": "Contrato de tipos compartido entre frontend y documentación de server via JSDoc"
+    }
+  },
+
+  "backward_compatibility": {
+    "Layer2_signals_unchanged": true,
+    "layer2_signalType_keys_still_emitted": [
+      "extreme_heat", "severe_heat", "tropical_nights", "temp_increase",
+      "drought", "extreme_rain", "flood_risk", "landslide_risk", "huayco_risk", "enso_phase"
+    ],
+    "note": "buildCanonicalSignal() normaliza landslide_risk → landslide_susceptibility. Layer2 no fue modificado en este sprint.",
+    "frontend_components_unchanged": true
+  },
+
+  "known_remaining_scope": [
+    "Layer2 puede importar buildCanonicalSignal() para emitir canonical ClimateSignals en el response — próximo sprint.",
+    "Tests unitarios para SIGNAL_TAXONOMY y EVIDENCE_REGISTRY (validar presencia de todos los campos).",
+    "ClimateRiskLookup sigue usando endpoint legacy — pendiente migración a v2 (sprint anterior, aún vigente).",
+    "TerrainContextCard: conectar con v2 analysis (sprint anterior, aún vigente).",
+    "Long-term (2060+) es extrapolación lineal desde SSP5-8.5 2040-2059 — documentado en SCIENTIFIC_METHODOLOGY.md."
+  ],
+
+  "platform_identity": {
+    "name": "Climate Intelligence Platform",
+    "tagline": "Inteligencia climática basada en evidencia y trazabilidad",
+    "approach": "Descriptivo — señales, tendencias, evidencia e incertidumbre. Sin scores, urgencia ni pérdidas económicas automáticas.",
+    "domain_model_version": "Sprint 6 — Scientific Domain Model",
+    "primary_references": ["IPCC AR6 WG1/WG2", "CMIP6 CCKP", "GRI Oxford", "WRI Aqueduct 4.0", "NOAA CPC ONI", "NASA SRTM", "World Bank", "SENAMHI Perú", "INGEMMET Perú"]
+  }
+}
