@@ -1,0 +1,80 @@
+{
+  "sprint": 4,
+  "date": "2026-05-22",
+  "title": "Eliminacion H×E×I y Financial Heuristics",
+  "build_status": "PASS",
+  "lint_status": "PASS",
+  "typecheck_status": "PASS",
+  "test_status": "PASS (105/105 activos)",
+  "objective": "Eliminar completamente riskModelService, calculateRiskScore, calculateFinancialImpact, REHAB_FACTOR, CLOSURE_DAYS, TYPE_FACTOR y HAZARD_WEIGHTS. Purgar directorios deprecated/ completos.",
+  "completed": [
+    "FASE_A: Todos los archivos de directorios deprecated/ eliminados — server/deprecated, src/deprecated, tests/deprecated vaciados y removidos",
+    "FASE_A: 17 archivos eliminados: riskModelService.js, riskConstants.js, riskEngine.js, constants.js, Simulator.jsx, ImpactBreakdown.jsx, HazardBreakdown.jsx, FinancialImpactChart.jsx, RiskDistributionChart.jsx, RiskGauge.jsx, RiskModel.jsx, formula-consistency.test.js, risk-engine.test.js, risk-model-service.test.js y READMEs",
+    "FASE_A: Directorios deprecated/ removidos completamente: server/deprecated, src/deprecated, tests/deprecated",
+    "FASE_B: HXE_FORMULA removido de src/lib/methodologyConfig.js — constante documentaba formula H×E×I obsoleta (R = H×0.40 + E×0.30 + I×0.30)",
+    "FASE_B: No se encontraron frases narrativas heuristicas activas (perdidas estimadas, urgencia critica, impacto economico, reduccion esperada) en archivos activos",
+    "FASE_C: npm test — 105/105 PASS",
+    "FASE_C: npx tsc -p tsconfig.typecheck.json — 0 errores",
+    "FASE_C: npx eslint . --quiet — 0 warnings",
+    "FASE_C: npx vite build — exit 0, dist/index.html + dist/assets generados"
+  ],
+  "deleted_files": [
+    "server/deprecated/services/riskModelService.js",
+    "server/deprecated/shared/riskConstants.js",
+    "server/deprecated/README.md",
+    "server/deprecated/layers/ (directorio vacio)",
+    "src/deprecated/lib/constants.js",
+    "src/deprecated/lib/riskEngine.js",
+    "src/deprecated/components/Simulator.jsx",
+    "src/deprecated/components/ImpactBreakdown.jsx",
+    "src/deprecated/components/HazardBreakdown.jsx",
+    "src/deprecated/components/FinancialImpactChart.jsx",
+    "src/deprecated/components/RiskDistributionChart.jsx",
+    "src/deprecated/components/RiskGauge.jsx",
+    "src/deprecated/components/RiskModel.jsx",
+    "src/deprecated/README.md",
+    "tests/deprecated/formula-consistency.test.js",
+    "tests/deprecated/risk-engine.test.js",
+    "tests/deprecated/risk-model-service.test.js",
+    "tests/deprecated/README.md"
+  ],
+  "deleted_directories": [
+    "server/deprecated/",
+    "src/deprecated/",
+    "tests/deprecated/"
+  ],
+  "updated_files": [
+    "src/lib/methodologyConfig.js — HXE_FORMULA export eliminado"
+  ],
+  "safe_data_contract": {
+    "permanently_removed": [
+      "riskModelService",
+      "calculateRiskScore",
+      "calculateFinancialImpact",
+      "REHAB_FACTOR",
+      "CLOSURE_DAYS",
+      "TYPE_FACTOR",
+      "HAZARD_WEIGHTS",
+      "HXE_FORMULA",
+      "deprecated/ directories"
+    ],
+    "preserved_active": [
+      "FINANCIAL_RANGES en Layer3_BusinessRiskEngine.js (rangos USD/año por señal × sector, basados en TCFD Guidance)",
+      "financial_impact_range en scenarios.js y API v2 (rango min/max científico, no fórmula heurística)",
+      "confidence, evidence, scenario, provenance, uncertainty, signals, adaptations, narrative"
+    ],
+    "nota": "FINANCIAL_RANGES en Layer3 es contexto científico TCFD — no es H×E×I. Conservado intencionalmente."
+  },
+  "validation_commands": [
+    "node --test tests/regression/layer2-signal-engine.test.js tests/baselines/baseline-validation.test.js",
+    "npx tsc -p ./tsconfig.typecheck.json",
+    "npx eslint . --quiet",
+    "npx vite build"
+  ],
+  "known_remaining_scope": [
+    "No quedan directorios deprecated/ en el proyecto.",
+    "No quedan referencias a H×E×I heuristics en archivos activos.",
+    "test:deprecated script en package.json apunta a archivos ya eliminados — puede limpiarse en sprint siguiente si se desea.",
+    "FINANCIAL_RANGES en Layer3 conservado como referencia TCFD legítima (no heurística)."
+  ]
+}

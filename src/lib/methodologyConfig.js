@@ -152,36 +152,6 @@ export const TEMPORAL_HORIZONS = [
   },
 ];
 
-export const HXE_FORMULA = {
-  title: "Fórmula H×E×I — Portfolio de Activos Registrados",
-  reference: "IPCC AR5/AR6 · Risk = f(Hazard, Exposure, Vulnerability)",
-  formula: "R = (H × 0.40) + (E × 0.30) + (I × 0.30)",
-  scale: "[0, 1]",
-  components: [
-    {
-      key: "H",
-      label: "Peligro (Hazard)",
-      weight: "40%",
-      description:
-        "Suma ponderada de peligros. Inundación 30%, El Niño 25%, Sismo 20%, Deslizamiento 15%, Sequía 10%.",
-    },
-    {
-      key: "E",
-      label: "Exposición",
-      weight: "30%",
-      description:
-        "Área del activo normalizada por tipo (centro distribución, supermercado grande/mediano, tienda express).",
-    },
-    {
-      key: "I",
-      label: "Impacto financiero",
-      weight: "30%",
-      description:
-        "Estimado como: ventas perdidas + personal + logística + rehabilitación física. Normalizado contra USD 20M.",
-    },
-  ],
-};
-
 export const ANALYSIS_LIMITATIONS = [
   "La plataforma describe señales y tendencias; no calcula prioridad, ranking ni puntaje agregado.",
   "La interpretación contextual no modela interacciones no lineales (ej. calor + sequía simultáneos).",
