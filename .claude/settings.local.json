@@ -59,7 +59,12 @@
       "Bash(PATH='D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64:__TRACKED_VAR__' node --version)",
       "Bash(PATH='D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64:__TRACKED_VAR__' npm run build)",
       "Bash(PATH='D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64:__TRACKED_VAR__' npx vite build)",
-      "Bash(PATH='D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64:__TRACKED_VAR__' npx vitest run --reporter=verbose)"
+      "Bash(PATH='D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64:__TRACKED_VAR__' npx vitest run --reporter=verbose)",
+      "Bash(\"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\" --test tests/frontend/normalizeRisks.test.js)",
+      "Bash(\"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\" node_modules/.bin/vite build)",
+      "Bash(\"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\" node_modules/vite/bin/vite.js build)",
+      "Bash(echo \"Exit: $?\")",
+      "PowerShell(cd \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\"; $output = & \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\" node_modules/vite/bin/vite.js build 2>&1; $exitCode = $LASTEXITCODE; Write-Output \"Exit: $exitCode\"; Write-Output $output)"
     ],
     "additionalDirectories": [
       "d:\\Usuarios\\PM75161698\\Desktop\\datarisk\\climate-risk-app"

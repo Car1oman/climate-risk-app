@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { toast } from "sonner";
 
 import { analyzeClimateRisk, fetchDocumentContext, fetchTerritorialContext } from "@/lib/api";
 import MethodologyPanel from "@/components/climate/MethodologyPanel";
+import { normalizeRisks, buildExecutiveSummary } from "@/domain/normalizeRisks";
 
 import { SECTORS } from "@/features/climate-lookup/constants";
 import MapView               from "@/features/climate-lookup/components/MapView";
@@ -87,6 +88,31 @@ export default function ClimateRiskLookup() {
       setLoading(false);
     }
   };
+
+  // Normalized risk model — computed from raw API response.
+  // consolidatedRisks[] is the source of truth for Sprint 15+ UI components.
+  // The existing panels (SignalsPanel, RisksPanel, GRIThreatsPanel) still
+  // consume analysis directly during the transition period.
+  const consolidatedRisks = useMemo(() => {
+    if (!analysis) return [];
+    try {
+      return normalizeRisks(analysis);
+    } catch (err) {
+      if (import.meta.env.DEV) console.error('[ClimateRiskLookup] normalizeRisks failed:', err);
+      return [];
+    }
+  }, [analysis]);
+
+  const executiveSummary = useMemo(() => {
+    if (!consolidatedRisks.length) return null;
+    const location = analysis?.location;
+    const locationLabel = location?.city
+      ? `${location.city}${location.country ? ', ' + location.country : ''}`
+      : 'la ubicación seleccionada';
+    const sectorObj = SECTORS.find(s => s.value === sector);
+    const sectorLabel = sectorObj?.label ?? sector;
+    return buildExecutiveSummary(consolidatedRisks, locationLabel, sectorLabel);
+  }, [consolidatedRisks, analysis, sector]);
 
   const hasResults = !!analysis;
 
@@ -171,6 +197,30 @@ export default function ClimateRiskLookup() {
 
           {hasResults && !loading && (
             <>
+              {/* Sprint 14: consolidated risk preview (non-destructive) */}
+              {consolidatedRisks.length > 0 && executiveSummary && (
+                <Card className="border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10">
+                  <CardContent className="pt-4 pb-4 space-y-3">
+                    <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide">
+                      Resumen normalizado · {consolidatedRisks.length} riesgo{consolidatedRisks.length !== 1 ? 's' : ''} consolidado{consolidatedRisks.length !== 1 ? 's' : ''}
+                    </p>
+                    <p className="text-sm text-foreground leading-relaxed">{executiveSummary}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {consolidatedRisks.map(r => (
+                        <span
+                          key={r.id}
+                          className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border bg-background text-foreground"
+                        >
+                          {r.displayName}
+                          <span className="text-muted-foreground">·</span>
+                          <span className="text-muted-foreground">{r.period.replace('_', ' ')}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               <NarrativePanel
                 narrative={analysis.narrative}
                 location={analysis.location}
