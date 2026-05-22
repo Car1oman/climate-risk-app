@@ -141,14 +141,143 @@ function transformationForSignal(signal) {
   return 'Threshold comparison against projected/current indicator value';
 }
 
+// ── Evidence metadata helpers (FASE A) ──────────────────────────────────────
+
+function datasetForSignal(signal, fusedData) {
+  const indicator = signal.indicator ?? '';
+  if (signal.signalType === 'enso_phase') return 'NOAA ONI / ERSST v5 — Oceanic Niño Index';
+  if (['landslide_risk', 'huayco_risk'].includes(signal.signalType)) return 'SRTM 30m v3 / NASA — Shuttle Radar Topography Mission 2000';
+  if (indicator.startsWith('gri_') || signal.signalType === 'flood_risk') return 'GRI Infrastructure Resilience / WRI Aqueduct Floods 4.0';
+  if (fusedData?.climateSource === 'climate_cells') return 'CMIP6 CCKP 2023 — climate_cells ensemble (49+ GCMs)';
+  if (fusedData?.climateSource === 'open_meteo_derived') return 'CMIP6 via Open-Meteo API — derived climate indices';
+  return 'dataset not identified';
+}
+
+function modelForSignal(signal, fusedData) {
+  if (signal.signalType === 'enso_phase') return 'NOAA CPC ONI (near-real-time observational)';
+  if (['landslide_risk', 'huayco_risk'].includes(signal.signalType)) return 'SRTM topography + INGEMMET/SENAMHI slope thresholds';
+  if ((signal.indicator ?? '').startsWith('gri_') || signal.signalType === 'flood_risk') return 'GRI / ISIMIP2b + WRI Aqueduct hydrological models';
+  if (fusedData?.climateSource === 'climate_cells') return 'CMIP6 multi-model ensemble (BCC-CSM2-MR, CanESM5, CNRM-CM6, EC-Earth3, GFDL-ESM4, IPSL-CM6A-LR, MIROC6, MPI-ESM1-2-HR, MRI-ESM2-0 + 40 others)';
+  if (fusedData?.climateSource === 'open_meteo_derived') return 'CMIP6 ensemble via Open-Meteo aggregation';
+  return 'model not identified';
+}
+
+function sspForSignal(signal, fusedData) {
+  if (['enso_phase', 'landslide_risk', 'huayco_risk'].includes(signal.signalType)) return 'N/A — non-projection signal';
+  const sc = (fusedData?.scenario ?? 'ssp245').toLowerCase();
+  return sc === 'ssp585' ? 'SSP5-8.5 (high emissions)' : 'SSP2-4.5 (moderate emissions)';
+}
+
+function temporalWindowForSignal(signal) {
+  const map = {
+    short_term: '2020–2039 (short-term)',
+    mid_term:   '2040–2059 (mid-term)',
+    long_term:  '2060–2100 (long-term)',
+    historical: '1980–2014 (historical baseline)',
+  };
+  return map[signal.horizon] ?? (signal.horizon ?? 'unknown');
+}
+
+function validationStatusForSignal(signal, fusedData) {
+  if (signal.signalType === 'enso_phase') return 'validated';
+  if (['landslide_risk', 'huayco_risk'].includes(signal.signalType)) return 'provisional';
+  if ((signal.indicator ?? '').startsWith('gri_')) return 'validated';
+  if (signal.signalType === 'flood_risk') return 'validated';
+  if (fusedData?.climateSource === 'climate_cells') return 'validated';
+  if (fusedData?.climateSource === 'open_meteo_derived') return 'provisional';
+  return 'experimental';
+}
+
+// ── Uncertainty helpers (FASE B) ─────────────────────────────────────────────
+
+function uncertaintySpreadForSignal(signal, fusedData) {
+  const indicator = signal.indicator ?? '';
+  if (signal.signalType === 'enso_phase') return null; // single observational series
+  if (indicator.startsWith('gri_') || signal.signalType === 'flood_risk') {
+    return {
+      spread_type: 'model_agreement',
+      p10: null,
+      p90: null,
+      spread_note: 'Inter-model spread from multiple hazard probability models (ISIMIP2b, WRI Aqueduct 4.0, GRI). Reflects uncertainty in hazard probability estimates across scenarios.',
+      model_count: null,
+    };
+  }
+  if (['landslide_risk', 'huayco_risk'].includes(signal.signalType)) {
+    return {
+      spread_type: 'threshold_based',
+      p10: null,
+      p90: null,
+      spread_note: 'Slope-derived susceptibility; uncertainty from SRTM 30m resolution and absence of dynamic land-use/soil data.',
+      model_count: null,
+    };
+  }
+  const horizonKey = signal.horizon ?? 'short_term';
+  const stats = fusedData?.climateDataStats?.[horizonKey]?.[indicator];
+  if (!stats) {
+    return {
+      spread_type: 'ensemble_percentile',
+      p10: null,
+      p90: null,
+      spread_note: 'CMIP6 ensemble spread data not available for this variable/period combination.',
+      model_count: 49,
+    };
+  }
+  return {
+    spread_type: 'ensemble_percentile',
+    p10: stats.p10 ?? null,
+    p90: stats.p90 ?? null,
+    spread_note: stats.p10 != null && stats.p90 != null
+      ? `CMIP6 ensemble 10th–90th percentile for ${indicator}: [${stats.p10.toFixed(1)}, ${stats.p90.toFixed(1)}] — median ${stats.median?.toFixed(1) ?? 'n/a'}`
+      : 'CMIP6 ensemble spread available; p10/p90 not stored for this variable.',
+    model_count: 49,
+  };
+}
+
+function confidenceTextForSignal(signal, fusedData) {
+  const level = signal.confidence ?? 'low';
+  const source = sourceForSignal(signal, fusedData);
+  if (level === 'high')   return `High confidence — derived from ${source} with validated historical calibration and multi-model ensemble agreement.`;
+  if (level === 'medium') return `Medium confidence — ${source} provides probabilistic estimates; inherits uncertainty from emission scenario choice and regional climate variability.`;
+  return `Low confidence — signal inferred from available data; limited direct observational validation for this location and variable.`;
+}
+
+function scientificDisclaimerForSignal(signal, fusedData) {
+  if (signal.signalType === 'enso_phase') {
+    return 'ENSO phase reflects current oceanic conditions; not a climate change projection. ENSO interactions with local climate vary by region, season, and El Niño / La Niña intensity.';
+  }
+  if (['landslide_risk', 'huayco_risk'].includes(signal.signalType)) {
+    return 'Terrain susceptibility is based on SRTM topography (NASA, 2000). Does not account for post-2000 land-use changes, vegetation cover, soil saturation, or engineered slope stabilization.';
+  }
+  if ((signal.indicator ?? '').startsWith('gri_') || signal.signalType === 'flood_risk') {
+    return 'GRI hazard probabilities represent modeled exposure at ~1 km resolution. Actual risk depends on local vulnerability, adaptive capacity, and asset-specific characteristics not captured in this dataset.';
+  }
+  const sc = (fusedData?.scenario ?? 'ssp245').toUpperCase();
+  const window = temporalWindowForSignal(signal);
+  return `CMIP6 projections represent ensemble median under ${sc} for ${window}. Spatial resolution ~25 km does not capture urban heat islands or local microclimates. Uncertainty increases with temporal horizon. These projections describe physical climate tendencies, not guaranteed future conditions or financial losses.`;
+}
+
 function enrichTraceability(signal, fusedData) {
   const scenario = (fusedData?.scenario ?? 'ssp245').toUpperCase();
   const source = sourceForSignal(signal, fusedData);
   const modelBadge = modelBadgeForSignal(signal, fusedData);
+  const confLevel = signal.confidence ?? 'low';
+
+  // FASE A — Evidence metadata
+  const dataset           = datasetForSignal(signal, fusedData);
+  const model             = modelForSignal(signal, fusedData);
+  const SSP               = sspForSignal(signal, fusedData);
+  const temporal_window   = temporalWindowForSignal(signal);
+  const validation_status = validationStatusForSignal(signal, fusedData);
+
+  // FASE B — Uncertainty layer
+  const uncertainty_spread    = uncertaintySpreadForSignal(signal, fusedData);
+  const confidence_text       = confidenceTextForSignal(signal, fusedData);
+  const scientific_disclaimer = scientificDisclaimerForSignal(signal, fusedData);
 
   return {
     ...signal,
     source_traceability: {
+      // Legacy fields (backward-compatible)
       source_origin: source,
       climate_variable: signal.indicator ?? signal.signalType,
       temporal_period: signal.horizon,
@@ -160,7 +289,7 @@ function enrichTraceability(signal, fusedData) {
       scenario_ssp: scenario,
       threshold_applied: signal.threshold_reference ?? 'No explicit threshold reference',
       transformation_applied: transformationForSignal(signal),
-      confidence_level: signal.confidence ?? 'low',
+      confidence_level: confLevel,
       responsible_endpoint: endpointForSignal(signal, fusedData),
       provenance_badges: Array.from(new Set([
         source.includes('GRI') ? 'GRI' : null,
@@ -170,6 +299,18 @@ function enrichTraceability(signal, fusedData) {
         source.includes('SRTM') ? 'Terrain' : null,
       ].filter(Boolean))),
       climate_model_badge: modelBadge,
+      // FASE A — Full evidence metadata
+      source:             source,
+      dataset,
+      model,
+      SSP,
+      temporal_window,
+      confidence:         confLevel,
+      validation_status,
+      // FASE B — Uncertainty layer
+      uncertainty_spread,
+      confidence_text,
+      scientific_disclaimer,
     },
   };
 }

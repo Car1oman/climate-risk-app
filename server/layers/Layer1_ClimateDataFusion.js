@@ -77,6 +77,30 @@ function normalizePeriod(periodData) {
 }
 
 /**
+ * Normaliza un período JSONB extrayendo {median, p10, p90} por variable.
+ * Usado para transmitir el spread del ensamble CMIP6 a la capa de incertidumbre.
+ * @returns {Object} { varName: {median, p10, p90} }
+ */
+function normalizePeriodStats(periodData) {
+  if (!periodData || typeof periodData !== 'object') return null;
+  const result = {};
+  for (const v of CLIMATE_VARS) {
+    const entry = periodData?.[v];
+    if (entry == null) continue;
+    if (typeof entry === 'object') {
+      result[v] = {
+        median: entry.median ?? null,
+        p10:    entry.p10   ?? null,
+        p90:    entry.p90   ?? null,
+      };
+    } else if (typeof entry === 'number') {
+      result[v] = { median: entry, p10: null, p90: null };
+    }
+  }
+  return result;
+}
+
+/**
  * Consulta la celda climática más cercana vía RPC PostGIS.
  * @param {number} lat
  * @param {number} lon
@@ -93,11 +117,13 @@ async function fetchClimateCell(lat, lon, scenario) {
     const cell       = data[0];
     const raw        = typeof cell.data === 'string' ? JSON.parse(cell.data) : (cell.data || {});
     const horizonMap = buildHorizonMap(scenario);
-    const climateData = {};
+    const climateData      = {};
+    const climateDataStats = {};
 
     for (const [rawKey, mappedKey] of Object.entries(horizonMap)) {
       if (raw[rawKey]) {
-        climateData[mappedKey] = normalizePeriod(raw[rawKey]);
+        climateData[mappedKey]      = normalizePeriod(raw[rawKey]);
+        climateDataStats[mappedKey] = normalizePeriodStats(raw[rawKey]);
       }
     }
 
@@ -105,7 +131,7 @@ async function fetchClimateCell(lat, lon, scenario) {
     if (!climateData.historical) return null;
 
     const distanceKm = haversineKm(lat, lon, cell.lat, cell.lon);
-    return { climateData, distanceKm, cellLat: cell.lat, cellLon: cell.lon };
+    return { climateData, climateDataStats, distanceKm, cellLat: cell.lat, cellLon: cell.lon };
   } catch (err) {
     console.warn('[Layer1] climate_cells falló (fallo silencioso):', err.message);
     return null;
@@ -154,11 +180,13 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
   // Cuando climate_cells no tiene datos, usar los índices extremos computados
   // por Open-Meteo (hd35, hd40, cdd, rx5day, rx1day, pr, tas) como fallback.
   // climateIndices ya está en el mismo formato que climateData (historical/short_term/mid_term).
-  const climateData = cellData?.climateData ?? meteoResult_?.climateIndices ?? null;
+  const climateData      = cellData?.climateData ?? meteoResult_?.climateIndices ?? null;
+  const climateDataStats = cellData?.climateDataStats ?? null; // only available for climate_cells (CMIP6)
 
   return {
     // Datos climáticos normalizados: climate_cells (preferido) u Open-Meteo computed
     climateData,
+    climateDataStats,  // {historical,short_term,mid_term} × {varName:{median,p10,p90}} — CMIP6 only
     climateSource:   cellData?.climateData ? 'climate_cells' : (meteoResult_?.climateIndices ? 'open_meteo_derived' : null),
     // Datos GRI (probabilidades de amenaza por peligro)
     griData:         griData                  ?? null,
