@@ -1,0 +1,144 @@
+{
+  "sprint": 7,
+  "date": "2026-05-22",
+  "title": "Scientific Interpretation Engine — Climate Intelligence Platform",
+  "build_status": "PASS",
+  "test_status": "165/165 PASS",
+  "objective": "Construir un motor de interpretación climática SIN scoring: deduplicación de señales equivalentes, fusión contextual (topografía + clima + ENSO + histórico + proyecciones), interpretación narrativa en lenguaje natural, capa de incertidumbre, y validación de invariantes científicos.",
+
+  "completed_phases": {
+    "FASE_A": {
+      "title": "Deduplicación de señales",
+      "description": "groupSignals() agrupa señales semánticamente equivalentes provenientes de CMIP6, GRI/WRI, ENSO y terreno en 5 grupos canónicos. Selecciona la señal canónica por mayor confianza; en caso de empate, por mayor delta absoluto.",
+      "signal_groups": {
+        "heat_stress":             ["extreme_heat", "severe_heat", "tropical_nights", "temp_increase"],
+        "precipitation_intensity": ["extreme_rain", "flood_risk"],
+        "water_stress":            ["drought"],
+        "terrain_instability":     ["landslide_susceptibility", "landslide_risk", "huayco_risk"],
+        "climate_mode":            ["enso_phase"]
+      },
+      "canonical_selection_rule": "1. Mayor confidence (high > medium > low). 2. Desempate: mayor |delta|."
+    },
+
+    "FASE_B": {
+      "title": "Fusión contextual",
+      "description": "buildContext() combina topografía (terrainData), clima (climateData/scenario), ENSO (ensoData) y proyecciones en un objeto de contexto. Expone flags de presencia por grupo, valores topográficos y escalares ENSO para los generadores de texto.",
+      "context_fields": [
+        "has_heat_stress, has_precipitation_intensity, has_water_stress, has_terrain_instability, has_climate_mode",
+        "enso_phase, enso_oni — de fusedData.ensoData",
+        "terrain_slope_deg, terrain_region, terrain_susceptibility, terrain_huayco_risk — de fusedData.terrainData",
+        "climate_source, scenario, scenario_label — de fusedData",
+        "temporal_horizon, temporal_horizon_label — primer horizonte no-nulo de señales canónicas"
+      ]
+    },
+
+    "FASE_C": {
+      "title": "Interpretación narrativa",
+      "description": "generateInterpretations() produce interpretaciones single_group y compound. Cada texto está construido exclusivamente con valores de signal.delta, signal.projected, signal.delta_pct, y fusedData.terrainData — nunca números inventados.",
+      "single_group_builders": {
+        "heat_stress":             "buildHeatInterpretation() — maneja temp_increase, extreme_heat, severe_heat, tropical_nights con valores numéricos reales",
+        "precipitation_intensity": "buildPrecipitationInterpretation() — multi-fuente: CMIP6+GRI combinados, o sólo CMIP6, o sólo GRI",
+        "terrain_instability":     "buildTerrainInterpretation() — usa slope_degrees/region de fusedData.terrainData preferentemente",
+        "water_stress":            "buildDroughtInterpretation() — maneja cdd, prpercnt/pr, gri_drought_probability",
+        "climate_mode":            "buildEnsoInterpretation() — fase + valor ONI desde fusedData.ensoData"
+      },
+      "compound_builders": {
+        "precipitation + terrain": "buildPrecipTerrainCompound() — combina delta_pct de precipitación + slope de terreno → susceptibilidad a deslizamientos/huaycos",
+        "ENSO + precipitación":    "buildEnsoAmplificationCompound() — El Niño como amplificador de lluvia extrema (sólo si phase != 'neutral')",
+        "ENSO + sequía":           "buildEnsoAmplificationCompound() — La Niña como amplificador de déficit hídrico (sólo si phase != 'neutral')",
+        "calor + sequía":          "buildHeatDroughtCompound() — estrés compuesto calor–sequía concurrente"
+      },
+      "example_output": [
+        "Las proyecciones CMIP6 (SSP5-8.5, 2020–2039) muestran un incremento de +28% en la precipitación máxima de 5 días (Rx5day) sobre la línea base histórica 1980–2014.",
+        "El análisis topográfico SRTM identifica pendientes de 22.0° en ladera andina, con susceptibilidad moderada a deslizamientos y flujos de detritos (huaycos) según la clasificación INGEMMET 2021.",
+        "La combinación del incremento de +28% en precipitación extrema proyectado (CMIP6, SSP5-8.5) y las pendientes de 22.0° identificadas en ladera andina incrementa la exposición a deslizamientos y flujos de detritos (huaycos).",
+        "La fase El Niño activa (ONI: +1.40°C) actúa como amplificador interanual de los eventos de precipitación extrema en la región costera del Pacífico."
+      ]
+    },
+
+    "FASE_D": {
+      "title": "Capa de incertidumbre",
+      "description": "buildUncertainty() agrega overall_confidence, model_spread, limitations y evidence_strength desde la traceability de las señales canónicas y el EVIDENCE_REGISTRY de domain.js.",
+      "fields": [
+        "overall_confidence: high si todos son high; medium si al menos uno es high; low en caso contrario",
+        "model_spread: p10/p90/model_count desde source_traceability.uncertainty_spread de la señal primaria",
+        "limitations: hasta 5 limitaciones desde EVIDENCE_REGISTRY[evidenceId].limitations (2 por fuente)",
+        "evidence_strength: strong (≥80% validated), moderate (≥40%), limited (<40%)"
+      ]
+    },
+
+    "FASE_E": {
+      "title": "Validación de invariantes",
+      "description": "validateInterpretation() verifica que el output no contenga scores, urgency language, impactos financieros ni números inventados. Usa regex patterns contra el JSON serializado de {interpretations, uncertainty}.",
+      "invariants": {
+        "has_scores":            "false — ningún campo score/puntaje/calificación en el output",
+        "has_urgency":           "false — sin lenguaje urgente/inmediato/debe-actuar-ahora",
+        "has_invented_numbers":  "false — por construcción: todos los valores provienen de signal data",
+        "has_financial_impacts": "false — sin financial_impact_range ni pérdida económica ni USD"
+      }
+    }
+  },
+
+  "files_created": [
+    "server/scientific/interpretation.js — motor de interpretación científica (FASES A-E), ~420 líneas",
+    "tests/regression/layer7-interpretation-engine.test.js — 60 tests, 7 suites (FASES A-E + estructura + integración)"
+  ],
+
+  "files_modified": [
+    "package.json — test y test:regression scripts ahora incluyen layer7-interpretation-engine.test.js"
+  ],
+
+  "test_results": {
+    "layer7_tests": "60/60 PASS",
+    "total_suite":  "165/165 PASS (layer2 + layer7 + baselines)",
+    "previous_total": "105/105"
+  },
+
+  "architecture_additions": {
+    "interpretation_engine": {
+      "path": "server/scientific/interpretation.js",
+      "role": "Motor de interpretación post-Layer2. Consume signalOutput (Layer2) + fusedData (Layer1) y produce una interpretación estructurada sin scoring.",
+      "pattern": "Pure function module — no I/O, no side effects, fully testable",
+      "exports": ["interpretSignals(signalOutput, fusedData)"],
+      "imports_from": ["server/scientific/domain.js (EVIDENCE_REGISTRY, getSignalMeta)"],
+      "output_shape": {
+        "signal_groups":    "FASE A — Array de grupos semánticos con señal canónica por grupo",
+        "context":          "FASE B — Objeto de contexto topografía+clima+ENSO",
+        "interpretations":  "FASE C — Array de narrativas (type: single_group | compound)",
+        "uncertainty":      "FASE D — overall_confidence, model_spread, limitations, evidence_strength",
+        "validation":       "FASE E — has_scores, has_urgency, has_invented_numbers, has_financial_impacts, validation_passed",
+        "generated_at":     "ISO timestamp"
+      }
+    }
+  },
+
+  "compound_patterns": {
+    "precipitation_intensity + terrain_instability": "Sólo cuando ambos grupos presentes; genera narrativa de susceptibilidad a deslizamientos/huaycos",
+    "climate_mode + precipitation_intensity":       "Sólo cuando ENSO phase == 'el_nino'; amplificación de lluvia extrema",
+    "climate_mode + water_stress":                  "Sólo cuando ENSO phase == 'la_nina'; amplificación de déficit hídrico",
+    "heat_stress + water_stress":                   "Siempre que ambos presentes; estrés compuesto calor–sequía",
+    "ENSO neutral":                                 "No genera compuesto ENSO — fase neutral no modifica señales climáticas proyectadas"
+  },
+
+  "backward_compatibility": {
+    "Layer1_unchanged": true,
+    "Layer2_unchanged": true,
+    "Layer3_unchanged": true,
+    "Layer6_unchanged": true,
+    "integration_pattern": "interpretSignals() puede llamarse en el route de /api/v2/climate-risk-analysis después de detectSignals() — aún no wired en sprint 7"
+  },
+
+  "known_remaining_scope": [
+    "Wiring: Layer7.interpretSignals() no está integrado en server/routes/climate.js aún — pendiente sprint siguiente.",
+    "Los tipos TypeScript para InterpretationResult no han sido añadidos a src/types/domain.d.ts.",
+    "La UI no consume aún el output del motor de interpretación.",
+    "Layer3_BusinessRiskEngine contiene FINANCIAL_RANGES hardcodeados — potencial candidato de refactor o aislamiento en deprecated/ en sprint futuro."
+  ],
+
+  "platform_identity": {
+    "name": "Climate Intelligence Platform",
+    "approach": "Descriptivo — señales, tendencias, evidencia e incertidumbre. Sin scores, urgencia ni pérdidas económicas automáticas.",
+    "interpretation_engine_version": "Sprint 7 — Scientific Interpretation Engine",
+    "primary_references": ["IPCC AR6 WG1/WG2", "CMIP6 CCKP", "GRI Oxford", "WRI Aqueduct 4.0", "NOAA CPC ONI", "NASA SRTM", "INGEMMET 2021", "SENAMHI Perú"]
+  }
+}
