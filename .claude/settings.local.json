@@ -51,7 +51,9 @@
       "Bash(\"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\" --test tests/regression/layer9-projection-engine.test.js)",
       "Bash(\"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\" --test tests/regression/layer2-signal-engine.test.js tests/regression/layer7-interpretation-engine.test.js tests/regression/layer8-historical-engine.test.js tests/regression/layer9-projection-engine.test.js tests/baselines/baseline-validation.test.js)",
       "Bash(\"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\" --test tests/regression/layer10-storytelling-engine.test.js)",
-      "Bash(\"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\" --test tests/regression/layer2-signal-engine.test.js tests/regression/layer7-interpretation-engine.test.js tests/regression/layer8-historical-engine.test.js tests/regression/layer9-projection-engine.test.js tests/regression/layer10-storytelling-engine.test.js tests/baselines/baseline-validation.test.js)"
+      "Bash(\"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\" --test tests/regression/layer2-signal-engine.test.js tests/regression/layer7-interpretation-engine.test.js tests/regression/layer8-historical-engine.test.js tests/regression/layer9-projection-engine.test.js tests/regression/layer10-storytelling-engine.test.js tests/baselines/baseline-validation.test.js)",
+      "Bash(\"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\" --test tests/regression/layer11-governance-engine.test.js)",
+      "Bash(\"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\" --test tests/regression/layer2-signal-engine.test.js tests/regression/layer7-interpretation-engine.test.js tests/regression/layer8-historical-engine.test.js tests/regression/layer9-projection-engine.test.js tests/regression/layer10-storytelling-engine.test.js tests/regression/layer11-governance-engine.test.js tests/baselines/baseline-validation.test.js)"
     ]
   }
 }
