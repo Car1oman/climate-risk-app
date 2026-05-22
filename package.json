@@ -13,8 +13,8 @@
     "quality": "npm run lint && npm run typecheck",
     "ci": "npm run quality && npm run build",
     "preview": "vite preview",
-    "test": "node --test tests/regression/layer2-signal-engine.test.js tests/regression/layer7-interpretation-engine.test.js tests/regression/layer8-historical-engine.test.js tests/baselines/baseline-validation.test.js",
-    "test:regression": "node --test tests/regression/layer2-signal-engine.test.js tests/regression/layer7-interpretation-engine.test.js tests/regression/layer8-historical-engine.test.js",
+    "test": "node --test tests/regression/layer2-signal-engine.test.js tests/regression/layer7-interpretation-engine.test.js tests/regression/layer8-historical-engine.test.js tests/regression/layer9-projection-engine.test.js tests/baselines/baseline-validation.test.js",
+    "test:regression": "node --test tests/regression/layer2-signal-engine.test.js tests/regression/layer7-interpretation-engine.test.js tests/regression/layer8-historical-engine.test.js tests/regression/layer9-projection-engine.test.js",
     "test:deprecated": "node --test tests/deprecated/risk-engine.test.js tests/deprecated/risk-model-service.test.js tests/deprecated/formula-consistency.test.js",
     "test:baselines": "node --test tests/baselines/baseline-validation.test.js"
   },
