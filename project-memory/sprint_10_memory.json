@@ -1,0 +1,168 @@
+{
+  "sprint": 10,
+  "date": "2026-05-22",
+  "title": "Scientific Storytelling Engine — Explicable, Traceable Climate Narrative",
+  "build_status": "PASS",
+  "test_status": "425/425 PASS (100 new layer10 tests + 325 previous)",
+
+  "objective": "Construir un motor de storytelling climático científicamente trazable que ensambla la narrativa principal desde las salidas de Layer 7 (interpretaciones), Layer 9 (proyecciones) y Layer 8 (eventos históricos). Las medidas de adaptación son cualitativas, sin costos ni eficacia inventada, contextualizadas al sector.",
+
+  "completed_phases": {
+    "FASE_A": {
+      "title": "Narrativa principal — buildMainNarrative()",
+      "description": "Ensambla 2–3 párrafos desde los engines existentes: (1) interpretaciones Layer 7 (max 3 single-group + compuestos), (2) narrativa de proyección Layer 9 (escenario × ventana), (3) compuestos si existen. Agrega uncertainty_note con niveles de confianza de temperatura y precipitación. Cita fuentes extraídas de los textos de entrada.",
+      "output_shape": {
+        "paragraphs":        "string[] — 1-3 párrafos (Layer 7 texts + Layer 9 projection narrative + compounds)",
+        "sources_cited":     "string[] — fuentes detectadas en textos (CMIP6, IPCC AR6, NASA SRTM, INGEMMET, NOAA, GRI, WRI, SENAMHI)",
+        "scenario_label":    "string — 'SSP2-4.5' | 'SSP5-8.5'",
+        "horizon_label":     "string — '2020–2039' | '2040–2059' | '2060–2079'",
+        "uncertainty_note":  "string — siempre contiene 'confianza'; menciona temperatura y precipitación",
+        "historical_anchor": "{ id, label, description, source, date_start } | null — primer evento relevante de Layer 8",
+        "evidence_cited":    "string[] — evidence IDs de Layer 7 interpretations"
+      },
+      "invariants": [
+        "Todos los textos de párrafos provienen de Layer 7 o Layer 9 — nada inventado",
+        "sources_cited siempre incluye CMIP6 e IPCC AR6 cuando hay proyección",
+        "uncertainty_note siempre contiene la palabra 'confianza'",
+        "historical_anchor es null si no se provee contexto histórico"
+      ]
+    },
+
+    "FASE_B": {
+      "title": "Reglas de narrativa (validadas en SUITE C)",
+      "description": "La narrativa cumple 5 reglas: cita fuentes, menciona escenario (SSP), menciona horizonte (año), menciona incertidumbre (confianza), menciona evidencia (CMIP6 en párrafos). Sin urgencia, alarmismo, financiero ni heurísticas ocultas.",
+      "rules": {
+        "cite_sources":          "sources_cited.length > 0",
+        "mention_scenario":      "SSP presente en paragraphs",
+        "mention_horizon":       "año de 4 dígitos en paragraphs",
+        "mention_uncertainty":   "'confianza' en uncertainty_note",
+        "mention_evidence":      "CMIP6 en paragraphs"
+      }
+    },
+
+    "FASE_C": {
+      "title": "Medidas de adaptación — buildAdaptationMeasures()",
+      "description": "Genera medidas cualitativas por grupo de señal × sector. ADAPTATION_CATALOG contiene 5 grupos × 8 sectores = 40 medidas + 40 rationales. Cada measure es una string de acción sin costos, sin eficacia, sin plazos numéricos. Cada rationale cita la fuente científica correspondiente.",
+      "signal_groups":  ["heat_stress", "precipitation_intensity", "water_stress", "terrain_instability", "climate_mode"],
+      "sectors":        ["general", "retail", "agriculture", "infrastructure", "logistics", "manufacturing", "financial", "hospitality"],
+      "invariants": [
+        "No costo estimado, no USD, no dólares, no millones de",
+        "No eficacia del X%, no eficiencia del X%, no reduce en X%",
+        "No urgencia, no plazos numéricos (en X días)",
+        "Rationales citan fuentes: CMIP6, IPCC AR6, INGEMMET, NOAA CPC, WRI Aqueduct 4.0",
+        "Sector desconocido → fallback a 'general'",
+        "Sin grupos de señal → adaptations = []"
+      ]
+    },
+
+    "FASE_D": {
+      "title": "UI Card — ClimateStoryCard.jsx reconstruida",
+      "description": "Componente React con modo dual. Sprint 10 mode (storyContext prop): muestra paragraphs, sources_cited, badge SSP/horizonte, uncertainty_note colapsable, adaptation rows expandibles, historical anchor. Legacy mode (climateData/signals props): comportamiento Sprint 2 preservado.",
+      "features": [
+        "StorytellingCard: paragraphs como texto corrido, SourceBadge para cada fuente, AdaptationRow con rationale expandible, HistoricalAnchor, disclaimer científico",
+        "LegacyCard: comportamiento Sprint 2 completo (SignalRow, ContextRow, Meta)",
+        "Dispatcher: si storyContext presente → StorytellingCard; else → LegacyCard",
+        "Props: { storyContext, asset, climateData, evidence, traceability, signals }"
+      ]
+    },
+
+    "FASE_E": {
+      "title": "Validación — validateStorytelling()",
+      "description": "Verifica 8 invariantes sobre el output completo de buildStorytellingContext(). validation_passed = true solo cuando todos los checks pasan.",
+      "validation_flags": {
+        "has_urgency_language":   "false — no urgente/urgencia/debe actuar ahora/acción inmediata",
+        "has_alarmism":           "false — no catastrófico/colapso/inevitable/peligro inminente/emergencia climática",
+        "has_financial_language": "false — no costo estimado/pérdida económica/USD/dólares/millones de",
+        "has_hidden_heuristics":  "false — no risk_score/overall_score/urgency_rank/puntaje de riesgo",
+        "has_efficacy_claims":    "false — no eficacia del X%/reduce en X%",
+        "citations_present":      "true — sources_cited.length > 0",
+        "scenario_mentioned":     "true — SSP en paragraphs",
+        "uncertainty_mentioned":  "true — confianza en uncertainty_note",
+        "validation_passed":      "true — todos los anteriores"
+      }
+    },
+
+    "FASE_F": {
+      "title": "Memoria del sprint",
+      "description": "Guardado en project-memory/sprint_10_memory.json"
+    }
+  },
+
+  "files_created": [
+    "server/scientific/storytelling.js — Storytelling Engine (FASES A-E), ADAPTATION_CATALOG (5 grupos × 8 sectores), ~360 líneas",
+    "tests/regression/layer10-storytelling-engine.test.js — 100 tests, 6 suites (SUITES A-F)"
+  ],
+
+  "files_modified": [
+    "src/components/climate/ClimateStoryCard.jsx — Reconstruida con modo dual: StorytellingCard (Sprint 10) + LegacyCard (Sprint 2 backward-compat)",
+    "package.json — test y test:regression scripts incluyen layer10-storytelling-engine.test.js"
+  ],
+
+  "test_results": {
+    "layer10_tests":   "100/100 PASS",
+    "total_suite":     "425/425 PASS (layer2 + layer7 + layer8 + layer9 + layer10 + baselines)",
+    "previous_total":  "325/325",
+    "new_tests_added": 100
+  },
+
+  "architecture_additions": {
+    "storytelling_engine": {
+      "path":    "server/scientific/storytelling.js",
+      "role":    "Motor de storytelling. Ensambla narrativa desde Layer 7 + Layer 9 + Layer 8. Puro, sin I/O.",
+      "pattern": "Pure function module — no I/O, no side effects, fully testable",
+      "exports": [
+        "buildMainNarrative(interpretationOutput, projectionContext, historicalContext, opts) — FASE A",
+        "buildAdaptationMeasures(interpretationOutput, opts) — FASE C",
+        "validateStorytelling(output) — FASE E",
+        "buildStorytellingContext(interpretationOutput, projectionContext, historicalContext, opts) — Main entry",
+        "ADAPTATION_CATALOG — 5 grupos × 8 sectores"
+      ],
+      "output_shape_buildStorytellingContext": {
+        "narrative":     "FASE A — paragraphs, sources_cited, scenario_label, horizon_label, uncertainty_note, historical_anchor, evidence_cited",
+        "adaptations":   "FASE C — [{measure, rationale, signal_group, sector}]",
+        "metadata":      "{signals_used, groups_covered, scenario, window, sector}",
+        "validation":    "FASE E — 8 flags + validation_passed",
+        "generated_at":  "ISO timestamp"
+      }
+    }
+  },
+
+  "key_scientific_decisions": {
+    "no_reinvention":           "buildMainNarrative() NO genera texto nuevo — ensamble desde Layer 7 (interpretations) + Layer 9 (narratives). Todos los números en párrafos vienen de engines anteriores.",
+    "sources_extracted":        "extractSources() detecta 8 fuentes por patrón regex en los textos de entrada (CMIP6, IPCC, SRTM, INGEMMET, GRI, WRI, NOAA, SENAMHI).",
+    "projection_sources_forced":"Cuando hay projNarrative, CMIP6 e IPCC AR6 se añaden a sources_cited incondicionalmente.",
+    "adaptation_catalog":       "ADAPTATION_CATALOG es estático y curado — medidas redactadas sin costos, sin eficacia, sin plazos. Sector desconocido → fallback 'general'.",
+    "uncertainty_note":         "Siempre construida desde Layer 9 confidence (temperature_confidence/precipitation_confidence) + Layer 7 overall_confidence. Nunca vacía.",
+    "historical_anchor":        "Primer evento de historicalContext.relevant_events — máximo 1 evento de referencia para no sobrecargar la narrativa.",
+    "backward_compatibility":   "ClimateStoryCard.jsx: cuando storyContext = null → LegacyCard con props Sprint 2 (asset, climateData, evidence, traceability, signals)."
+  },
+
+  "backward_compatibility": {
+    "Layer2_unchanged":  true,
+    "Layer7_unchanged":  true,
+    "Layer8_unchanged":  true,
+    "Layer9_unchanged":  true,
+    "ClimateStoryCard_legacy_mode": "LegacyCard preserva comportamiento Sprint 2 completo cuando storyContext = null"
+  },
+
+  "known_remaining_scope": [
+    "buildStorytellingContext() no está integrado en server/routes/climate.js — /api/v2 no lo expone todavía.",
+    "buildProjectionContext() (Sprint 9) y buildHistoricalContext() (Sprint 8) tampoco están wired en /api/v2.",
+    "La ClimateStoryCard usa storyContext inline — pendiente integración con la respuesta del API.",
+    "ADAPTATION_CATALOG cubre 5 grupos de señal × 8 sectores — podría ampliarse con más sectores (minería, salud, educación).",
+    "Layer3_BusinessRiskEngine sigue con FINANCIAL_RANGES hardcodeados — candidato de aislamiento en deprecated/."
+  ],
+
+  "platform_identity": {
+    "name": "Climate Intelligence Platform",
+    "approach": "Descriptivo — señales, tendencias, evidencia e incertidumbre observable y proyectada. Sin scores, urgencia ni pérdidas económicas automáticas.",
+    "storytelling_engine_version": "Sprint 10 — Scientific Storytelling Engine",
+    "layers_complete": {
+      "Layer2":  "Signal Detection Engine — umbrales IPCC, señales con source_traceability",
+      "Layer7":  "Scientific Interpretation Engine — deduplicación, fusión, narrativas, incertidumbre",
+      "Layer8":  "Historical Climate Engine — catálogo 20 eventos observados en Perú",
+      "Layer9":  "Projection Scenario Engine — SSP245/SSP585, 3 ventanas, 4 variables, 6 narrativas",
+      "Layer10": "Scientific Storytelling Engine — narrativa principal + adaptaciones cualitativas + validación"
+    }
+  }
+}
