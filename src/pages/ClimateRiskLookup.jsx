@@ -1,868 +1,44 @@
 // @ts-nocheck
-import { useState, useCallback, useRef, useEffect } from "react";
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useState, useCallback, useEffect } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { API_URL, fetchTerritorialContext, fetchDocumentContext, analyzeClimateRisk } from "@/lib/api";
-import MethodologyPanel from "@/components/climate/MethodologyPanel";
-import {
-  Search, MapPin, Loader2, AlertTriangle,
-  Sparkles, Building2, Plus, Globe2, BookOpen, ChevronDown, ChevronUp,
-  ShieldAlert, Leaf, BarChart3, Thermometer,
-} from "lucide-react";
+import { AlertTriangle, Loader2, MapPin, Search } from "lucide-react";
 import { toast } from "sonner";
 
-// ── Leaflet icon fix ──────────────────────────────────────────────────────────
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
-  iconUrl:       "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
-  shadowUrl:     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
-});
-
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-const TILE_LAYERS = {
-  osm: {
-    label: "Calles", icon: "🗺️",
-    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-  },
-  topo: {
-    label: "Topográfico", icon: "🌄",
-    url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
-    attribution: '&copy; <a href="https://opentopomap.org">OpenTopoMap</a> contributors',
-  },
-  satellite: {
-    label: "Satélite", icon: "🛰️",
-    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    attribution: '&copy; <a href="https://www.esri.com">Esri</a>',
-  },
-};
-
-const SECTORS = [
-  { value: "retail",          label: "Retail / Supermercados" },
-  { value: "salud",           label: "Salud / Clínicas" },
-  { value: "educacion",       label: "Educación" },
-  { value: "entretenimiento", label: "Entretenimiento" },
-  { value: "otros",           label: "Otro sector" },
-];
-
-const SIGNAL_META = {
-  extreme_heat:    { icon: "🌡️", label: "Calor extremo (>35°C)",        unit: "días/año" },
-  severe_heat:     { icon: "🔥", label: "Calor severo (>40°C)",          unit: "días/año" },
-  tropical_nights: { icon: "🌙", label: "Noches tropicales (>20°C)",     unit: "noches/año" },
-  drought:         { icon: "☀️", label: "Sequía / estrés hídrico",       unit: "días"     },
-  extreme_rain:    { icon: "🌧️", label: "Lluvia extrema",               unit: "mm"       },
-  temp_increase:   { icon: "📈", label: "Aumento temperatura media",     unit: "°C"       },
-  flood_risk:      { icon: "🌊", label: "Riesgo de inundación",          unit: "%"        },
-};
-
-const HORIZON_LABEL = {
-  short_term: "2020–2039 (corto plazo)",
-  mid_term:   "2040–2059 (mediano plazo)",
-  long_term:  "2060+ (largo plazo)",
-};
-
-const GRI_ICONS = {
-  flood: "🌊", fluvial: "🏞️", coastal: "🌊", pluvial: "🌧️",
-  drought: "☀️", heat: "🌡️", extreme_heat: "🌡️", landslide: "⛰️",
-};
-
-const GRI_BADGE = {
-  alto:       "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/60 dark:text-red-200 dark:border-red-700",
-  medio:      "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/60 dark:text-amber-200 dark:border-amber-700",
-  bajo:       "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/60 dark:text-emerald-200 dark:border-emerald-700",
-  "sin data": "bg-slate-100 text-slate-600 border-slate-200 dark:bg-secondary dark:text-secondary-foreground dark:border-border",
-};
-
-// ── Map sub-components ─────────────────────────────────────────────────────────
-
-function SearchPanel({ onLocationSelect }) {
-  const [query, setQuery]               = useState("");
-  const [results, setResults]           = useState([]);
-  const [searching, setSearching]       = useState(false);
-  const [showResults, setShowResults]   = useState(false);
-  const [selectedPlace, setSelectedPlace]   = useState(null);
-  const [registerForm, setRegisterForm] = useState({ name: "", unidad_negocio: "" });
-  const [registering, setRegistering]   = useState(false);
-  const debounceRef = useRef(null);
-  const panelRef    = useRef(null);
-
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (query.trim().length < 2) { setResults([]); setShowResults(false); return; }
-    debounceRef.current = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const res = await fetch(`${API_URL}/api/search?q=${encodeURIComponent(query)}`);
-        if (res.ok) { setResults(await res.json()); setShowResults(true); }
-      } catch (e) { console.error("Search error:", e); }
-      finally { setSearching(false); }
-    }, 300);
-    return () => clearTimeout(debounceRef.current);
-  }, [query]);
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (panelRef.current && !panelRef.current.contains(e.target)) setShowResults(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const handleSelectResult = (r) => {
-    onLocationSelect(r.lat, r.lng);
-    setQuery(r.tipo === "asset" ? r.name : r.direccion);
-    setShowResults(false);
-    setSelectedPlace(r.tipo === "place" ? r : null);
-    setRegisterForm({ name: "", unidad_negocio: "" });
-  };
-
-  const handleRegister = async (e) => {
-    e.preventDefault();
-    if (!registerForm.name.trim()) { toast.error("El nombre del activo es requerido"); return; }
-    setRegistering(true);
-    try {
-      const res = await fetch(`${API_URL}/api/places/assets`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          place_id: selectedPlace.id,
-          name: registerForm.name,
-          unidad_negocio: registerForm.unidad_negocio,
-        }),
-      });
-      if (!res.ok) { const err = await res.json(); throw new Error(err.error); }
-      toast.success("Activo registrado correctamente");
-      setRegisterForm({ name: "", unidad_negocio: "" });
-      setSelectedPlace(null);
-      const fresh = await fetch(`${API_URL}/api/search?q=${encodeURIComponent(query)}`);
-      if (fresh.ok) { setResults(await fresh.json()); setShowResults(true); }
-    } catch (err) {
-      toast.error(err.message || "Error al registrar el activo");
-    } finally {
-      setRegistering(false);
-    }
-  };
-
-  return (
-    <div className="space-y-3" ref={panelRef}>
-      <div className="relative">
-        <Label className="text-xs text-muted-foreground">Buscar por nombre o dirección</Label>
-        <div className="relative mt-1.5">
-          {searching
-            ? <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground animate-spin" />
-            : <Search  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />}
-          <Input
-            className="pl-9"
-            placeholder="Ej. Plaza Vea San Isidro o Av. Javier Prado..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onFocus={() => results.length > 0 && setShowResults(true)}
-          />
-        </div>
-
-        {showResults && (
-          <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-xl shadow-lg overflow-hidden max-h-64 overflow-y-auto">
-            {results.length === 0 && !searching && (
-              <p className="px-3 py-2.5 text-xs text-muted-foreground text-center">
-                Sin resultados para &ldquo;{query}&rdquo;
-              </p>
-            )}
-            {results.map((r, i) => (
-              <button
-                key={r.id || i}
-                onClick={() => handleSelectResult(r)}
-                className="w-full flex items-start gap-2.5 px-3 py-2.5 text-left hover:bg-muted/50 transition-colors border-b border-border/40 last:border-0"
-              >
-                <span className="flex-shrink-0 mt-0.5">
-                  {r.tipo === "asset"
-                    ? <Building2 className="w-4 h-4 text-blue-500" />
-                    : <MapPin    className="w-4 h-4 text-amber-500" />}
-                </span>
-                <div className="flex-1 min-w-0">
-                  {r.tipo === "asset" ? (
-                    <>
-                      <p className="text-sm font-medium truncate">{r.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{r.direccion}</p>
-                      {r.unidad_negocio && (
-                        <Badge className="text-[10px] px-1.5 py-0 mt-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-200 border-0">
-                          {r.unidad_negocio}
-                        </Badge>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-sm font-medium truncate">{r.direccion}</p>
-                      <Badge className="text-[10px] px-1.5 py-0 mt-0.5 bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-200 border-0">
-                        Sin activos registrados
-                      </Badge>
-                    </>
-                  )}
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {selectedPlace && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 p-3 space-y-3">
-          <div className="flex items-start gap-2">
-            <MapPin className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-xs font-semibold text-amber-900 dark:text-amber-200">No hay activos registrados aquí</p>
-              <p className="text-[11px] text-amber-800 dark:text-amber-300 mt-0.5 leading-snug">{selectedPlace.direccion}</p>
-            </div>
-          </div>
-          <form onSubmit={handleRegister} className="space-y-2">
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Nombre del activo *</Label>
-              <Input
-                placeholder="Ej. Plaza Vea San Isidro"
-                value={registerForm.name}
-                onChange={(e) => setRegisterForm(f => ({ ...f, name: e.target.value }))}
-                className="h-8 text-sm text-foreground bg-secondary"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Unidad de negocio</Label>
-              <Input
-                placeholder="Ej. Supermercados"
-                value={registerForm.unidad_negocio}
-                onChange={(e) => setRegisterForm(f => ({ ...f, unidad_negocio: e.target.value }))}
-                className="h-8 text-sm text-foreground bg-secondary"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button type="submit" size="sm" className="flex-1 h-8 text-xs gap-1.5" disabled={registering}>
-                {registering
-                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Registrando...</>
-                  : <><Plus    className="w-3.5 h-3.5" />Registrar activo</>}
-              </Button>
-              <Button
-                type="button" size="sm" variant="ghost"
-                className="h-8 text-xs text-muted-foreground"
-                onClick={() => setSelectedPlace(null)}
-              >
-                Cancelar
-              </Button>
-            </div>
-          </form>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function MapClickHandler({ onMapClick }) {
-  useMapEvents({
-    click(e) {
-      onMapClick(
-        parseFloat(e.latlng.lat.toFixed(5)),
-        parseFloat(e.latlng.lng.toFixed(5))
-      );
-    },
-  });
-  return null;
-}
-
-function MapFlyTo({ target }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!target?.pos) return;
-    const [lat, lng] = target.pos;
-    if (!isFinite(lat) || !isFinite(lng)) return;
-    map.flyTo(target.pos, target.zoom, { animate: true, duration: 1.2 });
-  }, [target]); // eslint-disable-line react-hooks/exhaustive-deps
-  return null;
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function fmtUSD(val) {
-  if (val == null) return "—";
-  if (val >= 1_000_000) return `USD ${(val / 1_000_000).toFixed(1)}M`;
-  if (val >= 1_000)     return `USD ${(val / 1_000).toFixed(0)}K`;
-  return `USD ${val}`;
-}
-
-function fmtNum(v, decimals = 1) {
-  if (v == null) return "—";
-  return Number.isInteger(v) ? String(v) : v.toFixed(decimals);
-}
-
-const CONFIDENCE_BADGE = {
-  high:   "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/60 dark:text-emerald-200 dark:border-emerald-700",
-  medium: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/60 dark:text-amber-200 dark:border-amber-700",
-  low:    "bg-slate-100 text-slate-600 border-slate-200 dark:bg-secondary dark:text-secondary-foreground dark:border-border",
-};
-
-function TraceBadges({ trace }) {
-  if (!trace) return null;
-  const confidence = trace.confidence_level ?? "low";
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <Badge variant="outline" className={`text-[9px] py-0 px-1.5 font-semibold border ${CONFIDENCE_BADGE[confidence] ?? CONFIDENCE_BADGE.low}`}>
-        confianza {confidence}
-      </Badge>
-      {(trace.provenance_badges ?? []).map(source => (
-        <Badge key={source} variant="outline" className="text-[9px] py-0 px-1.5 border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-900/60 dark:text-blue-200">
-          {source}
-        </Badge>
-      ))}
-      {trace.climate_model_badge && (
-        <Badge variant="outline" className="text-[9px] py-0 px-1.5 border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-700 dark:bg-violet-900/60 dark:text-violet-200">
-          {trace.climate_model_badge}
-        </Badge>
-      )}
-    </div>
-  );
-}
-
-function TraceabilityDetails({ trace }) {
-  if (!trace) return null;
-  const rows = [
-    ["Fuente", trace.source_origin],
-    ["Variable", trace.climate_variable],
-    ["Periodo", trace.temporal_period_label ?? trace.temporal_period],
-    ["Escenario", trace.scenario_ssp],
-    ["Cambio detectado", trace.transformation_applied],
-    ["Umbral", trace.threshold_applied],
-    ["API", trace.responsible_endpoint],
-  ];
-
-  return (
-    <div className="rounded-md border border-border bg-secondary p-2.5 space-y-2">
-      <p className="text-[10px] font-semibold text-secondary-foreground">
-        ¿Por qué se detectó este riesgo?
-      </p>
-      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5">
-        {rows.map(([label, value]) => (
-          <div key={label} className="min-w-0">
-            <dt className="text-[9px] uppercase tracking-widest text-slate-400">{label}</dt>
-            <dd className="text-[10px] text-secondary-foreground break-words">{value ?? "No disponible"}</dd>
-          </div>
-        ))}
-      </dl>
-    </div>
-  );
-}
-
-// ── Panel 1: Resumen ejecutivo (Layer 6 narrative) ────────────────────────────
-
-function NarrativePanel({ narrative, location, metadata }) {
-  const summary = narrative?.executive_summary;
-  const metrics = narrative?.key_metrics ?? {};
-  const distKm = location?.distanceKm ?? metadata?.distance_km;
-
-  if (!summary) return null;
-
-  return (
-    <Card className="border-2 border-primary/30 bg-card shadow-sm">
-      <CardHeader className="pb-3 pt-4">
-        <div className="flex items-start justify-between gap-3">
-          <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <BarChart3 className="w-4 h-4 text-primary flex-shrink-0" />
-            Evaluación de riesgo climático
-          </CardTitle>
-          <Badge variant="outline" className="text-[10px] py-0 px-2">Evidencia descriptiva</Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4 pb-4">
-        <p className="text-sm leading-relaxed text-secondary-foreground">{summary}</p>
-
-        {/* Key metrics strip */}
-        {(metrics.total_señales > 0 || metadata?.scenario || metadata?.data_sources?.length > 0) && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-            {metrics.total_señales > 0 && (
-              <div className="rounded-lg bg-secondary border border-border p-2.5 text-center">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">Señales</p>
-                <p className="text-lg font-bold text-foreground">{metrics.total_señales}</p>
-              </div>
-            )}
-            <div className="rounded-lg bg-secondary border border-border p-2.5 text-center">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">Escenario</p>
-              <p className="text-sm font-bold text-foreground">{metadata?.scenario || "SSP245 / SSP585"}</p>
-            </div>
-            <div className="rounded-lg bg-secondary border border-border p-2.5 text-center">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">Confianza</p>
-              <p className="text-sm font-bold text-foreground">{metadata?.confidence || "medium"}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Distance warning */}
-        {distKm != null && distKm > 30 && (
-          <Alert className="border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/40 py-2">
-            <AlertTriangle className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
-            <AlertDescription className="text-xs text-blue-900 dark:text-blue-200">
-              Punto de datos más cercano: {distKm.toFixed(0)} km. Los resultados son orientativos.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <p className="text-[10px] text-muted-foreground">
-          Fuentes: {(metadata?.data_sources ?? []).join(" · ") || "climate_cells · GRI · Open-Meteo · World Bank"}
-          {metadata?.scenario && ` · ${metadata.scenario}`}
-        </p>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ── Panel 2: Señales climáticas (Layer 2) ─────────────────────────────────────
-
-function SignalRow({ signal }) {
-  const meta     = SIGNAL_META[signal.signalType] ?? { icon: "⚠️", label: signal.signalType, unit: "" };
-  const isGRI    = signal.indicator?.startsWith('gri_');
-  const trace    = signal.source_traceability;
-  const sign     = (signal.delta ?? 0) >= 0 ? "+" : "";
-  const conf     = signal.confidence;
-  const confColor = conf === "high"
-    ? "text-emerald-600 dark:text-emerald-400"
-    : conf === "medium" ? "text-amber-600 dark:text-amber-400"
-    : "text-slate-400";
-
-  // Para señales GRI, los valores son probabilidades (0-1) → mostrar como %
-  const fmtVal  = (v) => v == null ? "—" : isGRI ? `${(v * 100).toFixed(0)}%` : fmtNum(v);
-  const unit    = isGRI ? "" : meta.unit;
-  const fmtDelta = (v) => v == null ? null : isGRI
-    ? `${sign}${(v * 100).toFixed(0)}pp`
-    : `${sign}${fmtNum(v)}`;
-
-  return (
-    <div className="rounded-lg border border-border bg-secondary p-3 space-y-2">
-      <TraceBadges trace={trace} />
-
-      <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-          <span className="text-base leading-none">{meta.icon}</span>
-          {meta.label}
-          {isGRI && <span className="text-[9px] font-normal text-slate-400 ml-1">GRI</span>}
-        </span>
-        <span className={`text-[10px] font-semibold ${confColor}`}>{conf}</span>
-      </div>
-
-      <div className="flex items-center gap-2 font-mono text-xs text-secondary-foreground">
-        <span className="tabular-nums">{fmtVal(signal.historical)}</span>
-        <span className="text-border">→</span>
-        <span className="tabular-nums font-bold text-foreground">{fmtVal(signal.projected)}</span>
-        {unit && <span className="text-muted-foreground font-sans">{unit}</span>}
-        {signal.delta != null && (
-          <span className="ml-auto text-muted-foreground">({fmtDelta(signal.delta)})</span>
-        )}
-      </div>
-
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-[10px] text-muted-foreground">{HORIZON_LABEL[signal.horizon] ?? signal.horizon}</p>
-        {signal.threshold_reference && (
-          <p className="text-[10px] text-muted-foreground truncate max-w-[55%] text-right" title={signal.threshold_reference}>
-            {signal.threshold_reference.slice(0, 45)}…
-          </p>
-        )}
-      </div>
-
-      <TraceabilityDetails trace={trace} />
-    </div>
-  );
-}
-
-function SignalsPanel({ signals }) {
-  const list = signals?.signals ?? [];
-  if (!list.length) return null;
-
-  return (
-    <Card className="bg-card border-border shadow-sm">
-      <CardHeader className="pb-3 pt-4">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <Thermometer className="w-4 h-4 text-amber-500" />
-          <span className="font-semibold text-foreground">
-            Señales climáticas detectadas
-            <span className="ml-2 text-[11px] font-normal text-muted-foreground">({list.length})</span>
-          </span>
-        </CardTitle>
-        <p className="text-xs text-muted-foreground mt-1">
-          Cuantitativas (IPCC AR6 / WRI Aqueduct) + cualitativas GRI · histórico vs. proyectado
-        </p>
-      </CardHeader>
-      <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pb-4">
-        {list.map((s, i) => <SignalRow key={i} signal={s} />)}
-      </CardContent>
-    </Card>
-  );
-}
-
-// ── Panel 3: Señales e impactos contextuales ─────────────────────────────────
-
-function RiskCard({ risk }) {
-  const [expanded, setExpanded] = useState(false);
-  const signalMeta = SIGNAL_META[risk.signal?.signalType] ?? { icon: "⚠️", label: risk.signal?.signalType ?? "Riesgo" };
-  const trace = risk.source_traceability ?? risk.signal?.source_traceability;
-  return (
-    <div className="rounded-lg border border-border bg-secondary overflow-hidden">
-      <div className="p-3 space-y-2.5">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-base leading-none flex-shrink-0">{signalMeta.icon}</span>
-            <p className="text-xs font-semibold text-foreground truncate">{signalMeta.label}</p>
-          </div>
-          <Badge variant="outline" className="text-[10px] py-0 px-2">Senal observada</Badge>
-        </div>
-
-        <TraceBadges trace={trace} />
-
-        {/* Operational impacts (top 3) */}
-        {risk.operational_impacts?.length > 0 && (
-          <ul className="space-y-1">
-            {risk.operational_impacts.slice(0, expanded ? undefined : 3).map((imp, j) => (
-              <li key={j} className="flex items-start gap-1.5 text-[11px] text-secondary-foreground">
-                <span className="w-1 h-1 rounded-full bg-muted-foreground flex-shrink-0 mt-1.5" />
-                {imp}
-              </li>
-            ))}
-          </ul>
-        )}
-
-      </div>
-
-      {trace && (
-        <div className="border-t border-border">
-          <button
-            onClick={() => setExpanded(e => !e)}
-            className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <span>Metadata cientifica</span>
-            {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          </button>
-          {expanded && (
-            <div className="px-3 pb-3">
-              <TraceabilityDetails trace={trace} />
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function RisksPanel({ risks }) {
-  if (!risks?.length) return null;
-  return (
-    <Card className="bg-card border-border shadow-sm">
-      <CardHeader className="pb-3 pt-4">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <ShieldAlert className="w-4 h-4 text-orange-500" />
-          <span className="font-semibold text-foreground">Senales climaticas para revisar</span>
-        </CardTitle>
-        <p className="text-xs text-muted-foreground mt-1">
-          Lectura descriptiva con fuente, periodo, escenario SSP y trazabilidad cientifica
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-2.5 pb-4">
-        {risks.map((r, i) => <RiskCard key={i} risk={r} />)}
-      </CardContent>
-    </Card>
-  );
-}
-
-// ── Panel 4: Amenazas GRI (desde gri_hazards en respuesta v2) ─────────────────
-
-function GRIThreatsPanel({ hazards }) {
-  const filtered = (hazards ?? [])
-    .filter(h => h.baseline?.score && h.baseline.score !== "sin data")
-    .sort((a, b) => {
-      const order = { alto: 3, medio: 2, bajo: 1 };
-      return (order[b.baseline?.score] ?? 0) - (order[a.baseline?.score] ?? 0);
-    });
-
-  if (!filtered.length) return null;
-
-  return (
-    <Card className="bg-card border-border shadow-sm">
-      <CardHeader className="pb-3 pt-4">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-amber-500" />
-          <span className="font-semibold text-foreground">Exposición a amenazas</span>
-        </CardTitle>
-        <p className="text-xs text-muted-foreground mt-1">Fuente: GRI Infrastructure Resilience · probabilidad histórica y proyecciones</p>
-      </CardHeader>
-      <CardContent className="space-y-2 pb-4">
-        {filtered.map(h => {
-          const scoreKey = (h.baseline?.score ?? "sin data").toLowerCase();
-          const badgeCls = GRI_BADGE[scoreKey] ?? GRI_BADGE["sin data"];
-          const icon = GRI_ICONS[h.hazard] ?? "⚠️";
-          const futureScore = h.future_high_emissions?.score ?? h.future_low_emissions?.score;
-          const hasChange = futureScore && futureScore !== h.baseline?.score;
-
-          return (
-            <div
-              key={h.hazard}
-              className="rounded-lg border border-border p-3 flex items-center justify-between gap-3 bg-secondary"
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-lg leading-none">{icon}</span>
-                <div>
-                  <p className="text-sm font-semibold text-foreground">{h.hazard_name}</p>
-                  {hasChange && (
-                    <p className="text-[10px] text-muted-foreground">
-                      Proyección: {h.baseline?.score} → {futureScore}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <Badge variant="outline" className={`text-[10px] py-0.5 px-2 font-semibold border flex-shrink-0 ${badgeCls}`}>
-                {h.baseline?.score}
-              </Badge>
-            </div>
-          );
-        })}
-      </CardContent>
-    </Card>
-  );
-}
-
-// ── Panel 5: Medidas de adaptación (Layer 5) ──────────────────────────────────
-
-function AdaptationPanel({ adaptations }) {
-  const list = adaptations?.adaptations ?? [];
-  if (!list.length) return null;
-
-  return (
-    <Card className="bg-card border-border shadow-sm">
-      <CardHeader className="pb-3 pt-4">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <Leaf className="w-4 h-4 text-emerald-500" />
-          <span className="font-semibold text-foreground">Medidas de adaptación</span>
-        </CardTitle>
-        <p className="text-xs text-muted-foreground mt-1">Sugeridas por señal detectada · incluye horizonte y costo estimado</p>
-      </CardHeader>
-      <CardContent className="space-y-3 pb-4">
-        {list.map((adapt, i) => {
-          const signalMeta = SIGNAL_META[adapt.risk_type] ?? { icon: "⚠️", label: adapt.risk_type };
-          return (
-            <div key={i} className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-sm leading-none">{signalMeta.icon}</span>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  {signalMeta.label}
-                </p>
-                <Badge variant="outline" className="text-[10px] py-0 px-2">
-                  Confianza {adapt.confidence ?? "medium"}
-                </Badge>
-              </div>
-              <div className="space-y-1.5 pl-1">
-                {(adapt.measures ?? []).slice(0, 3).map((m, j) => (
-                  <div key={j} className="flex items-start justify-between gap-3 rounded-lg border border-border bg-secondary p-2.5">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-foreground">{m.nombre}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">
-                        {m.horizonte_implementacion} plazo
-                        {m.costo_estimado_rango && ` · ${fmtUSD(m.costo_estimado_rango.min_usd)}–${fmtUSD(m.costo_estimado_rango.max_usd)}`}
-                      </p>
-                      {m.donde_impacta && (
-                        <p className="text-[10px] text-muted-foreground mt-0.5 italic">{m.donde_impacta}</p>
-                      )}
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className={`text-[9px] py-0 px-1.5 flex-shrink-0 ${
-                        m.efectividad === "alta"  ? "border-emerald-400 text-emerald-700 dark:text-emerald-300" :
-                        m.efectividad === "media" ? "border-amber-400 text-amber-700 dark:text-amber-300" :
-                                                    "border-slate-400 text-slate-500"
-                      }`}
-                    >
-                      {m.efectividad}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-              {i < list.length - 1 && <div className="border-t border-border" />}
-            </div>
-          );
-        })}
-      </CardContent>
-    </Card>
-  );
-}
-
-// ── Panel 6: Contexto territorial (World Bank) ────────────────────────────────
-
-function TerritorialContextPanel({ data }) {
-  if (!data?.narrative?.length) return null;
-  return (
-    <Card className="bg-card border-border shadow-sm">
-      <CardHeader className="pb-2 pt-4">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <Globe2 className="w-4 h-4 text-blue-500" />
-          <span className="font-semibold text-foreground">Contexto del territorio</span>
-        </CardTitle>
-        <p className="text-xs text-muted-foreground">Fuente: Banco Mundial · indicadores socioeconómicos de Perú</p>
-      </CardHeader>
-      <CardContent className="pb-4">
-        <ul className="space-y-2">
-          {data.narrative.map((msg, i) => (
-            <li key={i} className="flex items-start gap-2.5 text-sm text-secondary-foreground">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0 mt-1.5" />
-              {msg}
-            </li>
-          ))}
-        </ul>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ── Panel 7: Recomendaciones IA ───────────────────────────────────────────────
-
-function AIPanel({ analysis, docContext }) {
-  const [loading, setLoading] = useState(false);
-  const [text, setText]       = useState(null);
-  const docCount = docContext?.total || 0;
-
-  const handleGenerate = async () => {
-    if (!analysis) return;
-    setLoading(true);
-    setText(null);
-    try {
-      const { narrative, risks, signals, metadata } = analysis;
-      const summary = narrative?.executive_summary ?? "";
-      const topRisks = (risks ?? []).slice(0, 3).map(r =>
-        `- ${r.signal?.signalType ?? "senal climatica"}: ${(r.operational_impacts ?? []).slice(0, 2).join(", ")}`
-      ).join("\n");
-      const sigCount = signals?.signals_count ?? 0;
-
-      const docSection = docContext?.ai_context ? `\n${docContext.ai_context}\n` : "";
-
-      const prompt = `Eres asesor experto en riesgos climáticos para operaciones de ${metadata?.sector ?? "retail"} en Perú.
-
-Resumen ejecutivo del análisis:
-${summary}
-
-Señales detectadas: ${sigCount}
-Riesgos principales:
-${topRisks || "Sin riesgos detectados"}
-${docSection}
-Elabora un análisis ejecutivo breve y accionable con:
-1. Perfil de riesgo (2–3 oraciones basadas en los datos anteriores)
-2. Impactos operacionales más probables para el sector (máx. 4 puntos concretos)
-3. Acciones recomendadas${docCount > 0 ? " — cuando sea pertinente, menciona los documentos de referencia disponibles" : ""} (máx. 3 puntos)
-
-Responde en español. Usa lenguaje claro y directo, sin términos técnicos científicos. No inventes datos que no estén en el contexto.`;
-
-      const res = await fetch(`${API_URL}/api/ai`, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ prompt }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Error al generar recomendaciones");
-      const text = typeof data === "string" ? data : data.response ?? "";
-      if (!text) throw new Error("La IA no devolvió texto. Intenta de nuevo.");
-      setText(text);
-    } catch (err) {
-      toast.error(err.message || "Error al generar recomendaciones");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
-            <Sparkles className="w-4 h-4 text-primary" />
-            Recomendaciones con IA
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Análisis generado a partir de los datos de riesgo detectados.
-          </p>
-        </div>
-        {docCount > 0 && (
-          <span className="inline-flex items-center gap-1 rounded-full border border-border bg-secondary px-3 py-1 text-[11px] font-semibold text-secondary-foreground">
-            <BookOpen className="w-3.5 h-3.5" />
-            {docCount} documento{docCount !== 1 ? "s" : ""}
-          </span>
-        )}
-      </div>
-
-      {!text ? (
-        <Button className="w-full gap-2" size="sm" onClick={handleGenerate} disabled={loading || !analysis}>
-          {loading
-            ? <><Loader2 className="w-4 h-4 animate-spin" />Analizando con IA...</>
-            : <><Sparkles className="w-4 h-4" />Generar recomendaciones</>}
-        </Button>
-      ) : (
-        <div className="space-y-3">
-          <div className="rounded-xl border border-border bg-secondary p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <p className="text-sm font-semibold text-foreground">Análisis IA</p>
-              <span className="rounded-full bg-primary/15 dark:bg-primary/25 px-2.5 py-1 text-[11px] font-bold text-primary">IA</span>
-            </div>
-            <div className="text-sm leading-6 text-foreground whitespace-pre-wrap">{text}</div>
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <Button size="sm" variant="secondary" onClick={() => setText(null)}>Regenerar</Button>
-            <p className="text-[11px] text-muted-foreground">Valida las acciones con tu equipo técnico.</p>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Loading state ─────────────────────────────────────────────────────────────
-
-function AnalysisLoading() {
-  return (
-    <Card className="bg-card border-border">
-      <CardContent className="py-6 flex flex-col items-center gap-3 text-center">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
-        <div>
-          <p className="text-sm font-medium text-secondary-foreground">Ejecutando análisis climático</p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Consultando climate_cells · GRI · Open-Meteo · World Bank
-          </p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ── Main page ─────────────────────────────────────────────────────────────────
+import { analyzeClimateRisk, fetchDocumentContext, fetchTerritorialContext } from "@/lib/api";
+import MethodologyPanel from "@/components/climate/MethodologyPanel";
+
+import { SECTORS } from "@/features/climate-lookup/constants";
+import MapView               from "@/features/climate-lookup/components/MapView";
+import SearchPanel           from "@/features/climate-lookup/components/SearchPanel";
+import NarrativePanel        from "@/features/climate-lookup/components/NarrativePanel";
+import SignalsPanel          from "@/features/climate-lookup/components/SignalsPanel";
+import RisksPanel            from "@/features/climate-lookup/components/RisksPanel";
+import GRIThreatsPanel       from "@/features/climate-lookup/components/GRIThreatsPanel";
+import AdaptationPanel       from "@/features/climate-lookup/components/AdaptationPanel";
+import TerritorialContextPanel from "@/features/climate-lookup/components/TerritorialContextPanel";
+import AIPanel               from "@/features/climate-lookup/components/AIPanel";
+import AnalysisLoading       from "@/features/climate-lookup/components/AnalysisLoading";
 
 export default function ClimateRiskLookup() {
-  const DEFAULT_CENTER = [-12.0464, -77.0428];
-
   const [lat, setLat]             = useState("");
   const [lng, setLng]             = useState("");
   const [sector, setSector]       = useState("retail");
   const [tileLayer, setTileLayer] = useState("osm");
   const [markerPos, setMarkerPos] = useState(null);
   const [flyTarget, setFlyTarget] = useState(null);
-
   const [loading, setLoading]     = useState(false);
   const [analysis, setAnalysis]   = useState(null);
   const [error, setError]         = useState(null);
-
   const [territorialCtx, setTerritorialCtx] = useState(null);
   const [docContext, setDocContext]         = useState(null);
 
   useEffect(() => {
-    Promise.allSettled([
-      fetchTerritorialContext(),
-      fetchDocumentContext(),
-    ]).then(([terrResult, docResult]) => {
+    Promise.allSettled([fetchTerritorialContext(), fetchDocumentContext()]).then(([terrResult, docResult]) => {
       if (terrResult.status === "fulfilled" && terrResult.value) setTerritorialCtx(terrResult.value);
       if (docResult.status === "fulfilled" && docResult.value?.total > 0) setDocContext(docResult.value);
     });
@@ -872,6 +48,16 @@ export default function ClimateRiskLookup() {
     setLat(String(clickLat));
     setLng(String(clickLng));
     setMarkerPos([clickLat, clickLng]);
+    setAnalysis(null);
+    setError(null);
+  }, []);
+
+  const handleLocationSelect = useCallback((newLat, newLng) => {
+    if (!isFinite(newLat) || !isFinite(newLng)) return;
+    setLat(String(newLat));
+    setLng(String(newLng));
+    setMarkerPos([newLat, newLng]);
+    setFlyTarget({ pos: [newLat, newLng], zoom: 16 });
     setAnalysis(null);
     setError(null);
   }, []);
@@ -914,65 +100,18 @@ export default function ClimateRiskLookup() {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+        <MapView
+          tileLayer={tileLayer}
+          onTileLayerChange={setTileLayer}
+          onMapClick={handleMapClick}
+          markerPos={markerPos}
+          flyTarget={flyTarget}
+        />
 
-        {/* ── Mapa ─────────────────────────── */}
-        <div className="space-y-2">
-          <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-            <MapPin className="w-3.5 h-3.5" />
-            Haz clic en el mapa para seleccionar una ubicación
-          </p>
-          <div className="rounded-xl border border-border shadow-sm relative" style={{ height: "480px" }}>
-            <MapContainer
-              center={DEFAULT_CENTER} zoom={7}
-              style={{ height: "100%", width: "100%", borderRadius: "0.75rem" }}
-              className="z-0"
-            >
-              <TileLayer
-                key={tileLayer}
-                url={TILE_LAYERS[tileLayer].url}
-                attribution={TILE_LAYERS[tileLayer].attribution}
-              />
-              <MapClickHandler onMapClick={handleMapClick} />
-              <MapFlyTo target={flyTarget} />
-              {markerPos && <Marker position={markerPos} />}
-            </MapContainer>
-
-            {/* Selector de capa flotante */}
-            <div className="absolute bottom-3 left-3 z-[1000] flex gap-1 bg-card/90 backdrop-blur-sm rounded-lg border border-border p-1 shadow-md">
-              {Object.entries(TILE_LAYERS).map(([key, t]) => (
-                <button
-                  key={key}
-                  onClick={() => setTileLayer(key)}
-                  className={`text-[10px] px-2 py-1 rounded-md transition-colors whitespace-nowrap ${
-                    tileLayer === key
-                      ? "bg-primary text-primary-foreground font-medium"
-                      : "text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  {t.icon} {t.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* ── Panel derecho ─────────────────── */}
         <div className="space-y-4 overflow-y-auto" style={{ maxHeight: "82vh" }}>
-
-          {/* Formulario de búsqueda */}
           <Card>
             <CardContent className="pt-4 space-y-4">
-              <SearchPanel
-                onLocationSelect={(newLat, newLng) => {
-                  if (!isFinite(newLat) || !isFinite(newLng)) return;
-                  setLat(String(newLat));
-                  setLng(String(newLng));
-                  setMarkerPos([newLat, newLng]);
-                  setFlyTarget({ pos: [newLat, newLng], zoom: 16 });
-                  setAnalysis(null);
-                  setError(null);
-                }}
-              />
+              <SearchPanel onLocationSelect={handleLocationSelect} />
 
               <div className="border-t border-border/50" />
 
@@ -995,7 +134,6 @@ export default function ClimateRiskLookup() {
                 </div>
               </div>
 
-              {/* Sector selector */}
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Sector operacional</Label>
                 <Select value={sector} onValueChange={setSector}>
@@ -1022,10 +160,8 @@ export default function ClimateRiskLookup() {
             </CardContent>
           </Card>
 
-          {/* Loading state */}
           {loading && <AnalysisLoading />}
 
-          {/* Error state */}
           {error && !loading && (
             <Alert className="border-destructive bg-destructive/10">
               <AlertTriangle className="w-4 h-4 text-destructive" />
@@ -1033,38 +169,23 @@ export default function ClimateRiskLookup() {
             </Alert>
           )}
 
-          {/* Resultados del análisis integrado (Layers 1-6) */}
           {hasResults && !loading && (
             <>
-              {/* Layer 6: Narrativa ejecutiva */}
               <NarrativePanel
                 narrative={analysis.narrative}
                 location={analysis.location}
                 metadata={analysis.metadata}
-                analysis={analysis}
               />
-
-              {/* Layer 2: Señales climáticas */}
-              <SignalsPanel signals={analysis.signals} />
-
-              {/* Interpretacion contextual: señales e impactos */}
-              <RisksPanel risks={analysis.risks} />
-
-              {/* GRI: Amenazas por tipo */}
+              <SignalsPanel    signals={analysis.signals} />
+              <RisksPanel      risks={analysis.risks} />
               <GRIThreatsPanel hazards={analysis.gri_hazards} />
-
-              {/* Layer 5: Adaptaciones */}
               <AdaptationPanel adaptations={analysis.adaptations} />
             </>
           )}
 
-          {/* Panel de Metodología y Fuentes — siempre visible, badges dinámicos con análisis */}
           <MethodologyPanel metadata={analysis?.metadata} />
-
-          {/* Contexto territorial Banco Mundial (siempre disponible) */}
           <TerritorialContextPanel data={territorialCtx} />
 
-          {/* Recomendaciones IA */}
           {hasResults && !loading && (
             <Card className="bg-card border-border shadow-sm">
               <CardContent className="pt-4 pb-4">
@@ -1073,7 +194,6 @@ export default function ClimateRiskLookup() {
             </Card>
           )}
 
-          {/* Estado vacío */}
           {!hasResults && !loading && !error && (
             <div className="text-center py-12">
               <MapPin className="w-8 h-8 mx-auto mb-2 text-muted-foreground/30" />

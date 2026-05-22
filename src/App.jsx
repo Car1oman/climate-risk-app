@@ -2,40 +2,37 @@ import React, { useEffect, useState } from 'react'
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import LoginPage from '@/pages/LoginPage';
 
 import AppLayout from './components/layout/AppLayout';
-import Dashboard from './pages/Dashboard';
-import RiskMap from './pages/RiskMap';
-import Assets from './pages/Assets';
-import AssetDetail from './pages/AssetDetail';
-import Alerts from './pages/Alerts';
-import Report from './pages/Report';
 import AppSettings from './pages/AppSettings';
-import DataManagement from './pages/DataManagement';
 import ClimateDataUpload from './pages/ClimateDataUpload';
 import ClimateRiskLookup from './pages/ClimateRiskLookup';
 import DocumentosClimaticos from './pages/DocumentosClimaticos';
+
+// Rutas MVP activas. Dashboard, RiskMap, Assets, AssetDetail, Alerts, Report,
+// DataManagement están desactivadas del flujo principal (versión 2).
 
 const AuthenticatedApp = () => {
   return (
     <Routes>
       <Route element={<AppLayout />}>
         <Route path="/" element={<ClimateRiskLookup />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/map" element={<RiskMap />} />
-        <Route path="/assets" element={<Assets />} />
-        <Route path="/assets/:id" element={<AssetDetail />} />
-        <Route path="/alerts" element={<Alerts />} />
-        <Route path="/report" element={<Report />} />
-        <Route path="/data-management" element={<DataManagement />} />
         <Route path="/climate-upload" element={<ClimateDataUpload />} />
-        <Route path="/climate-risk-lookup" element={<ClimateRiskLookup />} />
         <Route path="/documentos" element={<DocumentosClimaticos />} />
         <Route path="/settings" element={<AppSettings />} />
+        {/* Rutas desactivadas — redirigen al flujo principal hasta versión 2 */}
+        <Route path="/dashboard"        element={<Navigate to="/" replace />} />
+        <Route path="/map"              element={<Navigate to="/" replace />} />
+        <Route path="/assets"           element={<Navigate to="/" replace />} />
+        <Route path="/assets/:id"       element={<Navigate to="/" replace />} />
+        <Route path="/alerts"           element={<Navigate to="/" replace />} />
+        <Route path="/report"           element={<Navigate to="/" replace />} />
+        <Route path="/data-management"  element={<Navigate to="/" replace />} />
+        <Route path="/climate-risk-lookup" element={<Navigate to="/" replace />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
