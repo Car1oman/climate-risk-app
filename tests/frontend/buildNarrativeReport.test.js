@@ -1,91 +1,162 @@
 /**
- * Unit tests — buildNarrativeReport() narrative assembly (Sprint 15).
+ * Unit tests — buildNarrativeReport() / buildOperationalNarrative (Sprint 18).
  *
- * Mirrors the TS logic in src/domain/buildNarrativeReport.ts and
- * src/domain/normalizeRisks.ts (buildExecutiveSummary).  Pure JS so
- * Node --test can run it without Vite/TS transpilation.
+ * Mirrors the TS logic in:
+ *   src/domain/buildNarrativeReport.ts
+ *   src/domain/buildOperationalNarrative.ts  (Sprint 18: no raw metrics, no IPCC codes)
+ *   src/domain/normalizeRisks.ts             (buildExecutiveSummary — deduplicated)
  *
+ * Pure JS so Node --test can run without Vite/TS transpilation.
  * Run: node --test tests/frontend/buildNarrativeReport.test.js
  */
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-// ─── Inline: buildExecutiveSummary (mirrors normalizeRisks.ts) ───────────────
+// ─── Inline: buildOperationalNarrative (mirrors buildOperationalNarrative.ts) ─
 
-function buildExecutiveSummary(risks, locationLabel, sectorLabel) {
-  const topRisks = risks
-    .filter(r => r.confidence !== 'baja')
-    .slice(0, 3)
-    .map(r => r.displayName.toLowerCase());
+const IMPACT_DOMAINS = {
+  lluvias_extremas: ['accesos y logística', 'continuidad operativa'],
+  calor_extremo:    ['productividad del personal', 'demanda energética'],
+  sequia:           ['abastecimiento hídrico', 'cadena de suministro'],
+  deslizamiento:    ['vías de acceso', 'infraestructura crítica'],
+  heladas:          ['instalaciones expuestas', 'operaciones en campo'],
+  fenomeno_enso:    ['logística', 'planificación operativa'],
+  inundacion:       ['instalaciones', 'rutas logísticas'],
+};
 
-  if (topRisks.length === 0) {
+const MID_TERM_PROJECTION = {
+  lluvias_extremas: 'lluvias más intensas y frecuentes',
+  calor_extremo:    'temperaturas más extremas',
+  sequia:           'períodos de sequía más extensos y severos',
+  deslizamiento:    'mayor susceptibilidad a movimientos de terreno',
+  heladas:          'episodios de heladas más intensos',
+  fenomeno_enso:    'mayor variabilidad climática interanual',
+  inundacion:       'mayor riesgo de desborde e inundaciones',
+};
+
+const LONG_TERM_PROJECTION = {
+  lluvias_extremas: 'un régimen de lluvias más intenso y variable',
+  calor_extremo:    'condiciones de calor extremo más frecuentes e intensas',
+  sequia:           'mayor escasez hídrica',
+  deslizamiento:    'riesgo incrementado de deslizamientos',
+  heladas:          'variabilidad en el riesgo de heladas',
+  fenomeno_enso:    'variabilidad climática de largo plazo amplificada',
+  inundacion:       'mayor exposición a inundaciones',
+};
+
+const SCENARIO_PHRASE = {
+  emisiones_moderadas: 'bajo un escenario de emisiones moderadas',
+  altas_emisiones:     'bajo un escenario de altas emisiones',
+  bajas_emisiones:     'bajo un escenario de bajas emisiones',
+};
+
+function formatList(items) {
+  if (!items.length) return '';
+  if (items.length === 1) return items[0];
+  return items.slice(0, -1).join(', ') + ' y ' + items[items.length - 1];
+}
+
+function dedupeByRiskType(risks) {
+  const seen = new Set();
+  return risks.filter(r => {
+    if (seen.has(r.riskType)) return false;
+    seen.add(r.riskType);
+    return true;
+  });
+}
+
+function buildOperationalExecutiveSummary(risks, locationLabel, sectorLabel) {
+  const qualifying = risks.filter(r => r.confidence !== 'baja');
+  const unique = dedupeByRiskType(qualifying).slice(0, 3);
+
+  if (unique.length === 0) {
     return `Para ${locationLabel}, el análisis no identificó riesgos climáticos de alta o media confianza en el período evaluado.`;
   }
 
-  const riskList =
-    topRisks.length === 1
-      ? topRisks[0]
-      : topRisks.slice(0, -1).join(', ') + ' y ' + topRisks[topRisks.length - 1];
+  const riskNames = unique.map(r => r.displayName.toLowerCase());
+  const riskList = formatList(riskNames);
+
+  const domains = unique
+    .flatMap(r => IMPACT_DOMAINS[r.riskType] ?? [])
+    .filter((v, i, arr) => arr.indexOf(v) === i)
+    .slice(0, 3);
+
+  const impactSentence = domains.length > 0
+    ? ` Esto podría afectar ${formatList(domains)}.`
+    : '';
 
   const adaptCount = risks.flatMap(r => r.adaptationMeasures).length;
-  const keyMetricRisk = risks.find(r => r.keyMetric);
-  const metricSentence = keyMetricRisk?.keyMetric
-    ? ` Las proyecciones estiman ${keyMetricRisk.keyMetric} hacia ${keyMetricRisk.period.replace('_', ' ')}.`
+  const adaptSentence = adaptCount > 0
+    ? ` Se identificaron ${adaptCount} medidas de adaptación prioritarias.`
     : '';
-  const adaptSentence =
-    adaptCount > 0 ? ` Se identificaron ${adaptCount} medidas de adaptación prioritarias.` : '';
 
   return (
-    `Para ${locationLabel}, el análisis climático identifica ${riskList} como los principales` +
-    ` factores de riesgo para operaciones de ${sectorLabel}.` +
-    metricSentence +
+    `Para ${locationLabel}, el análisis identifica ${riskList} como los principales` +
+    ` riesgos para las operaciones de ${sectorLabel}.` +
+    impactSentence +
     adaptSentence
   );
 }
 
-// ─── Inline: buildNarrativeReport (mirrors buildNarrativeReport.ts) ──────────
-
-const PERIOD_LABEL = {
-  historico:     'período histórico de referencia',
-  corto_plazo:   'corto plazo (2020–2039)',
-  mediano_plazo: 'mediano plazo (2040–2059)',
-  largo_plazo:   'largo plazo (2060–2079)',
-};
-
-function buildPeriodNarrative(risks, period) {
+function buildOperationalPeriodNarrative(risks, period) {
   const filtered = risks.filter(r => r.period === period && r.confidence !== 'baja');
   if (!filtered.length) return '';
 
-  const parts = filtered.map(r => {
-    const metric = r.keyMetric ? ` (${r.keyMetric})` : '';
-    return `${r.displayName.toLowerCase()}${metric}`;
-  });
-
-  const riskList =
-    parts.length === 1
-      ? parts[0]
-      : parts.slice(0, -1).join(', ') + ' y ' + parts[parts.length - 1];
-
+  const unique = dedupeByRiskType(filtered);
   const adaptCount = filtered.flatMap(r => r.adaptationMeasures).length;
-  const adaptSentence =
-    adaptCount > 0
-      ? ` Se disponen ${adaptCount} medida${adaptCount > 1 ? 's' : ''} de adaptación asociada${adaptCount > 1 ? 's' : ''}.`
-      : '';
+  const adaptSuffix = adaptCount > 0
+    ? ` Se disponen ${adaptCount} medida${adaptCount > 1 ? 's' : ''} de adaptación.`
+    : '';
 
-  return (
-    `En el ${PERIOD_LABEL[period]}, el análisis identifica ${riskList} ` +
-    `como fenómeno${filtered.length > 1 ? 's' : ''} relevante${filtered.length > 1 ? 's' : ''} ` +
-    `para esta ubicación.` +
-    adaptSentence
-  );
+  if (period === 'historico') {
+    const names = unique.map(r => r.displayName.toLowerCase());
+    const list = formatList(names);
+    const domains = unique
+      .flatMap(r => IMPACT_DOMAINS[r.riskType] ?? [])
+      .filter((v, i, arr) => arr.indexOf(v) === i)
+      .slice(0, 2);
+    const domainSuffix = domains.length > 0
+      ? `, con potencial afectación sobre ${formatList(domains)}`
+      : '';
+    return `En el período de referencia, se han identificado ${list} en esta zona${domainSuffix}.${adaptSuffix}`;
+  }
+
+  if (period === 'mediano_plazo') {
+    const projections = unique.map(
+      r => MID_TERM_PROJECTION[r.riskType] ?? r.displayName.toLowerCase()
+    );
+    const projList = formatList(projections);
+    const scenario = unique[0]?.scenario;
+    const scenarioPart = scenario && SCENARIO_PHRASE[scenario]
+      ? `${SCENARIO_PHRASE[scenario]}, esta zona`
+      : 'esta zona';
+    return `Hacia mediados de siglo, ${scenarioPart} podría experimentar ${projList}.${adaptSuffix}`;
+  }
+
+  if (period === 'largo_plazo') {
+    const projections = unique.map(
+      r => LONG_TERM_PROJECTION[r.riskType] ?? r.displayName.toLowerCase()
+    );
+    const projList = formatList(projections);
+    const scenario = unique[0]?.scenario;
+    const lead = scenario === 'altas_emisiones'
+      ? 'Bajo un escenario de altas emisiones'
+      : 'A largo plazo';
+    return `${lead}, se proyecta ${projList}, con mayor afectación sobre la infraestructura y las operaciones.${adaptSuffix}`;
+  }
+
+  const names = unique.map(r => r.displayName.toLowerCase());
+  return `En el corto plazo se anticipan ${formatList(names)} con potencial de impacto operativo.${adaptSuffix}`;
 }
 
+// ─── Inline: buildNarrativeReport (mirrors buildNarrativeReport.ts) ───────────
+
 function buildNarrativeReport(risks, locationLabel, sectorLabel, rawResponse) {
-  const executiveSummary    = buildExecutiveSummary(risks, locationLabel, sectorLabel);
-  const historicalNarrative = buildPeriodNarrative(risks, 'historico');
-  const midTermNarrative    = buildPeriodNarrative(risks, 'mediano_plazo');
-  const longTermNarrative   = buildPeriodNarrative(risks, 'largo_plazo');
+  const executiveSummary    = buildOperationalExecutiveSummary(risks, locationLabel, sectorLabel);
+  const historicalNarrative = buildOperationalPeriodNarrative(risks, 'historico');
+  const midTermNarrative    = buildOperationalPeriodNarrative(risks, 'mediano_plazo');
+  const longTermNarrative   = buildOperationalPeriodNarrative(risks, 'largo_plazo');
 
   const primaryScenario = risks.find(r => r.scenario !== null)?.scenario ?? null;
 
@@ -112,6 +183,40 @@ function buildNarrativeReport(risks, locationLabel, sectorLabel, rawResponse) {
   };
 }
 
+// ─── Legacy buildExecutiveSummary (mirrors normalizeRisks.ts — deduplicated) ──
+
+function buildExecutiveSummary(risks, locationLabel, sectorLabel) {
+  const seen = new Set();
+  const topRisks = risks
+    .filter(r => r.confidence !== 'baja')
+    .filter(r => {
+      if (seen.has(r.riskType)) return false;
+      seen.add(r.riskType);
+      return true;
+    })
+    .slice(0, 3)
+    .map(r => r.displayName.toLowerCase());
+
+  if (topRisks.length === 0) {
+    return `Para ${locationLabel}, el análisis no identificó riesgos climáticos de alta o media confianza en el período evaluado.`;
+  }
+
+  const riskList =
+    topRisks.length === 1
+      ? topRisks[0]
+      : topRisks.slice(0, -1).join(', ') + ' y ' + topRisks[topRisks.length - 1];
+
+  const adaptCount = risks.flatMap(r => r.adaptationMeasures).length;
+  const adaptSentence =
+    adaptCount > 0 ? ` Se identificaron ${adaptCount} medidas de adaptación prioritarias.` : '';
+
+  return (
+    `Para ${locationLabel}, el análisis identifica ${riskList} como los principales` +
+    ` riesgos para las operaciones de ${sectorLabel}.` +
+    adaptSentence
+  );
+}
+
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 const makeRisk = (overrides) => ({
@@ -130,7 +235,7 @@ const makeRisk = (overrides) => ({
   ...overrides,
 });
 
-// ─── Tests ────────────────────────────────────────────────────────────────────
+// ─── Tests — buildNarrativeReport structure ───────────────────────────────────
 
 describe('buildNarrativeReport — structure', () => {
   it('returns all required fields', () => {
@@ -160,35 +265,37 @@ describe('buildNarrativeReport — structure', () => {
   });
 });
 
+// ─── Tests — period narratives ────────────────────────────────────────────────
+
 describe('buildNarrativeReport — period narratives', () => {
   it('historicalNarrative only includes historico risks', () => {
     const risks = [
-      makeRisk({ id: 'r1', period: 'historico',     displayName: 'Lluvias extremas' }),
-      makeRisk({ id: 'r2', period: 'mediano_plazo',  displayName: 'Calor extremo'   }),
+      makeRisk({ id: 'r1', period: 'historico',     riskType: 'lluvias_extremas', displayName: 'Lluvias extremas' }),
+      makeRisk({ id: 'r2', period: 'mediano_plazo',  riskType: 'calor_extremo',    displayName: 'Calor extremo'   }),
     ];
     const report = buildNarrativeReport(risks, 'Lima', 'Retail');
     assert.ok(report.historicalNarrative.includes('lluvias extremas'));
     assert.ok(!report.historicalNarrative.includes('calor extremo'));
   });
 
-  it('midTermNarrative only includes mediano_plazo risks', () => {
+  it('midTermNarrative uses operational projection language for mediano_plazo risks', () => {
     const risks = [
-      makeRisk({ id: 'r1', period: 'historico',    displayName: 'Sequía'       }),
-      makeRisk({ id: 'r2', period: 'mediano_plazo', displayName: 'Calor extremo' }),
+      makeRisk({ id: 'r1', period: 'historico',     riskType: 'sequia',        displayName: 'Sequía'        }),
+      makeRisk({ id: 'r2', period: 'mediano_plazo',  riskType: 'calor_extremo', displayName: 'Calor extremo' }),
     ];
     const report = buildNarrativeReport(risks, 'Lima', 'Retail');
-    assert.ok(report.midTermNarrative.includes('calor extremo'));
-    assert.ok(!report.midTermNarrative.includes('sequía'));
+    assert.ok(report.midTermNarrative.includes('temperaturas más extremas'), 'debe usar proyección operacional');
+    assert.ok(!report.midTermNarrative.includes('sequía'), 'no debe incluir riesgos de otro período');
   });
 
-  it('longTermNarrative only includes largo_plazo risks', () => {
+  it('longTermNarrative uses operational projection language for largo_plazo risks', () => {
     const risks = [
-      makeRisk({ id: 'r1', period: 'mediano_plazo', displayName: 'Sequía'         }),
-      makeRisk({ id: 'r2', period: 'largo_plazo',   displayName: 'Deslizamiento'  }),
+      makeRisk({ id: 'r1', period: 'mediano_plazo', riskType: 'sequia',          displayName: 'Sequía'        }),
+      makeRisk({ id: 'r2', period: 'largo_plazo',   riskType: 'deslizamiento',   displayName: 'Deslizamiento' }),
     ];
     const report = buildNarrativeReport(risks, 'Lima', 'Retail');
-    assert.ok(report.longTermNarrative.includes('deslizamiento'));
-    assert.ok(!report.longTermNarrative.includes('sequía'));
+    assert.ok(report.longTermNarrative.includes('deslizamiento'), 'debe mencionar el fenómeno');
+    assert.ok(!report.longTermNarrative.includes('sequía'), 'no debe incluir riesgos de otro período');
   });
 
   it('returns empty string for period with no risks', () => {
@@ -206,18 +313,39 @@ describe('buildNarrativeReport — period narratives', () => {
     assert.equal(report.historicalNarrative, '', 'Low-confidence risks must not appear in narrative');
   });
 
-  it('includes keyMetric in period narrative when present', () => {
+  it('period narrative does NOT include raw metrics', () => {
     const risks = [
-      makeRisk({ period: 'mediano_plazo', displayName: 'Lluvias extremas', keyMetric: '78 mm/día' }),
+      makeRisk({ period: 'mediano_plazo', riskType: 'lluvias_extremas', displayName: 'Lluvias extremas', keyMetric: '78 mm/día' }),
     ];
     const report = buildNarrativeReport(risks, 'Lima', 'Retail');
-    assert.ok(report.midTermNarrative.includes('78 mm/día'));
+    assert.ok(!report.midTermNarrative.includes('78 mm/día'), 'keyMetric no debe aparecer en la narrativa');
+    assert.ok(report.midTermNarrative.length > 0, 'la narrativa debe existir aunque sin métrica cruda');
+  });
+
+  it('period narrative does NOT include IPCC codes', () => {
+    const risks = [makeRisk({ period: 'mediano_plazo', riskType: 'lluvias_extremas' })];
+    const report = buildNarrativeReport(risks, 'Lima', 'Retail');
+    const technicalTerms = ['SSP245', 'SSP585', 'SSP2-4.5', 'CMIP6', 'rx1day', 'Rx5day', 'anomalía'];
+    for (const term of technicalTerms) {
+      assert.ok(!report.midTermNarrative.includes(term), `"${term}" no debe aparecer en la narrativa`);
+    }
+  });
+
+  it('midTermNarrative includes scenario plain label when scenario is set', () => {
+    const risks = [makeRisk({ period: 'mediano_plazo', scenario: 'emisiones_moderadas' })];
+    const report = buildNarrativeReport(risks, 'Lima', 'Retail');
+    assert.ok(
+      report.midTermNarrative.includes('emisiones moderadas'),
+      'debe mencionar el escenario en lenguaje llano'
+    );
+    assert.ok(!report.midTermNarrative.includes('SSP'), 'no debe exponer el código SSP');
   });
 
   it('mentions adaptation count when measures are present', () => {
     const risks = [
       makeRisk({
         period: 'historico',
+        riskType: 'lluvias_extremas',
         adaptationMeasures: [
           { id: 'a1', name: 'Drenaje', timeframe: 'mediano', effectiveness: 'alta' },
           { id: 'a2', name: 'Barreras', timeframe: 'largo', effectiveness: 'media' },
@@ -228,6 +356,8 @@ describe('buildNarrativeReport — period narratives', () => {
     assert.ok(report.historicalNarrative.includes('2 medidas'));
   });
 });
+
+// ─── Tests — confidence aggregation ──────────────────────────────────────────
 
 describe('buildNarrativeReport — confidence aggregation', () => {
   it('reports alta confidence when any risk is alta', () => {
@@ -255,6 +385,8 @@ describe('buildNarrativeReport — confidence aggregation', () => {
   });
 });
 
+// ─── Tests — primaryScenario ──────────────────────────────────────────────────
+
 describe('buildNarrativeReport — primaryScenario', () => {
   it('picks scenario from first risk that has one', () => {
     const risks = [
@@ -272,6 +404,8 @@ describe('buildNarrativeReport — primaryScenario', () => {
   });
 });
 
+// ─── Tests — analysisDate ─────────────────────────────────────────────────────
+
 describe('buildNarrativeReport — analysisDate', () => {
   it('uses generated_at from rawResponse.metadata when provided', () => {
     const rawResponse = { metadata: { generated_at: '2025-06-01T12:00:00Z' } };
@@ -286,6 +420,8 @@ describe('buildNarrativeReport — analysisDate', () => {
     assert.ok(!Number.isNaN(Date.parse(report.analysisDate)));
   });
 });
+
+// ─── Tests — buildExecutiveSummary (legacy, deduplicated) ────────────────────
 
 describe('buildExecutiveSummary — hero paragraph', () => {
   it('mentions location and sector', () => {
@@ -319,7 +455,7 @@ describe('buildExecutiveSummary — hero paragraph', () => {
     assert.ok(summary.includes('1 medidas de adaptación'));
   });
 
-  it('lists up to 3 top risks', () => {
+  it('lists up to 3 top risks, capped and deduplicated by riskType', () => {
     const risks = [
       makeRisk({ id: 'r1', riskType: 'lluvias_extremas', displayName: 'Lluvias extremas' }),
       makeRisk({ id: 'r2', riskType: 'calor_extremo',    displayName: 'Calor extremo',   period: 'largo_plazo'   }),
@@ -333,9 +469,96 @@ describe('buildExecutiveSummary — hero paragraph', () => {
     assert.ok(!summary.includes('deslizamiento'), '4th risk must be excluded (cap at 3)');
   });
 
-  it('includes keyMetric in the summary when available', () => {
+  it('deduplicates risks with the same riskType across periods', () => {
+    const risks = [
+      makeRisk({ id: 'r1', riskType: 'lluvias_extremas', period: 'mediano_plazo', displayName: 'Lluvias extremas' }),
+      makeRisk({ id: 'r2', riskType: 'lluvias_extremas', period: 'largo_plazo',   displayName: 'Lluvias extremas' }),
+      makeRisk({ id: 'r3', riskType: 'sequia',           period: 'mediano_plazo', displayName: 'Sequía'           }),
+    ];
+    const summary = buildExecutiveSummary(risks, 'Lima', 'Retail');
+    // "lluvias extremas" must appear only once, not "lluvias extremas, lluvias extremas y sequía"
+    const count = (summary.match(/lluvias extremas/g) ?? []).length;
+    assert.equal(count, 1, 'el mismo riskType no debe duplicarse en el resumen');
+    assert.ok(summary.includes('sequía'));
+  });
+
+  it('summary uses operational language — no raw metrics', () => {
     const risks = [makeRisk({ confidence: 'alta', keyMetric: '42 °C', period: 'mediano_plazo' })];
     const summary = buildExecutiveSummary(risks, 'Lima', 'Retail');
-    assert.ok(summary.includes('42 °C'));
+    assert.ok(!summary.includes('42 °C'), 'raw keyMetric must not appear in summary');
+    assert.ok(summary.includes('Lima'), 'location label must appear');
+    assert.ok(summary.includes('Retail'), 'sector label must appear');
+  });
+
+  it('summary has no IPCC/SSP codes', () => {
+    const risks = [makeRisk({ confidence: 'alta' })];
+    const summary = buildExecutiveSummary(risks, 'Lima', 'Retail');
+    const forbidden = ['SSP245', 'SSP585', 'CMIP6', 'rx1day', 'Rx5day', 'ONI', 'anomalía'];
+    for (const term of forbidden) {
+      assert.ok(!summary.includes(term), `"${term}" must not appear in executive summary`);
+    }
+  });
+});
+
+// ─── Tests — buildOperationalExecutiveSummary ────────────────────────────────
+
+describe('buildOperationalExecutiveSummary — operational hero', () => {
+  it('includes operational impact domains', () => {
+    const risks = [makeRisk({ confidence: 'alta', riskType: 'lluvias_extremas' })];
+    const summary = buildOperationalExecutiveSummary(risks, 'Lima', 'Retail');
+    assert.ok(
+      summary.includes('accesos y logística') || summary.includes('continuidad operativa'),
+      'debe mencionar dominios operativos'
+    );
+  });
+
+  it('deduplicates riskType across periods in the hero', () => {
+    const risks = [
+      makeRisk({ id: 'r1', riskType: 'lluvias_extremas', period: 'mediano_plazo' }),
+      makeRisk({ id: 'r2', riskType: 'lluvias_extremas', period: 'largo_plazo'   }),
+    ];
+    const summary = buildOperationalExecutiveSummary(risks, 'Lima', 'Retail');
+    const count = (summary.match(/lluvias extremas/g) ?? []).length;
+    assert.equal(count, 1, 'el mismo fenómeno no debe aparecer dos veces');
+  });
+});
+
+// ─── Tests — buildOperationalPeriodNarrative ─────────────────────────────────
+
+describe('buildOperationalPeriodNarrative — period language', () => {
+  it('historical uses observation language without raw metrics', () => {
+    const risks = [makeRisk({ period: 'historico', riskType: 'lluvias_extremas', displayName: 'Lluvias extremas' })];
+    const text = buildOperationalPeriodNarrative(risks, 'historico');
+    assert.ok(text.includes('lluvias extremas'), 'debe mencionar el fenómeno');
+    assert.ok(text.includes('período de referencia'), 'debe usar lenguaje histórico');
+    assert.ok(!text.includes('SSP'), 'no debe exponer código SSP');
+  });
+
+  it('mid-term uses projection language with scenario plain label', () => {
+    const risks = [makeRisk({ period: 'mediano_plazo', riskType: 'calor_extremo', scenario: 'emisiones_moderadas' })];
+    const text = buildOperationalPeriodNarrative(risks, 'mediano_plazo');
+    assert.ok(text.includes('temperaturas más extremas'), 'debe usar proyección operacional');
+    assert.ok(text.includes('mediados de siglo'), 'debe ubicar temporalmente');
+    assert.ok(text.includes('emisiones moderadas'), 'debe mencionar escenario en lenguaje llano');
+    assert.ok(!text.includes('SSP245') && !text.includes('ssp245'), 'no debe exponer código SSP');
+  });
+
+  it('long-term uses projection language', () => {
+    const risks = [makeRisk({ period: 'largo_plazo', riskType: 'sequia', scenario: 'altas_emisiones' })];
+    const text = buildOperationalPeriodNarrative(risks, 'largo_plazo');
+    assert.ok(text.includes('mayor escasez hídrica') || text.includes('escasez'), 'debe usar proyección operacional');
+    assert.ok(text.includes('altas emisiones'), 'debe mencionar escenario en lenguaje llano');
+    assert.ok(!text.includes('SSP585'), 'no debe exponer código SSP');
+  });
+
+  it('returns empty for period with no risks', () => {
+    const text = buildOperationalPeriodNarrative([], 'mediano_plazo');
+    assert.equal(text, '');
+  });
+
+  it('excludes baja-confidence risks', () => {
+    const risks = [makeRisk({ period: 'historico', confidence: 'baja' })];
+    const text = buildOperationalPeriodNarrative(risks, 'historico');
+    assert.equal(text, '');
   });
 });

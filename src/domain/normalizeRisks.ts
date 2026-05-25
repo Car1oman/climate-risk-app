@@ -360,14 +360,28 @@ export function normalizeRisks(apiResponse: Record<string, unknown>): Consolidat
 
 // ─── Executive summary builder ────────────────────────────────────────────────
 
-/** Builds a 3–4 sentence hero paragraph for the NarrativeReport. */
+/**
+ * Builds a hero paragraph for the NarrativeReport.
+ * Deduplicates by riskType before slicing to prevent the same phenomenon
+ * appearing twice ("lluvias extremas, lluvias extremas y sequía").
+ * Does NOT expose raw keyMetric values.
+ *
+ * @deprecated Use buildOperationalExecutiveSummary from buildOperationalNarrative.ts.
+ *   This function is kept for compatibility with legacy tests only.
+ */
 export function buildExecutiveSummary(
   risks: ConsolidatedRisk[],
   locationLabel: string,
   sectorLabel: string
 ): string {
+  const seen = new Set<string>();
   const topRisks = risks
     .filter(r => r.confidence !== 'baja')
+    .filter(r => {
+      if (seen.has(r.riskType)) return false;
+      seen.add(r.riskType);
+      return true;
+    })
     .slice(0, 3)
     .map(r => r.displayName.toLowerCase());
 
@@ -380,19 +394,13 @@ export function buildExecutiveSummary(
     : topRisks.slice(0, -1).join(', ') + ' y ' + topRisks[topRisks.length - 1];
 
   const adaptCount = risks.flatMap(r => r.adaptationMeasures).length;
-  const keyMetricRisk = risks.find(r => r.keyMetric);
-  const metricSentence = keyMetricRisk?.keyMetric
-    ? ` Las proyecciones estiman ${keyMetricRisk.keyMetric} hacia ${keyMetricRisk.period.replace('_', ' ')}.`
-    : '';
-
   const adaptSentence = adaptCount > 0
     ? ` Se identificaron ${adaptCount} medidas de adaptación prioritarias.`
     : '';
 
   return (
-    `Para ${locationLabel}, el análisis climático identifica ${riskList} como los principales` +
-    ` factores de riesgo para operaciones de ${sectorLabel}.` +
-    metricSentence +
+    `Para ${locationLabel}, el análisis identifica ${riskList} como los principales` +
+    ` riesgos para las operaciones de ${sectorLabel}.` +
     adaptSentence
   );
 }

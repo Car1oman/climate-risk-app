@@ -6,14 +6,10 @@ import TerritorialContextPanel from "./TerritorialContextPanel";
 import AIPanel from "./AIPanel";
 
 /**
- * ScientificFooter — Sprint 16.
+ * ScientificFooter — Sprint 16/18.
  * Collapses all scientific / methodology content behind a single toggle.
- * Starts collapsed so the main executive view is uncluttered.
- *
- * @param {object|null} metadata       - Raw API metadata (passed to MethodologyPanel)
- * @param {object|null} territorialCtx - World Bank territorial data
- * @param {object|null} rawResponse    - Full API response (passed to AIPanel)
- * @param {object|null} docContext     - Document context (passed to AIPanel)
+ * Visually secondary: low contrast, minimal padding, smaller hierarchy.
+ * Contains all IPCC/SSP/CMIP6 technical detail — invisible until expanded.
  */
 export default function ScientificFooter({ metadata, territorialCtx, rawResponse, docContext }) {
   const [expanded, setExpanded] = useState(false);
@@ -22,26 +18,28 @@ export default function ScientificFooter({ metadata, territorialCtx, rawResponse
   if (!hasContent) return null;
 
   return (
-    <div className="rounded-xl border border-border/60 bg-secondary/20 overflow-hidden">
+    <div className="rounded-lg border border-border/25 bg-transparent overflow-hidden">
       <button
         type="button"
         onClick={() => setExpanded(v => !v)}
         aria-expanded={expanded}
         aria-controls="scientific-footer-content"
-        className="w-full flex items-center justify-between px-4 py-3.5 text-left hover:bg-secondary/40 transition-colors"
+        className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-secondary/20 transition-colors"
       >
-        <div className="flex items-center gap-2.5">
-          <FlaskConical className="w-4 h-4 text-muted-foreground flex-shrink-0" aria-hidden="true" />
-          <div>
-            <p className="text-xs font-semibold text-foreground">Detalle científico y metodología</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Fuentes, escenarios y notas técnicas</p>
-          </div>
+        <div className="flex items-center gap-2">
+          <FlaskConical className="w-3 h-3 text-muted-foreground/50 flex-shrink-0" aria-hidden="true" />
+          <p className="text-[10px] font-medium text-muted-foreground/70">
+            Detalle científico y metodología
+          </p>
         </div>
-        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform flex-shrink-0 ${expanded ? 'rotate-180' : ''}`} aria-hidden="true" />
+        <ChevronDown
+          className={`w-3 h-3 text-muted-foreground/50 transition-transform flex-shrink-0 ${expanded ? 'rotate-180' : ''}`}
+          aria-hidden="true"
+        />
       </button>
 
       {expanded && (
-        <div id="scientific-footer-content" className="border-t border-border/40 space-y-0">
+        <div id="scientific-footer-content" className="border-t border-border/20 space-y-0">
           <MethodologyPanel metadata={metadata} />
 
           {territorialCtx && (

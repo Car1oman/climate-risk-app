@@ -427,9 +427,17 @@ describe('normalizeRisks — scenario mapping', () => {
 
 // ─── buildExecutiveSummary (inline mirror) ────────────────────────────────────
 
+// Mirrors the updated normalizeRisks.ts buildExecutiveSummary (Sprint 18):
+// deduplicates by riskType, no raw metrics in the summary.
 function buildExecutiveSummary(risks, locationLabel, sectorLabel) {
+  const seen = new Set();
   const topRisks = risks
     .filter(r => r.confidence !== 'baja')
+    .filter(r => {
+      if (seen.has(r.riskType)) return false;
+      seen.add(r.riskType);
+      return true;
+    })
     .slice(0, 3)
     .map(r => r.displayName.toLowerCase());
 
@@ -443,17 +451,12 @@ function buildExecutiveSummary(risks, locationLabel, sectorLabel) {
       : topRisks.slice(0, -1).join(', ') + ' y ' + topRisks[topRisks.length - 1];
 
   const adaptCount = risks.flatMap(r => r.adaptationMeasures || []).length;
-  const keyMetricRisk = risks.find(r => r.keyMetric);
-  const metricSentence = keyMetricRisk?.keyMetric
-    ? ` Las proyecciones estiman ${keyMetricRisk.keyMetric} hacia ${keyMetricRisk.period.replace('_', ' ')}.`
-    : '';
   const adaptSentence =
     adaptCount > 0 ? ` Se identificaron ${adaptCount} medidas de adaptación prioritarias.` : '';
 
   return (
-    `Para ${locationLabel}, el análisis climático identifica ${riskList} como los principales` +
-    ` factores de riesgo para operaciones de ${sectorLabel}.` +
-    metricSentence +
+    `Para ${locationLabel}, el análisis identifica ${riskList} como los principales` +
+    ` riesgos para las operaciones de ${sectorLabel}.` +
     adaptSentence
   );
 }
@@ -502,8 +505,8 @@ describe('buildExecutiveSummary — normal scenarios', () => {
 
   it('joins two risks with " y "', () => {
     const risks = [
-      makeRisk({ id: 'r1', displayName: 'Lluvias extremas' }),
-      makeRisk({ id: 'r2', displayName: 'Calor extremo', period: 'largo_plazo' }),
+      makeRisk({ id: 'r1', riskType: 'lluvias_extremas', displayName: 'Lluvias extremas' }),
+      makeRisk({ id: 'r2', riskType: 'calor_extremo',    displayName: 'Calor extremo', period: 'largo_plazo' }),
     ];
     const s = buildExecutiveSummary(risks, 'Lima', 'Retail');
     assert.ok(s.includes('lluvias extremas y calor extremo'));
@@ -520,13 +523,25 @@ describe('buildExecutiveSummary — normal scenarios', () => {
     assert.ok(!s.includes('deslizamiento'));
   });
 
-  it('includes keyMetric sentence when available', () => {
+  it('does NOT expose raw keyMetric in the summary', () => {
     const s = buildExecutiveSummary(
       [makeRisk({ keyMetric: '78 mm/día', period: 'mediano_plazo' })],
       'Lima', 'Retail'
     );
-    assert.ok(s.includes('78 mm/día'));
-    assert.ok(s.includes('mediano plazo'));
+    assert.ok(!s.includes('78 mm/día'), 'raw metric must not appear in executive summary');
+    assert.ok(s.includes('Lima'), 'location must still appear');
+    assert.ok(s.includes('Retail'), 'sector must still appear');
+  });
+
+  it('deduplicates same riskType across different periods', () => {
+    const risks = [
+      makeRisk({ id: 'r1', riskType: 'lluvias_extremas', period: 'mediano_plazo', displayName: 'Lluvias extremas' }),
+      makeRisk({ id: 'r2', riskType: 'lluvias_extremas', period: 'largo_plazo',   displayName: 'Lluvias extremas' }),
+      makeRisk({ id: 'r3', riskType: 'sequia',           period: 'mediano_plazo', displayName: 'Sequía'           }),
+    ];
+    const s = buildExecutiveSummary(risks, 'Lima', 'Retail');
+    const count = (s.match(/lluvias extremas/g) ?? []).length;
+    assert.equal(count, 1, 'mismo riskType no debe duplicarse: "lluvias extremas, lluvias extremas y sequía"');
   });
 
   it('includes adaptation count when adaptationMeasures present', () => {

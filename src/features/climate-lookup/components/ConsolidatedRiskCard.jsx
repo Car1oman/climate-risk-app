@@ -24,32 +24,38 @@ export default function ConsolidatedRiskCard({ risk }) {
   };
   const conf = CONFIDENCE_STYLES[risk.confidence] ?? CONFIDENCE_STYLES.media;
   const hasDetails = risk.impacts?.length > 0 || risk.adaptationMeasures?.length > 0;
+  const evidenceCount = risk.evidence?.length ?? 0;
 
   return (
     <div className={`rounded-xl border ${meta.borderColor} ${meta.bgColor} overflow-hidden`}>
-      {/* Main */}
+      {/* Main visible section */}
       <div className="p-4 space-y-2.5">
+
+        {/* Fenómeno + confianza */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-2.5 min-w-0">
-            <span className="text-lg leading-none mt-0.5 flex-shrink-0">{meta.icon}</span>
-            <div className="min-w-0">
-              <p className={`text-sm font-semibold leading-tight ${meta.textColor}`}>
-                {risk.displayName}
-              </p>
-              {risk.keyMetric && (
-                <p className="text-[11px] text-muted-foreground mt-0.5">{risk.keyMetric}</p>
-              )}
-            </div>
+            <span className="text-lg leading-none mt-0.5 flex-shrink-0" aria-hidden="true">{meta.icon}</span>
+            <p className={`text-sm font-semibold leading-tight ${meta.textColor}`}>
+              {risk.displayName}
+            </p>
           </div>
           <span className={`text-[10px] font-medium flex-shrink-0 mt-0.5 ${conf.cls}`}>
             {conf.label}
           </span>
         </div>
 
+        {/* Explicación simple — narrativa operativa, sin jerga técnica */}
         <p className="text-xs text-foreground/75 leading-relaxed">{risk.narrativeText}</p>
+
+        {/* Evidencia resumida */}
+        {evidenceCount > 0 && (
+          <p className="text-[10px] text-muted-foreground/70">
+            Respaldado por {evidenceCount} fuente{evidenceCount !== 1 ? 's' : ''} científica{evidenceCount !== 1 ? 's' : ''}
+          </p>
+        )}
       </div>
 
-      {/* Expandable section */}
+      {/* Expandable: impactos + adaptaciones (sin métricas crudas) */}
       {hasDetails && (
         <>
           <button
@@ -60,7 +66,7 @@ export default function ConsolidatedRiskCard({ risk }) {
           >
             <span>
               {expanded
-                ? 'Ocultar'
+                ? 'Ocultar detalles'
                 : `Ver impactos${risk.adaptationMeasures?.length ? ' y adaptaciones' : ''}`}
             </span>
             {expanded
@@ -70,15 +76,17 @@ export default function ConsolidatedRiskCard({ risk }) {
 
           {expanded && (
             <div className="px-4 pb-4 pt-3 space-y-3.5 border-t border-black/5 dark:border-white/5">
+
+              {/* Posibles impactos operativos */}
               {risk.impacts?.length > 0 && (
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">
-                    Impactos operativos
+                    Posibles impactos operativos
                   </p>
                   <ul className="space-y-1">
                     {risk.impacts.slice(0, 4).map((impact, i) => (
                       <li key={i} className="text-xs text-foreground/75 flex items-start gap-2">
-                        <span className="text-muted-foreground mt-0.5 flex-shrink-0">–</span>
+                        <span className="text-muted-foreground mt-0.5 flex-shrink-0" aria-hidden="true">–</span>
                         {impact}
                       </li>
                     ))}
@@ -86,6 +94,7 @@ export default function ConsolidatedRiskCard({ risk }) {
                 </div>
               )}
 
+              {/* Medidas de adaptación */}
               {risk.adaptationMeasures?.length > 0 && (
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">
@@ -104,6 +113,23 @@ export default function ConsolidatedRiskCard({ risk }) {
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Fuentes de evidencia (nombres, sin códigos técnicos) */}
+              {risk.evidence?.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">
+                    Evidencia científica
+                  </p>
+                  <ul className="space-y-0.5">
+                    {risk.evidence.slice(0, 4).map((ev, i) => (
+                      <li key={i} className="text-[10px] text-muted-foreground/80 flex items-center gap-1.5">
+                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${ev.validationStatus === 'validado' ? 'bg-emerald-400' : 'bg-amber-400'}`} aria-hidden="true" />
+                        {ev.sourceLabel}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
             </div>
