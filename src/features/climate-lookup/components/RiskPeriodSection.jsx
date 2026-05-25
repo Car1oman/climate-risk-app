@@ -79,11 +79,13 @@ export default function RiskPeriodSection({ period, risks, narrativeText, projec
 
       {/* Scenario toggle — projection periods only */}
       {config.showScenario && (
-        <div className="flex gap-1.5 p-1 rounded-lg border border-border bg-secondary">
+        <div className="flex gap-1.5 p-1 rounded-lg border border-border bg-secondary" role="group" aria-label="Escenario de emisiones">
           {SCENARIOS.map(s => (
             <button
               key={s.value}
+              type="button"
               onClick={() => setActiveScenario(s.value)}
+              aria-pressed={activeScenario === s.value}
               className={`flex-1 rounded-md py-1.5 text-xs font-medium transition-colors ${
                 activeScenario === s.value
                   ? 'bg-card border border-border text-foreground shadow-sm'

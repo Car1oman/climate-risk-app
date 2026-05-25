@@ -14,7 +14,7 @@
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { analyzeClimateRisk, fetchDocumentContext, fetchTerritorialContext } from '@/lib/api';
-import { normalizeRisks, buildExecutiveSummary } from '@/domain/normalizeRisks';
+import { normalizeRisks } from '@/domain/normalizeRisks';
 import { buildNarrativeReport } from '@/domain/buildNarrativeReport';
 import { SECTORS } from '@/features/climate-lookup/constants';
 
@@ -68,11 +68,6 @@ export function useClimateAnalysis(sector) {
     const found = SECTORS.find(s => s.value === sector);
     return found?.label ?? sector;
   }, [sector]);
-
-  const executiveSummary = useMemo(() => {
-    if (!consolidatedRisks.length) return null;
-    return buildExecutiveSummary(consolidatedRisks, _locationLabel, _sectorLabel);
-  }, [consolidatedRisks, _locationLabel, _sectorLabel]);
 
   const narrativeReport = useMemo(() => {
     if (!consolidatedRisks.length) return null;
@@ -129,22 +124,17 @@ export function useClimateAnalysis(sector) {
     error,
     hasResults: !!rawResponse,
 
-    // ── Normalized data (source of truth for Sprint 15+ UI) ───────────────────
+    // ── Normalized data (Sprint 14+) ───────────────────────────────────────────
     consolidatedRisks,
-    executiveSummary,
-    narrativeReport,
+    narrativeReport,    // NarrativeReport: includes executiveSummary, periodNarratives, risks
     projections,        // Layer9: { scenarios, time_windows, projections, narratives, uncertainty }
 
-    // ── Raw response (backward compat for legacy panels during transition) ─────
+    // ── Raw fields used by active panels ──────────────────────────────────────
     rawResponse,
-    signals:     rawResponse?.signals     ?? null,
-    risks:       rawResponse?.risks       ?? null,
-    griHazards:  rawResponse?.gri_hazards ?? [],
     adaptations: rawResponse?.adaptations ?? null,
-    narrative:   rawResponse?.narrative   ?? null,
     metadata:    rawResponse?.metadata    ?? null,
 
-    // ── Context (fetched independently of analysis) ────────────────────────────
+    // ── Context (fetched once on mount) ───────────────────────────────────────
     territorialCtx,
     docContext,
 

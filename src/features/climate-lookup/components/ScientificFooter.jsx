@@ -24,21 +24,24 @@ export default function ScientificFooter({ metadata, territorialCtx, rawResponse
   return (
     <div className="rounded-xl border border-border/60 bg-secondary/20 overflow-hidden">
       <button
+        type="button"
         onClick={() => setExpanded(v => !v)}
+        aria-expanded={expanded}
+        aria-controls="scientific-footer-content"
         className="w-full flex items-center justify-between px-4 py-3.5 text-left hover:bg-secondary/40 transition-colors"
       >
         <div className="flex items-center gap-2.5">
-          <FlaskConical className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+          <FlaskConical className="w-4 h-4 text-muted-foreground flex-shrink-0" aria-hidden="true" />
           <div>
             <p className="text-xs font-semibold text-foreground">Detalle científico y metodología</p>
             <p className="text-[10px] text-muted-foreground mt-0.5">Fuentes, escenarios y notas técnicas</p>
           </div>
         </div>
-        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform flex-shrink-0 ${expanded ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform flex-shrink-0 ${expanded ? 'rotate-180' : ''}`} aria-hidden="true" />
       </button>
 
       {expanded && (
-        <div className="border-t border-border/40 space-y-0">
+        <div id="scientific-footer-content" className="border-t border-border/40 space-y-0">
           <MethodologyPanel metadata={metadata} />
 
           {territorialCtx && (

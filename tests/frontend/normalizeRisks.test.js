@@ -424,3 +424,163 @@ describe('normalizeRisks — scenario mapping', () => {
     });
   }
 });
+
+// ─── buildExecutiveSummary (inline mirror) ────────────────────────────────────
+
+function buildExecutiveSummary(risks, locationLabel, sectorLabel) {
+  const topRisks = risks
+    .filter(r => r.confidence !== 'baja')
+    .slice(0, 3)
+    .map(r => r.displayName.toLowerCase());
+
+  if (topRisks.length === 0) {
+    return `Para ${locationLabel}, el análisis no identificó riesgos climáticos de alta o media confianza en el período evaluado.`;
+  }
+
+  const riskList =
+    topRisks.length === 1
+      ? topRisks[0]
+      : topRisks.slice(0, -1).join(', ') + ' y ' + topRisks[topRisks.length - 1];
+
+  const adaptCount = risks.flatMap(r => r.adaptationMeasures || []).length;
+  const keyMetricRisk = risks.find(r => r.keyMetric);
+  const metricSentence = keyMetricRisk?.keyMetric
+    ? ` Las proyecciones estiman ${keyMetricRisk.keyMetric} hacia ${keyMetricRisk.period.replace('_', ' ')}.`
+    : '';
+  const adaptSentence =
+    adaptCount > 0 ? ` Se identificaron ${adaptCount} medidas de adaptación prioritarias.` : '';
+
+  return (
+    `Para ${locationLabel}, el análisis climático identifica ${riskList} como los principales` +
+    ` factores de riesgo para operaciones de ${sectorLabel}.` +
+    metricSentence +
+    adaptSentence
+  );
+}
+
+const makeRisk = (overrides) => ({
+  id: 'lluvias_extremas_mediano_plazo',
+  riskType: 'lluvias_extremas',
+  displayName: 'Lluvias extremas',
+  period: 'mediano_plazo',
+  scenario: 'emisiones_moderadas',
+  confidence: 'alta',
+  narrativeText: '',
+  keyMetric: null,
+  impacts: [],
+  evidence: [],
+  adaptationMeasures: [],
+  rawSources: ['signals'],
+  ...overrides,
+});
+
+describe('buildExecutiveSummary — no-risk scenarios', () => {
+  it('returns no-risk message for empty array', () => {
+    const s = buildExecutiveSummary([], 'Lima', 'Retail');
+    assert.ok(s.includes('no identificó riesgos'));
+    assert.ok(s.includes('Lima'));
+  });
+
+  it('returns no-risk message when all risks are baja confidence', () => {
+    const s = buildExecutiveSummary([makeRisk({ confidence: 'baja' })], 'Lima', 'Retail');
+    assert.ok(s.includes('no identificó riesgos'));
+  });
+});
+
+describe('buildExecutiveSummary — normal scenarios', () => {
+  it('mentions location and sector', () => {
+    const s = buildExecutiveSummary([makeRisk()], 'Arequipa, Perú', 'Agroindustria');
+    assert.ok(s.includes('Arequipa, Perú'));
+    assert.ok(s.includes('Agroindustria'));
+  });
+
+  it('names a single risk without list formatting', () => {
+    const s = buildExecutiveSummary([makeRisk({ displayName: 'Sequía' })], 'Lima', 'Retail');
+    assert.ok(s.includes('sequía'));
+    assert.ok(!s.includes(' y '));
+  });
+
+  it('joins two risks with " y "', () => {
+    const risks = [
+      makeRisk({ id: 'r1', displayName: 'Lluvias extremas' }),
+      makeRisk({ id: 'r2', displayName: 'Calor extremo', period: 'largo_plazo' }),
+    ];
+    const s = buildExecutiveSummary(risks, 'Lima', 'Retail');
+    assert.ok(s.includes('lluvias extremas y calor extremo'));
+  });
+
+  it('caps risk list at 3 — 4th risk is excluded', () => {
+    const risks = [
+      makeRisk({ id: 'r1', displayName: 'Lluvias extremas' }),
+      makeRisk({ id: 'r2', displayName: 'Calor extremo',   period: 'largo_plazo' }),
+      makeRisk({ id: 'r3', displayName: 'Sequía',          period: 'historico' }),
+      makeRisk({ id: 'r4', displayName: 'Deslizamiento',   period: 'corto_plazo' }),
+    ];
+    const s = buildExecutiveSummary(risks, 'Lima', 'Retail');
+    assert.ok(!s.includes('deslizamiento'));
+  });
+
+  it('includes keyMetric sentence when available', () => {
+    const s = buildExecutiveSummary(
+      [makeRisk({ keyMetric: '78 mm/día', period: 'mediano_plazo' })],
+      'Lima', 'Retail'
+    );
+    assert.ok(s.includes('78 mm/día'));
+    assert.ok(s.includes('mediano plazo'));
+  });
+
+  it('includes adaptation count when adaptationMeasures present', () => {
+    const risks = [
+      makeRisk({
+        adaptationMeasures: [
+          { id: 'a1', name: 'Drenaje', timeframe: 'mediano', effectiveness: 'alta' },
+          { id: 'a2', name: 'Alerta',  timeframe: 'corto',   effectiveness: 'alta' },
+        ],
+      }),
+    ];
+    const s = buildExecutiveSummary(risks, 'Lima', 'Retail');
+    assert.ok(s.includes('2 medidas de adaptación'));
+  });
+});
+
+describe('normalizeRisks — no-duplicate validation (regression)', () => {
+  it('never creates two entries with the same id', () => {
+    const apiResponse = {
+      signals: [
+        { signal_type: 'extreme_heat', horizon: 'mid_term', confidence: 'high'   },
+        { signal_type: 'severe_heat',  horizon: 'mid_term', confidence: 'medium' },
+      ],
+      risks: [
+        { signal: { signalType: 'extreme_heat' }, operational_impacts: ['Impacto A'] },
+      ],
+      gri_hazards: [
+        { hazard: 'heat', baseline: {} },
+      ],
+      adaptations: [],
+    };
+    const result = normalizeRisks(apiResponse);
+    const ids = result.map(r => r.id);
+    const unique = new Set(ids);
+    assert.equal(ids.length, unique.size, 'Duplicate ids detected');
+  });
+
+  it('never shows raw signal codes in displayName (no technical labels)', () => {
+    const apiResponse = {
+      signals: [
+        { signal_type: 'extreme_heat', horizon: 'mid_term', confidence: 'high' },
+        { signal_type: 'extreme_rain', horizon: 'mid_term', confidence: 'high' },
+      ],
+      risks: [], gri_hazards: [], adaptations: [],
+    };
+    const result = normalizeRisks(apiResponse);
+    const TECHNICAL_CODES = ['extreme_heat', 'extreme_rain', 'CMIP6', 'ssp245', 'SSP'];
+    for (const entry of result) {
+      for (const code of TECHNICAL_CODES) {
+        assert.ok(
+          !entry.displayName.includes(code),
+          `Technical code "${code}" leaked into displayName: "${entry.displayName}"`
+        );
+      }
+    }
+  });
+});

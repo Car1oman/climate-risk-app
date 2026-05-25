@@ -53,7 +53,9 @@ export default function ConsolidatedRiskCard({ risk }) {
       {hasDetails && (
         <>
           <button
+            type="button"
             onClick={() => setExpanded(v => !v)}
+            aria-expanded={expanded}
             className="w-full flex items-center justify-between px-4 py-2.5 border-t border-black/5 dark:border-white/5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
           >
             <span>
@@ -62,8 +64,8 @@ export default function ConsolidatedRiskCard({ risk }) {
                 : `Ver impactos${risk.adaptationMeasures?.length ? ' y adaptaciones' : ''}`}
             </span>
             {expanded
-              ? <ChevronDown className="w-3 h-3" />
-              : <ChevronRight className="w-3 h-3" />}
+              ? <ChevronDown className="w-3 h-3" aria-hidden="true" />
+              : <ChevronRight className="w-3 h-3" aria-hidden="true" />}
           </button>
 
           {expanded && (

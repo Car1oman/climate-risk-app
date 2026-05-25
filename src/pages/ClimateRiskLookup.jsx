@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo, lazy, Suspense } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,13 +11,15 @@ import { toast } from "sonner";
 
 import { SECTORS }              from "@/features/climate-lookup/constants";
 import { useClimateAnalysis }   from "@/features/climate-lookup/hooks/useClimateAnalysis";
-import MapView                  from "@/features/climate-lookup/components/MapView";
 import SearchPanel              from "@/features/climate-lookup/components/SearchPanel";
 import AnalysisLoading          from "@/features/climate-lookup/components/AnalysisLoading";
-import AdaptationPanel          from "@/features/climate-lookup/components/AdaptationPanel";
 import ExecutiveSummaryCard     from "@/features/climate-lookup/components/ExecutiveSummaryCard";
 import RiskPeriodSection        from "@/features/climate-lookup/components/RiskPeriodSection";
-import ScientificFooter         from "@/features/climate-lookup/components/ScientificFooter";
+
+// Lazy-loaded heavy/deferred chunks — Vite splits these into separate bundles
+const MapView         = lazy(() => import("@/features/climate-lookup/components/MapView"));
+const AdaptationPanel = lazy(() => import("@/features/climate-lookup/components/AdaptationPanel"));
+const ScientificFooter = lazy(() => import("@/features/climate-lookup/components/ScientificFooter"));
 
 export default function ClimateRiskLookup() {
   // ── UI state only ─────────────────────────────────────────────────────────
@@ -72,10 +74,19 @@ export default function ClimateRiskLookup() {
     await analyze({ lat: latNum, lon: lngNum });
   }, [lat, lng, analyze]);
 
-  // ── Period-grouped risks ──────────────────────────────────────────────────
-  const historicalRisks = consolidatedRisks.filter(r => r.period === 'historico');
-  const midTermRisks    = consolidatedRisks.filter(r => r.period === 'mediano_plazo');
-  const longTermRisks   = consolidatedRisks.filter(r => r.period === 'largo_plazo');
+  // ── Period-grouped risks (memoized — avoids 3 filter passes on every render) ─
+  const historicalRisks = useMemo(
+    () => consolidatedRisks.filter(r => r.period === 'historico'),
+    [consolidatedRisks]
+  );
+  const midTermRisks = useMemo(
+    () => consolidatedRisks.filter(r => r.period === 'mediano_plazo'),
+    [consolidatedRisks]
+  );
+  const longTermRisks = useMemo(
+    () => consolidatedRisks.filter(r => r.period === 'largo_plazo'),
+    [consolidatedRisks]
+  );
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -88,13 +99,15 @@ export default function ClimateRiskLookup() {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
-        <MapView
-          tileLayer={tileLayer}
-          onTileLayerChange={setTileLayer}
-          onMapClick={handleMapClick}
-          markerPos={markerPos}
-          flyTarget={flyTarget}
-        />
+        <Suspense fallback={<div className="rounded-xl bg-secondary/30 animate-pulse" style={{ height: '420px' }} aria-hidden="true" />}>
+          <MapView
+            tileLayer={tileLayer}
+            onTileLayerChange={setTileLayer}
+            onMapClick={handleMapClick}
+            markerPos={markerPos}
+            flyTarget={flyTarget}
+          />
+        </Suspense>
 
         <div className="space-y-5 overflow-y-auto" style={{ maxHeight: "82vh" }}>
           {/* Search / coordinates form */}
@@ -193,15 +206,19 @@ export default function ClimateRiskLookup() {
               )}
 
               {/* 5 — Adaptation */}
-              <AdaptationPanel adaptations={adaptations} />
+              <Suspense fallback={null}>
+                <AdaptationPanel adaptations={adaptations} />
+              </Suspense>
 
               {/* 6 — Scientific detail (collapsed) */}
-              <ScientificFooter
-                metadata={metadata}
-                territorialCtx={territorialCtx}
-                rawResponse={rawResponse}
-                docContext={docContext}
-              />
+              <Suspense fallback={null}>
+                <ScientificFooter
+                  metadata={metadata}
+                  territorialCtx={territorialCtx}
+                  rawResponse={rawResponse}
+                  docContext={docContext}
+                />
+              </Suspense>
             </div>
           )}
 
