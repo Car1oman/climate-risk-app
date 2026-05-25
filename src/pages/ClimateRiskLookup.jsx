@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,49 +9,59 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertTriangle, Loader2, MapPin, Search } from "lucide-react";
 import { toast } from "sonner";
 
-import { analyzeClimateRisk, fetchDocumentContext, fetchTerritorialContext } from "@/lib/api";
-import MethodologyPanel from "@/components/climate/MethodologyPanel";
-import { normalizeRisks, buildExecutiveSummary } from "@/domain/normalizeRisks";
+import MethodologyPanel    from "@/components/climate/MethodologyPanel";
+import ProjectionScenarioCard from "@/components/climate/ProjectionScenarioCard";
 
-import { SECTORS } from "@/features/climate-lookup/constants";
-import MapView               from "@/features/climate-lookup/components/MapView";
-import SearchPanel           from "@/features/climate-lookup/components/SearchPanel";
-import NarrativePanel        from "@/features/climate-lookup/components/NarrativePanel";
-import SignalsPanel          from "@/features/climate-lookup/components/SignalsPanel";
-import RisksPanel            from "@/features/climate-lookup/components/RisksPanel";
-import GRIThreatsPanel       from "@/features/climate-lookup/components/GRIThreatsPanel";
-import AdaptationPanel       from "@/features/climate-lookup/components/AdaptationPanel";
-import TerritorialContextPanel from "@/features/climate-lookup/components/TerritorialContextPanel";
-import AIPanel               from "@/features/climate-lookup/components/AIPanel";
-import AnalysisLoading       from "@/features/climate-lookup/components/AnalysisLoading";
+import { SECTORS }              from "@/features/climate-lookup/constants";
+import { useClimateAnalysis }   from "@/features/climate-lookup/hooks/useClimateAnalysis";
+import MapView                  from "@/features/climate-lookup/components/MapView";
+import SearchPanel              from "@/features/climate-lookup/components/SearchPanel";
+import NarrativePanel           from "@/features/climate-lookup/components/NarrativePanel";
+import SignalsPanel             from "@/features/climate-lookup/components/SignalsPanel";
+import RisksPanel               from "@/features/climate-lookup/components/RisksPanel";
+import GRIThreatsPanel          from "@/features/climate-lookup/components/GRIThreatsPanel";
+import AdaptationPanel          from "@/features/climate-lookup/components/AdaptationPanel";
+import TerritorialContextPanel  from "@/features/climate-lookup/components/TerritorialContextPanel";
+import AIPanel                  from "@/features/climate-lookup/components/AIPanel";
+import AnalysisLoading          from "@/features/climate-lookup/components/AnalysisLoading";
 
 export default function ClimateRiskLookup() {
-  const [lat, setLat]             = useState("");
-  const [lng, setLng]             = useState("");
-  const [sector, setSector]       = useState("retail");
+  // ── UI state only ─────────────────────────────────────────────────────────
+  const [lat,       setLat]       = useState("");
+  const [lng,       setLng]       = useState("");
+  const [sector,    setSector]    = useState("retail");
   const [tileLayer, setTileLayer] = useState("osm");
   const [markerPos, setMarkerPos] = useState(null);
   const [flyTarget, setFlyTarget] = useState(null);
-  const [loading, setLoading]     = useState(false);
-  const [analysis, setAnalysis]   = useState(null);
-  const [error, setError]         = useState(null);
-  const [territorialCtx, setTerritorialCtx] = useState(null);
-  const [docContext, setDocContext]         = useState(null);
 
-  useEffect(() => {
-    Promise.allSettled([fetchTerritorialContext(), fetchDocumentContext()]).then(([terrResult, docResult]) => {
-      if (terrResult.status === "fulfilled" && terrResult.value) setTerritorialCtx(terrResult.value);
-      if (docResult.status === "fulfilled" && docResult.value?.total > 0) setDocContext(docResult.value);
-    });
-  }, []);
+  // ── All data / async logic lives in the hook ──────────────────────────────
+  const {
+    loading,
+    error,
+    hasResults,
+    consolidatedRisks,
+    executiveSummary,
+    projections,
+    rawResponse,
+    signals,
+    risks,
+    griHazards,
+    adaptations,
+    narrative,
+    metadata,
+    territorialCtx,
+    docContext,
+    analyze,
+    reset,
+  } = useClimateAnalysis(sector);
 
+  // ── Map event handlers ────────────────────────────────────────────────────
   const handleMapClick = useCallback((clickLat, clickLng) => {
     setLat(String(clickLat));
     setLng(String(clickLng));
     setMarkerPos([clickLat, clickLng]);
-    setAnalysis(null);
-    setError(null);
-  }, []);
+    reset();
+  }, [reset]);
 
   const handleLocationSelect = useCallback((newLat, newLng) => {
     if (!isFinite(newLat) || !isFinite(newLng)) return;
@@ -59,63 +69,22 @@ export default function ClimateRiskLookup() {
     setLng(String(newLng));
     setMarkerPos([newLat, newLng]);
     setFlyTarget({ pos: [newLat, newLng], zoom: 16 });
-    setAnalysis(null);
-    setError(null);
-  }, []);
+    reset();
+  }, [reset]);
 
-  const handleSearch = async () => {
+  // ── Search handler ────────────────────────────────────────────────────────
+  const handleSearch = useCallback(async () => {
     const latNum = parseFloat(lat);
     const lngNum = parseFloat(lng);
     if (isNaN(latNum) || latNum < -90  || latNum > 90)  { toast.error("Latitud inválida");  return; }
     if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) { toast.error("Longitud inválida"); return; }
 
-    setLoading(true);
-    setAnalysis(null);
-    setError(null);
     setMarkerPos([latNum, lngNum]);
     setFlyTarget({ pos: [latNum, lngNum], zoom: 14 });
+    await analyze({ lat: latNum, lon: lngNum });
+  }, [lat, lng, analyze]);
 
-    try {
-      const result = await analyzeClimateRisk({ lat: latNum, lon: lngNum, sector });
-      if (result) {
-        setAnalysis(result);
-      } else {
-        setError("No se pudo obtener el análisis. Verifica la conexión con el backend.");
-      }
-    } catch (err) {
-      setError(err.message || "Error al ejecutar el análisis climático.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Normalized risk model — computed from raw API response.
-  // consolidatedRisks[] is the source of truth for Sprint 15+ UI components.
-  // The existing panels (SignalsPanel, RisksPanel, GRIThreatsPanel) still
-  // consume analysis directly during the transition period.
-  const consolidatedRisks = useMemo(() => {
-    if (!analysis) return [];
-    try {
-      return normalizeRisks(analysis);
-    } catch (err) {
-      if (import.meta.env.DEV) console.error('[ClimateRiskLookup] normalizeRisks failed:', err);
-      return [];
-    }
-  }, [analysis]);
-
-  const executiveSummary = useMemo(() => {
-    if (!consolidatedRisks.length) return null;
-    const location = analysis?.location;
-    const locationLabel = location?.city
-      ? `${location.city}${location.country ? ', ' + location.country : ''}`
-      : 'la ubicación seleccionada';
-    const sectorObj = SECTORS.find(s => s.value === sector);
-    const sectorLabel = sectorObj?.label ?? sector;
-    return buildExecutiveSummary(consolidatedRisks, locationLabel, sectorLabel);
-  }, [consolidatedRisks, analysis, sector]);
-
-  const hasResults = !!analysis;
-
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="p-6 max-w-[1400px] mx-auto space-y-6">
       <div>
@@ -197,7 +166,7 @@ export default function ClimateRiskLookup() {
 
           {hasResults && !loading && (
             <>
-              {/* Sprint 14: consolidated risk preview (non-destructive) */}
+              {/* Consolidated risk preview — Sprint 14 (non-destructive) */}
               {consolidatedRisks.length > 0 && executiveSummary && (
                 <Card className="border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10">
                   <CardContent className="pt-4 pb-4 space-y-3">
@@ -221,25 +190,31 @@ export default function ClimateRiskLookup() {
                 </Card>
               )}
 
-              <NarrativePanel
-                narrative={analysis.narrative}
-                location={analysis.location}
-                metadata={analysis.metadata}
+              {/* Layer9 projections */}
+              <ProjectionScenarioCard
+                projectionContext={projections}
+                traceability={metadata}
               />
-              <SignalsPanel    signals={analysis.signals} />
-              <RisksPanel      risks={analysis.risks} />
-              <GRIThreatsPanel hazards={analysis.gri_hazards} />
-              <AdaptationPanel adaptations={analysis.adaptations} />
+
+              <NarrativePanel
+                narrative={narrative}
+                location={rawResponse?.location}
+                metadata={metadata}
+              />
+              <SignalsPanel    signals={signals} />
+              <RisksPanel      risks={risks} />
+              <GRIThreatsPanel hazards={griHazards} />
+              <AdaptationPanel adaptations={adaptations} />
             </>
           )}
 
-          <MethodologyPanel metadata={analysis?.metadata} />
+          <MethodologyPanel metadata={metadata} />
           <TerritorialContextPanel data={territorialCtx} />
 
           {hasResults && !loading && (
             <Card className="bg-card border-border shadow-sm">
               <CardContent className="pt-4 pb-4">
-                <AIPanel analysis={analysis} docContext={docContext} />
+                <AIPanel analysis={rawResponse} docContext={docContext} />
               </CardContent>
             </Card>
           )}

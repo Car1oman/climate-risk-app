@@ -97,6 +97,12 @@ export interface NarrativeReport {
   locationLabel: string;
   /** Hero paragraph synthesizing all risks in plain Spanish. */
   executiveSummary: string;
+  /** Plain-language paragraph for past observations. Empty string if no historical risks. */
+  historicalNarrative: string;
+  /** Plain-language paragraph for mid-term projections (2040–2059). */
+  midTermNarrative: string;
+  /** Plain-language paragraph for long-term projections (2060–2079). */
+  longTermNarrative: string;
   risks: ConsolidatedRisk[];
   sectorLabel: string;
   analysisDate: string;

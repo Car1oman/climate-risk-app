@@ -18,11 +18,12 @@ import { supabase } from '../supabaseClient.js';
 import { climateCache, CACHE_TTL } from '../shared/cache.js';
 
 // ── Fase 2: Backend Layers ────────────────────────────────────────────────────
-import { fusionClimateData }  from '../layers/Layer1_ClimateDataFusion.js';
-import { detectSignals }      from '../layers/Layer2_SignalEngine.js';
-import { assessBusinessRisk } from '../layers/Layer3_BusinessRiskEngine.js';
-import { getAdaptations }     from '../layers/Layer5_AdaptationEngine.js';
-import { generateNarrative }  from '../layers/Layer6_NarrativeEngine.js';
+import { fusionClimateData }    from '../layers/Layer1_ClimateDataFusion.js';
+import { detectSignals }        from '../layers/Layer2_SignalEngine.js';
+import { assessBusinessRisk }   from '../layers/Layer3_BusinessRiskEngine.js';
+import { getAdaptations }       from '../layers/Layer5_AdaptationEngine.js';
+import { generateNarrative }    from '../layers/Layer6_NarrativeEngine.js';
+import { buildProjectionContext } from '../scientific/projection.js';
 
 const router = express.Router();
 
@@ -749,6 +750,16 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
       narrativeOutput = { executive_summary: 'No disponible', key_metrics: {}, generated_from: {} };
     }
 
+    // ── Capa 9: Escenarios de proyección ────────────────────────────────────
+    let projectionOutput;
+    try {
+      projectionOutput = buildProjectionContext(signalOutput);
+      partialResult.layer9 = 'ok';
+    } catch (err) {
+      console.error('[v2] Layer9 falló:', err.message);
+      projectionOutput = null;
+    }
+
     // ── Respuesta final ─────────────────────────────────────────────────────
     return res.json({
       location: {
@@ -759,6 +770,7 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
       signals:     signalOutput,
       risks:       contextualRisks.risks,
       adaptations: adaptationOutput,
+      projections: projectionOutput,
       narrative:   {
         executive_summary: narrativeOutput.executive_summary,
         key_metrics:       narrativeOutput.key_metrics,
