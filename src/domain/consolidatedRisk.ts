@@ -60,6 +60,21 @@ export interface AdaptationSummary {
   effectiveness: 'alta' | 'media' | 'baja';
 }
 
+/**
+ * Per-scenario variant data for a projection period.
+ * Populated for 'mediano_plazo' and 'largo_plazo' periods only.
+ * Enables real differences in narrative text and impacts when the
+ * user switches between emission scenarios.
+ */
+export interface ScenarioVariant {
+  /** Scenario-specific plain-language narrative.  No IPCC codes. */
+  narrativeText: string;
+  /** Scenario-specific operational impacts (higher severity for altas_emisiones). */
+  impacts: string[];
+  /** Confidence may differ between scenarios. */
+  confidence: ConfidenceLabel;
+}
+
 // ─── Primary model ────────────────────────────────────────────────────────────
 
 /**
@@ -85,6 +100,12 @@ export interface ConsolidatedRisk {
   adaptationMeasures: AdaptationSummary[];
   /** Internal: which API sources contributed to this entry. */
   rawSources: ('signals' | 'risks' | 'gri')[];
+  /**
+   * Per-scenario variants for projection periods (mediano_plazo, largo_plazo).
+   * Empty object for 'historico'.  Populated by normalizeRisks() via
+   * buildScenarioVariants() in buildOperationalNarrative.ts.
+   */
+  scenarioVariants: Partial<Record<'emisiones_moderadas' | 'altas_emisiones', ScenarioVariant>>;
 }
 
 // ─── Report-level model ───────────────────────────────────────────────────────

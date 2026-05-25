@@ -98,7 +98,11 @@
       "Bash(\"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\" --test tests/frontend/buildNarrativeReport.test.js)",
       "Bash(cmd /c \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe node_modules/vite/bin/vite.js build\")",
       "PowerShell(cd \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\"; $env:PATH = \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64;\" + $env:PATH; & \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\" \"node_modules/vite/bin/vite.js\" build 2>&1)",
-      "PowerShell(cd \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\"; $node = \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\"; $result = & $node \"node_modules/vite/bin/vite.js\" build 2>&1; Write-Output $result; Write-Output \"EXIT: $LASTEXITCODE\")"
+      "PowerShell(cd \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\"; $node = \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\"; $result = & $node \"node_modules/vite/bin/vite.js\" build 2>&1; Write-Output $result; Write-Output \"EXIT: $LASTEXITCODE\")",
+      "Bash(npx vite *)",
+      "PowerShell(cd \"d:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\"; $env:PATH = \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64;\" + $env:PATH; node .\\\\node_modules\\\\vite\\\\bin\\\\vite.js build 2>&1)",
+      "Bash(\"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\" --test tests/layer*.test.js tests/scientific/*.test.js)",
+      "Bash(\"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\" --test tests/regression/*.test.js tests/baselines/*.test.js)"
     ],
     "additionalDirectories": [
       "d:\\Usuarios\\PM75161698\\Desktop\\datarisk\\climate-risk-app"

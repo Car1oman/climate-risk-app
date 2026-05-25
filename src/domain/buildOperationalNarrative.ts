@@ -11,7 +11,7 @@
  *   - Focus areas: operational continuity, logistics, supply chain, infrastructure
  */
 
-import type { ConsolidatedRisk, TemporalPeriod } from './consolidatedRisk';
+import type { ConsolidatedRisk, TemporalPeriod, ScenarioVariant, RiskTypeSlug } from './consolidatedRisk';
 
 // ─── Operational impact domains per risk type ─────────────────────────────────
 
@@ -53,6 +53,53 @@ const SCENARIO_PHRASE: Record<string, string> = {
   emisiones_moderadas: 'bajo un escenario de emisiones moderadas',
   altas_emisiones:     'bajo un escenario de altas emisiones',
   bajas_emisiones:     'bajo un escenario de bajas emisiones',
+};
+
+// ─── High-emissions projection phrases (more severe than moderate) ────────────
+
+const MID_TERM_PROJECTION_HIGH: Record<string, string> = {
+  lluvias_extremas: 'lluvias significativamente más intensas, con mayor frecuencia de eventos extremos',
+  calor_extremo:    'temperaturas extremas con mayor frecuencia e intensidad sostenida',
+  sequia:           'períodos de sequía más prolongados y severos, con escasez hídrica crítica',
+  deslizamiento:    'un riesgo considerablemente mayor de movimientos de terreno e inestabilidad de laderas',
+  heladas:          'episodios de heladas con mayor variabilidad e intensidad',
+  fenomeno_enso:    'mayor variabilidad climática interanual, con eventos El Niño / La Niña más intensos',
+  inundacion:       'un riesgo de desborde e inundaciones notablemente más elevado',
+};
+
+const LONG_TERM_PROJECTION_HIGH: Record<string, string> = {
+  lluvias_extremas: 'un régimen de lluvias substancialmente más intenso, variable y disruptivo',
+  calor_extremo:    'condiciones de calor extremo persistentes que impactarán gravemente la operación y el personal',
+  sequia:           'escasez hídrica crónica con restricciones operativas estructurales',
+  deslizamiento:    'un riesgo elevado y persistente de deslizamientos sobre infraestructura crítica',
+  heladas:          'variabilidad extrema en el riesgo de heladas con impacto en instalaciones y cultivos',
+  fenomeno_enso:    'variabilidad climática de largo plazo significativamente amplificada, con ciclos más extremos',
+  inundacion:       'exposición elevada y recurrente a inundaciones con daños estructurales frecuentes',
+};
+
+// ─── Additional impacts under high-emissions scenario ─────────────────────────
+
+const HIGH_EMISSION_EXTRA_IMPACTS: Record<string, string[]> = {
+  lluvias_extremas: ['daños estructurales más frecuentes y costosos', 'interrupciones logísticas prolongadas'],
+  calor_extremo:    ['mayor riesgo de estrés térmico en personal expuesto', 'aumento significativo del consumo energético'],
+  sequia:           ['restricciones hídricas severas con impacto en procesos productivos', 'mayor vulnerabilidad en la cadena de suministro regional'],
+  deslizamiento:    ['corte frecuente de vías de acceso críticas', 'mayor exposición de activos a daños estructurales'],
+  heladas:          ['daños más frecuentes a equipos e instalaciones expuestas', 'mayor impacto en operaciones de campo'],
+  fenomeno_enso:    ['disrupciones operativas más frecuentes y de mayor duración', 'mayor incertidumbre en planificación anual'],
+  inundacion:       ['mayor exposición de activos estratégicos a daños por agua', 'necesidad de medidas de protección reforzadas'],
+};
+
+// ─── Temporal evolution sentences per risk type ───────────────────────────────
+// Used by RiskTimeline to contextualize how the risk evolves across time.
+
+const TEMPORAL_EVOLUTION: Record<string, string> = {
+  lluvias_extremas: 'Las lluvias intensas ya se observan históricamente en esta zona, y podrían incrementarse en frecuencia e intensidad hacia mediados de siglo, con mayor severidad a largo plazo bajo altas emisiones.',
+  calor_extremo:    'El calor extremo es un fenómeno ya registrado históricamente, con proyecciones de aumento significativo en frecuencia e intensidad durante las próximas décadas.',
+  sequia:           'La sequía tiene antecedentes históricos en esta área, con mayor riesgo de déficit hídrico proyectado hacia 2050 y condiciones más severas a largo plazo.',
+  deslizamiento:    'Los deslizamientos tienen registros históricos en la zona; su susceptibilidad proyecta incrementarse a medida que aumenten las precipitaciones extremas asociadas al cambio climático.',
+  heladas:          'Las heladas son un fenómeno documentado históricamente, con variaciones proyectadas en su intensidad y frecuencia que requieren seguimiento continuo.',
+  fenomeno_enso:    'El Fenómeno El Niño / La Niña tiene un registro histórico extenso; el cambio climático proyecta amplificar su variabilidad e intensidad en las próximas décadas.',
+  inundacion:       'Las inundaciones tienen antecedentes históricos en la zona, con mayor exposición proyectada bajo escenarios de cambio climático y precipitaciones más extremas.',
 };
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -180,4 +227,82 @@ export function buildOperationalPeriodNarrative(
   // corto_plazo
   const names = unique.map(r => r.displayName.toLowerCase());
   return `En el corto plazo se anticipan ${formatList(names)} con potencial de impacto operativo.${adaptSuffix}`;
+}
+
+// ─── Scenario variant builders ────────────────────────────────────────────────
+
+/**
+ * Builds the scenario-specific narrative text for a single risk type in a
+ * projection period.  Returns empty string for 'historico'.
+ */
+function buildScenarioNarrativeText(
+  riskType: RiskTypeSlug,
+  period: TemporalPeriod,
+  scenario: 'emisiones_moderadas' | 'altas_emisiones'
+): string {
+  if (period === 'historico') return '';
+
+  if (period === 'mediano_plazo') {
+    const phrase = scenario === 'altas_emisiones'
+      ? MID_TERM_PROJECTION_HIGH[riskType]
+      : MID_TERM_PROJECTION[riskType];
+    const lead = scenario === 'altas_emisiones'
+      ? 'Bajo altas emisiones, hacia mediados de siglo esta zona podría experimentar'
+      : 'Hacia mediados de siglo, bajo emisiones moderadas, esta zona podría experimentar';
+    return `${lead} ${phrase ?? riskType}.`;
+  }
+
+  if (period === 'largo_plazo') {
+    const phrase = scenario === 'altas_emisiones'
+      ? LONG_TERM_PROJECTION_HIGH[riskType]
+      : LONG_TERM_PROJECTION[riskType];
+    const lead = scenario === 'altas_emisiones'
+      ? 'Bajo un escenario de altas emisiones a largo plazo, se proyecta'
+      : 'A largo plazo, bajo emisiones moderadas, se proyecta';
+    return `${lead} ${phrase ?? riskType}, con afectación sobre la infraestructura y las operaciones.`;
+  }
+
+  return '';
+}
+
+/**
+ * Builds both ScenarioVariant objects (moderate + high) for a projection risk.
+ * Returns empty object for 'historico' period — no scenario distinction needed.
+ *
+ * Called by normalizeRisks() when building each ConsolidatedRisk entry.
+ */
+export function buildScenarioVariants(
+  riskType: RiskTypeSlug,
+  period: TemporalPeriod,
+  baseImpacts: string[]
+): Partial<Record<'emisiones_moderadas' | 'altas_emisiones', ScenarioVariant>> {
+  if (period === 'historico') return {};
+
+  const moderate: ScenarioVariant = {
+    narrativeText: buildScenarioNarrativeText(riskType, period, 'emisiones_moderadas'),
+    impacts: baseImpacts.slice(),
+    confidence: 'media',
+  };
+
+  const highExtraImpacts = HIGH_EMISSION_EXTRA_IMPACTS[riskType] ?? [];
+  const allHighImpacts = [...baseImpacts, ...highExtraImpacts]
+    .filter((v, i, a) => a.indexOf(v) === i)
+    .slice(0, 5);
+
+  const high: ScenarioVariant = {
+    narrativeText: buildScenarioNarrativeText(riskType, period, 'altas_emisiones'),
+    impacts: allHighImpacts,
+    confidence: 'alta',
+  };
+
+  return { emisiones_moderadas: moderate, altas_emisiones: high };
+}
+
+/**
+ * Returns a single sentence describing how a risk type evolves across
+ * historical → mid-term → long-term horizons.
+ * Used by RiskTimeline as the "cómo evoluciona el fenómeno" caption.
+ */
+export function buildTemporalEvolutionSentence(riskType: RiskTypeSlug): string {
+  return TEMPORAL_EVOLUTION[riskType] ?? `Este fenómeno presenta variaciones proyectadas a lo largo de los horizontes temporales analizados.`;
 }

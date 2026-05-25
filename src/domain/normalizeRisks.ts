@@ -24,6 +24,7 @@ import type {
 
 import { RISK_TYPE_DISPLAY, formatKeyMetric } from '../constants/riskTypes';
 import { toScenarioLabel, toTemporalPeriod } from '../constants/scenarios';
+import { buildScenarioVariants } from './buildOperationalNarrative';
 
 // ─── Semantic mapping tables ──────────────────────────────────────────────────
 
@@ -148,6 +149,8 @@ function buildEmpty(
     evidence:           [],
     adaptationMeasures: [],
     rawSources:         [],
+    // Populated after impacts are fully merged (see post-processing step 5b)
+    scenarioVariants:   {},
   };
 }
 
@@ -342,7 +345,15 @@ export function normalizeRisks(apiResponse: Record<string, unknown>): Consolidat
     });
   }
 
-  // ── 5. Return sorted: higher-confidence first, then by period ─────────────
+  // ── 5a. Populate scenario variants for projection periods ─────────────────
+  // Must run after impacts are fully merged so variants inherit real impacts.
+  for (const entry of map.values()) {
+    if (entry.period !== 'historico') {
+      entry.scenarioVariants = buildScenarioVariants(entry.riskType, entry.period, entry.impacts);
+    }
+  }
+
+  // ── 5b. Return sorted: higher-confidence first, then by period ─────────────
   const periodOrder: Record<TemporalPeriod, number> = {
     historico:      0,
     corto_plazo:    1,

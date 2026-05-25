@@ -15,15 +15,26 @@ const EFFECTIVENESS_STYLES = {
   baja:  'text-muted-foreground',
 };
 
-export default function ConsolidatedRiskCard({ risk }) {
+/**
+ * @param {object}  risk            - ConsolidatedRisk
+ * @param {string=} activeScenario  - 'emisiones_moderadas' | 'altas_emisiones'
+ *                                    When provided, uses scenario-specific narrative + impacts.
+ */
+export default function ConsolidatedRiskCard({ risk, activeScenario }) {
   const [expanded, setExpanded] = useState(false);
+
+  // Resolve scenario-specific data when available
+  const variant = activeScenario && risk.scenarioVariants?.[activeScenario];
+  const displayNarrative = variant?.narrativeText || risk.narrativeText;
+  const displayImpacts   = variant?.impacts?.length ? variant.impacts : (risk.impacts ?? []);
+  const displayConf      = variant?.confidence ?? risk.confidence;
 
   const meta = RISK_TYPE_DISPLAY[risk.riskType] ?? {
     label: risk.displayName, icon: '⚠️',
     bgColor: 'bg-secondary', textColor: 'text-foreground', borderColor: 'border-border',
   };
-  const conf = CONFIDENCE_STYLES[risk.confidence] ?? CONFIDENCE_STYLES.media;
-  const hasDetails = risk.impacts?.length > 0 || risk.adaptationMeasures?.length > 0;
+  const conf = CONFIDENCE_STYLES[displayConf] ?? CONFIDENCE_STYLES.media;
+  const hasDetails = displayImpacts.length > 0 || risk.adaptationMeasures?.length > 0;
   const evidenceCount = risk.evidence?.length ?? 0;
 
   return (
@@ -45,7 +56,7 @@ export default function ConsolidatedRiskCard({ risk }) {
         </div>
 
         {/* Explicación simple — narrativa operativa, sin jerga técnica */}
-        <p className="text-xs text-foreground/75 leading-relaxed">{risk.narrativeText}</p>
+        <p className="text-xs text-foreground/75 leading-relaxed">{displayNarrative}</p>
 
         {/* Evidencia resumida */}
         {evidenceCount > 0 && (
@@ -78,13 +89,13 @@ export default function ConsolidatedRiskCard({ risk }) {
             <div className="px-4 pb-4 pt-3 space-y-3.5 border-t border-black/5 dark:border-white/5">
 
               {/* Posibles impactos operativos */}
-              {risk.impacts?.length > 0 && (
+              {displayImpacts.length > 0 && (
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">
                     Posibles impactos operativos
                   </p>
                   <ul className="space-y-1">
-                    {risk.impacts.slice(0, 4).map((impact, i) => (
+                    {displayImpacts.slice(0, 4).map((impact, i) => (
                       <li key={i} className="text-xs text-foreground/75 flex items-start gap-2">
                         <span className="text-muted-foreground mt-0.5 flex-shrink-0" aria-hidden="true">–</span>
                         {impact}

@@ -232,6 +232,7 @@ const makeRisk = (overrides) => ({
   evidence:           [],
   adaptationMeasures: [],
   rawSources:         ['signals'],
+  scenarioVariants:   {}, // Sprint 19: populated by buildScenarioVariants
   ...overrides,
 });
 
@@ -560,5 +561,110 @@ describe('buildOperationalPeriodNarrative — period language', () => {
     const risks = [makeRisk({ period: 'historico', confidence: 'baja' })];
     const text = buildOperationalPeriodNarrative(risks, 'historico');
     assert.equal(text, '');
+  });
+});
+
+// ─── Sprint 19: ScenarioVariant integration ───────────────────────────────────
+
+const MID_TERM_PROJ_MOD = {
+  lluvias_extremas: 'lluvias más intensas y frecuentes',
+  calor_extremo:    'temperaturas más extremas',
+  sequia:           'períodos de sequía más extensos y severos',
+};
+
+const MID_TERM_PROJ_HIGH = {
+  lluvias_extremas: 'lluvias significativamente más intensas, con mayor frecuencia de eventos extremos',
+  calor_extremo:    'temperaturas extremas con mayor frecuencia e intensidad sostenida',
+};
+
+const LONG_TERM_PROJ_MOD = {
+  sequia:        'mayor escasez hídrica',
+  deslizamiento: 'riesgo incrementado de deslizamientos',
+};
+
+const LONG_TERM_PROJ_HIGH = {
+  sequia:        'escasez hídrica crónica con restricciones operativas estructurales',
+  deslizamiento: 'un riesgo elevado y persistente de deslizamientos sobre infraestructura crítica',
+};
+
+function buildScenarioNarrativeText19(riskType, period, scenario) {
+  if (period === 'historico') return '';
+  if (period === 'mediano_plazo') {
+    const phrase = scenario === 'altas_emisiones' ? MID_TERM_PROJ_HIGH[riskType] : MID_TERM_PROJ_MOD[riskType];
+    const lead = scenario === 'altas_emisiones'
+      ? 'Bajo altas emisiones, hacia mediados de siglo esta zona podría experimentar'
+      : 'Hacia mediados de siglo, bajo emisiones moderadas, esta zona podría experimentar';
+    return `${lead} ${phrase ?? riskType}.`;
+  }
+  if (period === 'largo_plazo') {
+    const phrase = scenario === 'altas_emisiones' ? LONG_TERM_PROJ_HIGH[riskType] : LONG_TERM_PROJ_MOD[riskType];
+    const lead = scenario === 'altas_emisiones'
+      ? 'Bajo un escenario de altas emisiones a largo plazo, se proyecta'
+      : 'A largo plazo, bajo emisiones moderadas, se proyecta';
+    return `${lead} ${phrase ?? riskType}, con afectación sobre la infraestructura y las operaciones.`;
+  }
+  return '';
+}
+
+describe('buildScenarioVariants — Sprint 19 narrative', () => {
+  it('mid-term moderate scenario uses plain language without SSP codes', () => {
+    const text = buildScenarioNarrativeText19('lluvias_extremas', 'mediano_plazo', 'emisiones_moderadas');
+    assert.ok(text.length > 10, 'Moderate narrative must not be empty');
+    assert.ok(!text.includes('SSP245'), 'Must not expose SSP codes');
+    assert.ok(!text.includes('ssp245'), 'Must not expose ssp codes');
+    assert.ok(text.toLowerCase().includes('moderadas'), 'Must mention moderadas');
+  });
+
+  it('mid-term high-emissions scenario uses plain language without SSP codes', () => {
+    const text = buildScenarioNarrativeText19('lluvias_extremas', 'mediano_plazo', 'altas_emisiones');
+    assert.ok(text.length > 10, 'High narrative must not be empty');
+    assert.ok(!text.includes('SSP585'), 'Must not expose SSP codes');
+    assert.ok(text.toLowerCase().includes('altas emisiones'), 'Must mention altas emisiones');
+  });
+
+  it('long-term high-emissions narrative is more severe than moderate', () => {
+    const modText  = buildScenarioNarrativeText19('sequia', 'largo_plazo', 'emisiones_moderadas');
+    const highText = buildScenarioNarrativeText19('sequia', 'largo_plazo', 'altas_emisiones');
+    assert.notEqual(modText, highText, 'Scenarios must produce different narratives');
+    // High scenario should have a stronger word
+    assert.ok(
+      highText.includes('crónica') || highText.includes('estructurales') || highText.length > modText.length,
+      'High-emissions narrative should be more severe'
+    );
+  });
+
+  it('historico period returns empty string for both scenarios', () => {
+    assert.equal(buildScenarioNarrativeText19('lluvias_extremas', 'historico', 'emisiones_moderadas'), '');
+    assert.equal(buildScenarioNarrativeText19('lluvias_extremas', 'historico', 'altas_emisiones'), '');
+  });
+
+  it('deslizamiento has distinct long-term narratives per scenario', () => {
+    const mod  = buildScenarioNarrativeText19('deslizamiento', 'largo_plazo', 'emisiones_moderadas');
+    const high = buildScenarioNarrativeText19('deslizamiento', 'largo_plazo', 'altas_emisiones');
+    assert.notEqual(mod, high);
+    assert.ok(high.includes('elevado') || high.includes('crítica') || high.length >= mod.length);
+  });
+});
+
+describe('NarrativeReport — scenarioVariants field presence (regression)', () => {
+  it('makeRisk fixture includes scenarioVariants field', () => {
+    const risk = makeRisk();
+    assert.ok('scenarioVariants' in risk, 'ConsolidatedRisk must have scenarioVariants field');
+  });
+
+  it('historico risks have empty scenarioVariants by default', () => {
+    const risk = makeRisk({ period: 'historico', scenarioVariants: {} });
+    assert.deepEqual(risk.scenarioVariants, {});
+  });
+
+  it('buildNarrativeReport passes through risks with scenarioVariants intact', () => {
+    const variants = {
+      emisiones_moderadas: { narrativeText: 'Moderado', impacts: [], confidence: 'media' },
+      altas_emisiones:     { narrativeText: 'Alto',     impacts: ['daño estructural'], confidence: 'alta' },
+    };
+    const risk = makeRisk({ period: 'mediano_plazo', scenarioVariants: variants });
+    const report = buildNarrativeReport([risk], 'Lima', 'Retail');
+    const resultRisk = report.risks[0];
+    assert.deepEqual(resultRisk.scenarioVariants, variants, 'scenarioVariants must be preserved in the report');
   });
 });

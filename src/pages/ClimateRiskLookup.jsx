@@ -15,6 +15,7 @@ import SearchPanel              from "@/features/climate-lookup/components/Searc
 import AnalysisLoading          from "@/features/climate-lookup/components/AnalysisLoading";
 import ExecutiveSummaryCard     from "@/features/climate-lookup/components/ExecutiveSummaryCard";
 import RiskPeriodSection        from "@/features/climate-lookup/components/RiskPeriodSection";
+import RiskTimeline             from "@/features/climate-lookup/components/RiskTimeline";
 
 // Lazy-loaded heavy/deferred chunks — Vite splits these into separate bundles
 const MapView         = lazy(() => import("@/features/climate-lookup/components/MapView"));
@@ -23,12 +24,14 @@ const ScientificFooter = lazy(() => import("@/features/climate-lookup/components
 
 export default function ClimateRiskLookup() {
   // ── UI state only ─────────────────────────────────────────────────────────
-  const [lat,       setLat]       = useState("");
-  const [lng,       setLng]       = useState("");
-  const [sector,    setSector]    = useState("retail");
-  const [tileLayer, setTileLayer] = useState("osm");
-  const [markerPos, setMarkerPos] = useState(null);
-  const [flyTarget, setFlyTarget] = useState(null);
+  const [lat,            setLat]            = useState("");
+  const [lng,            setLng]            = useState("");
+  const [sector,         setSector]         = useState("retail");
+  const [tileLayer,      setTileLayer]      = useState("osm");
+  const [markerPos,      setMarkerPos]      = useState(null);
+  const [flyTarget,      setFlyTarget]      = useState(null);
+  // Shared emission scenario — drives both RiskTimeline and RiskPeriodSection toggles
+  const [activeScenario, setActiveScenario] = useState("emisiones_moderadas");
 
   // ── All data / async logic lives in the hook ──────────────────────────────
   const {
@@ -176,7 +179,13 @@ export default function ClimateRiskLookup() {
               {/* 1 — Executive summary (hero) */}
               <ExecutiveSummaryCard narrativeReport={narrativeReport} />
 
-              {/* 2 — Historical risks */}
+              {/* 2 — Temporal evolution timeline (multi-period risks) */}
+              <RiskTimeline
+                consolidatedRisks={consolidatedRisks}
+                activeScenario={activeScenario}
+              />
+
+              {/* 3 — Historical risks */}
               {historicalRisks.length > 0 && (
                 <RiskPeriodSection
                   period="historico"
@@ -185,32 +194,36 @@ export default function ClimateRiskLookup() {
                 />
               )}
 
-              {/* 3 — Mid-term projections */}
+              {/* 4 — Mid-term projections */}
               {midTermRisks.length > 0 && (
                 <RiskPeriodSection
                   period="mediano_plazo"
                   risks={midTermRisks}
                   narrativeText={narrativeReport?.midTermNarrative}
                   projections={projections}
+                  activeScenario={activeScenario}
+                  onScenarioChange={setActiveScenario}
                 />
               )}
 
-              {/* 4 — Long-term projections */}
+              {/* 5 — Long-term projections */}
               {longTermRisks.length > 0 && (
                 <RiskPeriodSection
                   period="largo_plazo"
                   risks={longTermRisks}
                   narrativeText={narrativeReport?.longTermNarrative}
                   projections={projections}
+                  activeScenario={activeScenario}
+                  onScenarioChange={setActiveScenario}
                 />
               )}
 
-              {/* 5 — Adaptation */}
+              {/* 6 — Adaptation */}
               <Suspense fallback={null}>
                 <AdaptationPanel adaptations={adaptations} />
               </Suspense>
 
-              {/* 6 — Scientific detail (collapsed) */}
+              {/* 7 — Scientific detail (collapsed) */}
               <Suspense fallback={null}>
                 <ScientificFooter
                   metadata={metadata}

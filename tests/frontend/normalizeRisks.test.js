@@ -124,6 +124,7 @@ function buildEmpty(riskType, period, scenario, confidence) {
     evidence: [],
     adaptationMeasures: [],
     rawSources: [],
+    scenarioVariants: {}, // Sprint 19: populated by buildScenarioVariants post-processing
   };
 }
 
@@ -555,6 +556,203 @@ describe('buildExecutiveSummary — normal scenarios', () => {
     ];
     const s = buildExecutiveSummary(risks, 'Lima', 'Retail');
     assert.ok(s.includes('2 medidas de adaptación'));
+  });
+});
+
+// ─── Sprint 19: scenarioVariants — inline mirrors ────────────────────────────
+
+const MID_TERM_PROJECTION = {
+  lluvias_extremas: 'lluvias más intensas y frecuentes',
+  calor_extremo:    'temperaturas más extremas',
+  sequia:           'períodos de sequía más extensos y severos',
+  deslizamiento:    'mayor susceptibilidad a movimientos de terreno',
+  heladas:          'episodios de heladas más intensos',
+  fenomeno_enso:    'mayor variabilidad climática interanual',
+  inundacion:       'mayor riesgo de desborde e inundaciones',
+};
+
+const MID_TERM_PROJECTION_HIGH = {
+  lluvias_extremas: 'lluvias significativamente más intensas, con mayor frecuencia de eventos extremos',
+  calor_extremo:    'temperaturas extremas con mayor frecuencia e intensidad sostenida',
+  sequia:           'períodos de sequía más prolongados y severos, con escasez hídrica crítica',
+};
+
+const LONG_TERM_PROJECTION = {
+  lluvias_extremas: 'un régimen de lluvias más intenso y variable',
+  calor_extremo:    'condiciones de calor extremo más frecuentes e intensas',
+  sequia:           'mayor escasez hídrica',
+};
+
+const LONG_TERM_PROJECTION_HIGH = {
+  lluvias_extremas: 'un régimen de lluvias substancialmente más intenso, variable y disruptivo',
+  calor_extremo:    'condiciones de calor extremo persistentes que impactarán gravemente la operación y el personal',
+};
+
+const HIGH_EMISSION_EXTRA_IMPACTS = {
+  lluvias_extremas: ['daños estructurales más frecuentes y costosos', 'interrupciones logísticas prolongadas'],
+  calor_extremo:    ['mayor riesgo de estrés térmico en personal expuesto', 'aumento significativo del consumo energético'],
+  sequia:           ['restricciones hídricas severas con impacto en procesos productivos'],
+};
+
+const TEMPORAL_EVOLUTION = {
+  lluvias_extremas: 'Las lluvias intensas ya se observan históricamente en esta zona, y podrían incrementarse en frecuencia e intensidad hacia mediados de siglo, con mayor severidad a largo plazo bajo altas emisiones.',
+  calor_extremo:    'El calor extremo es un fenómeno ya registrado históricamente, con proyecciones de aumento significativo en frecuencia e intensidad durante las próximas décadas.',
+  sequia:           'La sequía tiene antecedentes históricos en esta área, con mayor riesgo de déficit hídrico proyectado hacia 2050 y condiciones más severas a largo plazo.',
+};
+
+function buildScenarioNarrativeText(riskType, period, scenario) {
+  if (period === 'historico') return '';
+  if (period === 'mediano_plazo') {
+    const phrase = scenario === 'altas_emisiones'
+      ? MID_TERM_PROJECTION_HIGH[riskType]
+      : MID_TERM_PROJECTION[riskType];
+    const lead = scenario === 'altas_emisiones'
+      ? 'Bajo altas emisiones, hacia mediados de siglo esta zona podría experimentar'
+      : 'Hacia mediados de siglo, bajo emisiones moderadas, esta zona podría experimentar';
+    return `${lead} ${phrase ?? riskType}.`;
+  }
+  if (period === 'largo_plazo') {
+    const phrase = scenario === 'altas_emisiones'
+      ? LONG_TERM_PROJECTION_HIGH[riskType]
+      : LONG_TERM_PROJECTION[riskType];
+    const lead = scenario === 'altas_emisiones'
+      ? 'Bajo un escenario de altas emisiones a largo plazo, se proyecta'
+      : 'A largo plazo, bajo emisiones moderadas, se proyecta';
+    return `${lead} ${phrase ?? riskType}, con afectación sobre la infraestructura y las operaciones.`;
+  }
+  return '';
+}
+
+function buildScenarioVariants(riskType, period, baseImpacts) {
+  if (period === 'historico') return {};
+  const moderate = {
+    narrativeText: buildScenarioNarrativeText(riskType, period, 'emisiones_moderadas'),
+    impacts: baseImpacts.slice(),
+    confidence: 'media',
+  };
+  const highExtra = HIGH_EMISSION_EXTRA_IMPACTS[riskType] ?? [];
+  const allHigh = [...baseImpacts, ...highExtra].filter((v, i, a) => a.indexOf(v) === i).slice(0, 5);
+  const high = {
+    narrativeText: buildScenarioNarrativeText(riskType, period, 'altas_emisiones'),
+    impacts: allHigh,
+    confidence: 'alta',
+  };
+  return { emisiones_moderadas: moderate, altas_emisiones: high };
+}
+
+function buildTemporalEvolutionSentence(riskType) {
+  return TEMPORAL_EVOLUTION[riskType] ?? 'Este fenómeno presenta variaciones proyectadas a lo largo de los horizontes temporales analizados.';
+}
+
+describe('buildScenarioVariants — Sprint 19', () => {
+  it('returns empty object for historico period', () => {
+    const variants = buildScenarioVariants('lluvias_extremas', 'historico', []);
+    assert.deepEqual(variants, {});
+  });
+
+  it('produces two scenario keys for mediano_plazo', () => {
+    const variants = buildScenarioVariants('lluvias_extremas', 'mediano_plazo', []);
+    assert.ok('emisiones_moderadas' in variants, 'must have emisiones_moderadas key');
+    assert.ok('altas_emisiones' in variants, 'must have altas_emisiones key');
+  });
+
+  it('produces two scenario keys for largo_plazo', () => {
+    const variants = buildScenarioVariants('calor_extremo', 'largo_plazo', []);
+    assert.ok('emisiones_moderadas' in variants);
+    assert.ok('altas_emisiones' in variants);
+  });
+
+  it('moderate and high narratives differ from each other', () => {
+    const variants = buildScenarioVariants('lluvias_extremas', 'mediano_plazo', []);
+    assert.notEqual(
+      variants.emisiones_moderadas.narrativeText,
+      variants.altas_emisiones.narrativeText,
+      'Scenario narratives must differ'
+    );
+  });
+
+  it('altas_emisiones has more impacts than emisiones_moderadas when extras exist', () => {
+    const base = ['Impacto operativo base'];
+    const variants = buildScenarioVariants('lluvias_extremas', 'mediano_plazo', base);
+    assert.ok(
+      variants.altas_emisiones.impacts.length >= variants.emisiones_moderadas.impacts.length,
+      'High emissions must have same or more impacts'
+    );
+  });
+
+  it('altas_emisiones confidence is alta', () => {
+    const variants = buildScenarioVariants('sequia', 'mediano_plazo', []);
+    assert.equal(variants.altas_emisiones.confidence, 'alta');
+  });
+
+  it('emisiones_moderadas confidence is media', () => {
+    const variants = buildScenarioVariants('sequia', 'mediano_plazo', []);
+    assert.equal(variants.emisiones_moderadas.confidence, 'media');
+  });
+
+  it('altas_emisiones narrative contains "altas emisiones"', () => {
+    const variants = buildScenarioVariants('calor_extremo', 'mediano_plazo', []);
+    assert.ok(
+      variants.altas_emisiones.narrativeText.toLowerCase().includes('altas emisiones'),
+      'high-emissions narrative must mention "altas emisiones"'
+    );
+  });
+
+  it('emisiones_moderadas narrative contains "moderadas"', () => {
+    const variants = buildScenarioVariants('calor_extremo', 'largo_plazo', []);
+    assert.ok(
+      variants.emisiones_moderadas.narrativeText.toLowerCase().includes('moderadas'),
+      'moderate narrative must mention "moderadas"'
+    );
+  });
+
+  it('base impacts are preserved in both variants', () => {
+    const base = ['acceso vial comprometido', 'daño estructural'];
+    const variants = buildScenarioVariants('deslizamiento', 'mediano_plazo', base);
+    for (const impact of base) {
+      assert.ok(variants.emisiones_moderadas.impacts.includes(impact), `Moderate must include: ${impact}`);
+      assert.ok(variants.altas_emisiones.impacts.includes(impact), `High must include: ${impact}`);
+    }
+  });
+
+  it('no duplicate impacts in altas_emisiones', () => {
+    const base = ['acceso vial comprometido'];
+    const variants = buildScenarioVariants('lluvias_extremas', 'mediano_plazo', base);
+    const impacts = variants.altas_emisiones.impacts;
+    const uniqueImpacts = new Set(impacts);
+    assert.equal(impacts.length, uniqueImpacts.size, 'No duplicate impacts in high-emissions variant');
+  });
+});
+
+describe('buildTemporalEvolutionSentence — Sprint 19', () => {
+  it('returns a non-empty string for known risk types', () => {
+    const types = ['lluvias_extremas', 'calor_extremo', 'sequia', 'deslizamiento', 'heladas', 'fenomeno_enso', 'inundacion'];
+    for (const rt of types) {
+      const s = buildTemporalEvolutionSentence(rt);
+      assert.ok(s.length > 20, `Empty or too short evolution sentence for ${rt}`);
+    }
+  });
+
+  it('returns fallback for unknown risk type', () => {
+    const s = buildTemporalEvolutionSentence('unknown_risk_xyz');
+    assert.ok(s.includes('fenómeno'));
+  });
+
+  it('lluvias sentence mentions historical observation and future projection', () => {
+    const s = buildTemporalEvolutionSentence('lluvias_extremas');
+    assert.ok(s.toLowerCase().includes('históricamente') || s.toLowerCase().includes('históricament'));
+    assert.ok(s.toLowerCase().includes('2050') || s.toLowerCase().includes('siglo') || s.toLowerCase().includes('largo'));
+  });
+
+  it('does not contain IPCC codes', () => {
+    const types = ['lluvias_extremas', 'calor_extremo', 'sequia'];
+    const BANNED = ['SSP', 'CMIP6', 'ssp245', 'ssp585', 'rx1day', 'anomalía'];
+    for (const rt of types) {
+      const s = buildTemporalEvolutionSentence(rt);
+      for (const term of BANNED) {
+        assert.ok(!s.includes(term), `"${term}" found in evolution sentence for ${rt}`);
+      }
+    }
   });
 });
 

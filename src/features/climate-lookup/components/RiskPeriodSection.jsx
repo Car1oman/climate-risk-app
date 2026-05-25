@@ -1,5 +1,4 @@
 // @ts-nocheck
-import { useState } from "react";
 import ConsolidatedRiskCard from "./ConsolidatedRiskCard";
 
 const PERIOD_CONFIG = {
@@ -38,18 +37,19 @@ const PERIOD_TO_WINDOW = {
 };
 
 /**
- * RiskPeriodSection — Sprint 16.
+ * RiskPeriodSection — Sprint 19.
  * Reusable section for histórico / mediano plazo / largo plazo.
  *
- * @param {string}              period        - TemporalPeriod slug
- * @param {ConsolidatedRisk[]}  risks         - Risks filtered to this period
- * @param {string}              narrativeText - Plain-language summary from buildNarrativeReport
- * @param {object|null}         projections   - Layer9 buildProjectionContext() output (optional)
+ * @param {string}              period           - TemporalPeriod slug
+ * @param {ConsolidatedRisk[]}  risks            - Risks filtered to this period
+ * @param {string}              narrativeText    - Plain-language summary from buildNarrativeReport
+ * @param {object|null}         projections      - Layer9 buildProjectionContext() output (optional)
+ * @param {string}              activeScenario   - Shared scenario state from parent
+ * @param {function}            onScenarioChange - Callback to update shared scenario state
  */
-export default function RiskPeriodSection({ period, risks, narrativeText, projections }) {
-  const [activeScenario, setActiveScenario] = useState('emisiones_moderadas');
-
+export default function RiskPeriodSection({ period, risks, narrativeText, projections, activeScenario = 'emisiones_moderadas', onScenarioChange }) {
   const config = PERIOD_CONFIG[period] ?? PERIOD_CONFIG.historico;
+  const setActiveScenario = onScenarioChange ?? (() => {});
 
   if (!risks?.length && !narrativeText) return null;
 
@@ -107,11 +107,15 @@ export default function RiskPeriodSection({ period, risks, narrativeText, projec
         <p className="text-sm text-muted-foreground leading-relaxed">{narrativeText}</p>
       ) : null}
 
-      {/* Risk cards */}
+      {/* Risk cards — scenario variant passed when toggle is active */}
       {risks?.length > 0 && (
         <div className="space-y-3">
           {risks.map(risk => (
-            <ConsolidatedRiskCard key={risk.id} risk={risk} />
+            <ConsolidatedRiskCard
+              key={risk.id}
+              risk={risk}
+              activeScenario={config.showScenario ? activeScenario : undefined}
+            />
           ))}
         </div>
       )}
