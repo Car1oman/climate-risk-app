@@ -102,10 +102,26 @@
       "Bash(npx vite *)",
       "PowerShell(cd \"d:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\"; $env:PATH = \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64;\" + $env:PATH; node .\\\\node_modules\\\\vite\\\\bin\\\\vite.js build 2>&1)",
       "Bash(\"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\" --test tests/layer*.test.js tests/scientific/*.test.js)",
-      "Bash(\"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\" --test tests/regression/*.test.js tests/baselines/*.test.js)"
+      "Bash(\"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\" --test tests/regression/*.test.js tests/baselines/*.test.js)",
+      "Bash(Remove-Item \"d:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\\\\src\\\\features\\\\climate-lookup\\\\components\\\\NarrativePanel.jsx\")",
+      "Bash(Remove-Item \"d:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\\\\src\\\\features\\\\climate-lookup\\\\components\\\\SignalsPanel.jsx\")",
+      "Bash(Remove-Item \"d:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\\\\src\\\\features\\\\climate-lookup\\\\components\\\\RisksPanel.jsx\")",
+      "Bash(Remove-Item \"d:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\\\\src\\\\features\\\\climate-lookup\\\\components\\\\GRIThreatsPanel.jsx\")",
+      "Bash(Write-Host \"Deleted 4 legacy files\")",
+      "Bash(rm \"d:/Usuarios/PM75161698/Desktop/datarisk/climate-risk-app/src/features/climate-lookup/components/NarrativePanel.jsx\" \"d:/Usuarios/PM75161698/Desktop/datarisk/climate-risk-app/src/features/climate-lookup/components/SignalsPanel.jsx\" \"d:/Usuarios/PM75161698/Desktop/datarisk/climate-risk-app/src/features/climate-lookup/components/RisksPanel.jsx\" \"d:/Usuarios/PM75161698/Desktop/datarisk/climate-risk-app/src/features/climate-lookup/components/GRIThreatsPanel.jsx\" && echo \"Deleted\")",
+      "Bash(\"D:/Usuarios/PM75161698/node-v24.15.0-win-x64/node-v24.15.0-win-x64/npm.cmd\" run *)",
+      "Bash(PATH=D:/Usuarios/PM75161698/node-v24.15.0-win-x64/node-v24.15.0-win-x64:__TRACKED_VAR__ npm run build)",
+      "PowerShell($env:PATH = \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64;\" + $env:PATH; Set-Location \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\"; npm run build 2>&1)",
+      "PowerShell($env:PATH = \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64;\" + $env:PATH; Set-Location \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\"; npm run build 2>&1 | Out-String)",
+      "PowerShell($env:PATH = \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64;\" + $env:PATH; Set-Location \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\"; $result = npm run build 2>&1; $LASTEXITCODE; $result -join \"`n\")",
+      "PowerShell($env:PATH = \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64;\" + $env:PATH; Set-Location \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\"; npm run build > \"C:\\\\temp\\\\build_output.txt\" 2>&1; $code = $LASTEXITCODE; Get-Content \"C:\\\\temp\\\\build_output.txt\"; Write-Host \"EXIT: $code\")",
+      "PowerShell($env:PATH = \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64;\" + $env:PATH; Set-Location \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\"; npm run build > \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\build_out.txt\" 2>&1; $LASTEXITCODE; Get-Content \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\build_out.txt\" -Raw)",
+      "PowerShell($env:PATH = \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64;\" + $env:PATH; Set-Location \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\"; Get-ChildItem dist -ErrorAction SilentlyContinue | Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize)",
+      "PowerShell($env:PATH = \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64;\" + $env:PATH; Set-Location \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\"; npm test -- --run 2>&1 | Select-Object -Last 30)"
     ],
     "additionalDirectories": [
-      "d:\\Usuarios\\PM75161698\\Desktop\\datarisk\\climate-risk-app"
+      "d:\\Usuarios\\PM75161698\\Desktop\\datarisk\\climate-risk-app",
+      "d:\\Usuarios\\PM75161698\\Desktop\\datarisk\\climate-risk-app\\src\\features\\climate-lookup\\components"
     ]
   }
 }

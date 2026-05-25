@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, Loader2, MapPin, Search } from "lucide-react";
+import { AlertTriangle, Loader2, MapPin, Search, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 import { SECTORS }              from "@/features/climate-lookup/constants";
@@ -14,13 +14,41 @@ import { useClimateAnalysis }   from "@/features/climate-lookup/hooks/useClimate
 import SearchPanel              from "@/features/climate-lookup/components/SearchPanel";
 import AnalysisLoading          from "@/features/climate-lookup/components/AnalysisLoading";
 import ExecutiveSummaryCard     from "@/features/climate-lookup/components/ExecutiveSummaryCard";
-import RiskPeriodSection        from "@/features/climate-lookup/components/RiskPeriodSection";
 import RiskTimeline             from "@/features/climate-lookup/components/RiskTimeline";
+import RiskPeriodTabs           from "@/features/climate-lookup/components/RiskPeriodTabs";
 
 // Lazy-loaded heavy/deferred chunks — Vite splits these into separate bundles
-const MapView         = lazy(() => import("@/features/climate-lookup/components/MapView"));
-const AdaptationPanel = lazy(() => import("@/features/climate-lookup/components/AdaptationPanel"));
+const MapView          = lazy(() => import("@/features/climate-lookup/components/MapView"));
+const AdaptationPanel  = lazy(() => import("@/features/climate-lookup/components/AdaptationPanel"));
 const ScientificFooter = lazy(() => import("@/features/climate-lookup/components/ScientificFooter"));
+
+// ─── Empty states ──────────────────────────────────────────────────────────────
+
+function EmptyNoRisks() {
+  return (
+    <div className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 px-5 py-8 text-center space-y-2">
+      <ShieldCheck className="w-8 h-8 mx-auto text-emerald-500" aria-hidden="true" />
+      <p className="text-sm font-semibold text-foreground">Zona de bajo riesgo climático</p>
+      <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+        No se identificaron fenómenos climáticos relevantes para esta ubicación y sector.
+      </p>
+    </div>
+  );
+}
+
+function EmptyInitial() {
+  return (
+    <div className="text-center py-12 space-y-2">
+      <MapPin className="w-8 h-8 mx-auto text-muted-foreground/30" aria-hidden="true" />
+      <p className="text-sm font-semibold text-muted-foreground">Selecciona un punto en el mapa</p>
+      <p className="text-xs text-muted-foreground">
+        o ingresa coordenadas para analizar los riesgos climáticos
+      </p>
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ClimateRiskLookup() {
   // ── UI state only ─────────────────────────────────────────────────────────
@@ -30,7 +58,7 @@ export default function ClimateRiskLookup() {
   const [tileLayer,      setTileLayer]      = useState("osm");
   const [markerPos,      setMarkerPos]      = useState(null);
   const [flyTarget,      setFlyTarget]      = useState(null);
-  // Shared emission scenario — drives both RiskTimeline and RiskPeriodSection toggles
+  // Shared emission scenario — drives RiskTimeline + RiskPeriodTabs
   const [activeScenario, setActiveScenario] = useState("emisiones_moderadas");
 
   // ── All data / async logic lives in the hook ──────────────────────────────
@@ -42,7 +70,6 @@ export default function ClimateRiskLookup() {
     narrativeReport,
     projections,
     rawResponse,
-    adaptations,
     metadata,
     territorialCtx,
     docContext,
@@ -77,7 +104,7 @@ export default function ClimateRiskLookup() {
     await analyze({ lat: latNum, lon: lngNum });
   }, [lat, lng, analyze]);
 
-  // ── Period-grouped risks (memoized — avoids 3 filter passes on every render) ─
+  // ── Period-grouped risks (memoized) ───────────────────────────────────────
   const historicalRisks = useMemo(
     () => consolidatedRisks.filter(r => r.period === 'historico'),
     [consolidatedRisks]
@@ -90,6 +117,8 @@ export default function ClimateRiskLookup() {
     () => consolidatedRisks.filter(r => r.period === 'largo_plazo'),
     [consolidatedRisks]
   );
+
+  const hasRisks = consolidatedRisks.length > 0;
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -112,7 +141,7 @@ export default function ClimateRiskLookup() {
           />
         </Suspense>
 
-        <div className="space-y-5 overflow-y-auto" style={{ maxHeight: "82vh" }}>
+        <div className="space-y-4 overflow-y-auto" style={{ maxHeight: "82vh" }}>
           {/* Search / coordinates form */}
           <Card>
             <CardContent className="pt-4 space-y-4">
@@ -169,61 +198,46 @@ export default function ClimateRiskLookup() {
 
           {error && !loading && (
             <Alert className="border-destructive bg-destructive/10">
-              <AlertTriangle className="w-4 h-4 text-destructive" />
+              <AlertTriangle className="w-4 h-4 text-destructive" aria-hidden="true" />
               <AlertDescription className="text-sm text-destructive">{error}</AlertDescription>
             </Alert>
           )}
 
           {hasResults && !loading && (
-            <div className="space-y-6">
-              {/* 1 — Executive summary (hero) */}
+            <div className="space-y-5">
+              {/* 1 — Executive briefing (hero — answers 4 questions) */}
               <ExecutiveSummaryCard narrativeReport={narrativeReport} />
 
-              {/* 2 — Temporal evolution timeline (multi-period risks) */}
-              <RiskTimeline
-                consolidatedRisks={consolidatedRisks}
-                activeScenario={activeScenario}
-              />
+              {hasRisks ? (
+                <>
+                  {/* 2 — Temporal evolution (multi-period risks only) */}
+                  <RiskTimeline
+                    consolidatedRisks={consolidatedRisks}
+                    activeScenario={activeScenario}
+                  />
 
-              {/* 3 — Historical risks */}
-              {historicalRisks.length > 0 && (
-                <RiskPeriodSection
-                  period="historico"
-                  risks={historicalRisks}
-                  narrativeText={narrativeReport?.historicalNarrative}
-                />
+                  {/* 3 — Period detail — tabbed: Histórico | Mediano | Largo plazo */}
+                  <RiskPeriodTabs
+                    historicalRisks={historicalRisks}
+                    midTermRisks={midTermRisks}
+                    longTermRisks={longTermRisks}
+                    narrativeReport={narrativeReport}
+                    projections={projections}
+                    activeScenario={activeScenario}
+                    onScenarioChange={setActiveScenario}
+                  />
+
+                  {/* 4 — Priority adaptation actions (from ConsolidatedRisk model) */}
+                  <Suspense fallback={null}>
+                    <AdaptationPanel consolidatedRisks={consolidatedRisks} />
+                  </Suspense>
+                </>
+              ) : (
+                /* No risks identified */
+                <EmptyNoRisks />
               )}
 
-              {/* 4 — Mid-term projections */}
-              {midTermRisks.length > 0 && (
-                <RiskPeriodSection
-                  period="mediano_plazo"
-                  risks={midTermRisks}
-                  narrativeText={narrativeReport?.midTermNarrative}
-                  projections={projections}
-                  activeScenario={activeScenario}
-                  onScenarioChange={setActiveScenario}
-                />
-              )}
-
-              {/* 5 — Long-term projections */}
-              {longTermRisks.length > 0 && (
-                <RiskPeriodSection
-                  period="largo_plazo"
-                  risks={longTermRisks}
-                  narrativeText={narrativeReport?.longTermNarrative}
-                  projections={projections}
-                  activeScenario={activeScenario}
-                  onScenarioChange={setActiveScenario}
-                />
-              )}
-
-              {/* 6 — Adaptation */}
-              <Suspense fallback={null}>
-                <AdaptationPanel adaptations={adaptations} />
-              </Suspense>
-
-              {/* 7 — Scientific detail (collapsed) */}
+              {/* 5 — Scientific detail (collapsed by default) */}
               <Suspense fallback={null}>
                 <ScientificFooter
                   metadata={metadata}
@@ -235,15 +249,7 @@ export default function ClimateRiskLookup() {
             </div>
           )}
 
-          {!hasResults && !loading && !error && (
-            <div className="text-center py-12">
-              <MapPin className="w-8 h-8 mx-auto mb-2 text-muted-foreground/30" />
-              <p className="text-sm font-semibold text-muted-foreground">Selecciona un punto en el mapa</p>
-              <p className="text-xs mt-1 text-muted-foreground">
-                o ingresa coordenadas para analizar los riesgos climáticos
-              </p>
-            </div>
-          )}
+          {!hasResults && !loading && !error && <EmptyInitial />}
         </div>
       </div>
     </div>

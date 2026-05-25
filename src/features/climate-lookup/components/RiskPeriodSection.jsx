@@ -3,24 +3,15 @@ import ConsolidatedRiskCard from "./ConsolidatedRiskCard";
 
 const PERIOD_CONFIG = {
   historico: {
-    label: 'Riesgos históricos',
-    description: 'Fenómenos observados en el período de referencia',
-    period: '1980–2014',
-    icon: '📊',
+    description: 'Fenómenos observados en el período de referencia (1980–2014)',
     showScenario: false,
   },
   mediano_plazo: {
-    label: 'Mediano plazo',
-    description: 'Proyecciones para las próximas décadas',
-    period: '2040–2059',
-    icon: '📈',
+    description: 'Proyecciones para 2040–2059',
     showScenario: true,
   },
   largo_plazo: {
-    label: 'Largo plazo',
-    description: 'Proyecciones de cambio climático a largo plazo',
-    period: '2060–2079',
-    icon: '🔭',
+    description: 'Proyecciones de cambio climático para 2060–2079',
     showScenario: true,
   },
 };
@@ -30,56 +21,55 @@ const SCENARIOS = [
   { value: 'altas_emisiones',     sspKey: 'ssp585', label: 'Altas emisiones'    },
 ];
 
-// Maps period slug → Layer9 narrative window key
 const PERIOD_TO_WINDOW = {
   mediano_plazo: 'mid_term',
   largo_plazo:   'long_term',
 };
 
 /**
- * RiskPeriodSection — Sprint 19.
- * Reusable section for histórico / mediano plazo / largo plazo.
+ * RiskPeriodSection — Sprint 20.
+ * Simplified header (emoji-free) — rendered inside a RiskPeriodTabs context.
  *
- * @param {string}              period           - TemporalPeriod slug
- * @param {ConsolidatedRisk[]}  risks            - Risks filtered to this period
- * @param {string}              narrativeText    - Plain-language summary from buildNarrativeReport
- * @param {object|null}         projections      - Layer9 buildProjectionContext() output (optional)
- * @param {string}              activeScenario   - Shared scenario state from parent
- * @param {function}            onScenarioChange - Callback to update shared scenario state
+ * @param {string}             period
+ * @param {ConsolidatedRisk[]} risks
+ * @param {string}             narrativeText
+ * @param {object|null}        projections
+ * @param {string}             activeScenario
+ * @param {function}           onScenarioChange
  */
-export default function RiskPeriodSection({ period, risks, narrativeText, projections, activeScenario = 'emisiones_moderadas', onScenarioChange }) {
+export default function RiskPeriodSection({
+  period,
+  risks,
+  narrativeText,
+  projections,
+  activeScenario = 'emisiones_moderadas',
+  onScenarioChange,
+}) {
   const config = PERIOD_CONFIG[period] ?? PERIOD_CONFIG.historico;
   const setActiveScenario = onScenarioChange ?? (() => {});
 
   if (!risks?.length && !narrativeText) return null;
 
-  const activeSSP  = SCENARIOS.find(s => s.value === activeScenario)?.sspKey ?? 'ssp245';
-  const windowKey  = PERIOD_TO_WINDOW[period];
+  const activeSSP = SCENARIOS.find(s => s.value === activeScenario)?.sspKey ?? 'ssp245';
+  const windowKey = PERIOD_TO_WINDOW[period];
 
-  // Scenario-specific narrative from Layer9 (projection periods only)
+  // Layer9 scenario-specific narrative (projection periods only)
   const projNarrative = config.showScenario
     ? (projections?.narratives?.find(n => n.scenario === activeSSP && n.window === windowKey)?.text ?? null)
     : null;
 
   return (
-    <section className="space-y-4">
-      {/* Section header */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-2.5">
-          <span className="text-base leading-none mt-0.5 flex-shrink-0">{config.icon}</span>
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">{config.label}</h3>
-            <p className="text-[11px] text-muted-foreground mt-0.5">{config.description}</p>
-          </div>
-        </div>
-        <span className="text-[10px] font-mono text-muted-foreground bg-secondary border border-border px-2 py-0.5 rounded-md flex-shrink-0">
-          {config.period}
-        </span>
-      </div>
+    <section className="space-y-3">
+      {/* Compact description — tab already provides label/period */}
+      <p className="text-[11px] text-muted-foreground">{config.description}</p>
 
       {/* Scenario toggle — projection periods only */}
       {config.showScenario && (
-        <div className="flex gap-1.5 p-1 rounded-lg border border-border bg-secondary" role="group" aria-label="Escenario de emisiones">
+        <div
+          className="flex gap-1 p-1 rounded-lg border border-border bg-secondary"
+          role="group"
+          aria-label="Escenario de emisiones"
+        >
           {SCENARIOS.map(s => (
             <button
               key={s.value}
@@ -98,7 +88,7 @@ export default function RiskPeriodSection({ period, risks, narrativeText, projec
         </div>
       )}
 
-      {/* Narrative text — Layer9 scenario-specific takes priority */}
+      {/* Narrative — Layer9 scenario takes priority over operational narrative */}
       {projNarrative ? (
         <p className="text-[11px] text-muted-foreground leading-relaxed border-l-2 border-border pl-3">
           {projNarrative}
@@ -107,7 +97,7 @@ export default function RiskPeriodSection({ period, risks, narrativeText, projec
         <p className="text-sm text-muted-foreground leading-relaxed">{narrativeText}</p>
       ) : null}
 
-      {/* Risk cards — scenario variant passed when toggle is active */}
+      {/* Risk cards */}
       {risks?.length > 0 && (
         <div className="space-y-3">
           {risks.map(risk => (
