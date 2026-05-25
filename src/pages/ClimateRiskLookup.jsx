@@ -9,21 +9,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertTriangle, Loader2, MapPin, Search } from "lucide-react";
 import { toast } from "sonner";
 
-import MethodologyPanel    from "@/components/climate/MethodologyPanel";
-import ProjectionScenarioCard from "@/components/climate/ProjectionScenarioCard";
-
 import { SECTORS }              from "@/features/climate-lookup/constants";
 import { useClimateAnalysis }   from "@/features/climate-lookup/hooks/useClimateAnalysis";
 import MapView                  from "@/features/climate-lookup/components/MapView";
 import SearchPanel              from "@/features/climate-lookup/components/SearchPanel";
-import NarrativePanel           from "@/features/climate-lookup/components/NarrativePanel";
-import SignalsPanel             from "@/features/climate-lookup/components/SignalsPanel";
-import RisksPanel               from "@/features/climate-lookup/components/RisksPanel";
-import GRIThreatsPanel          from "@/features/climate-lookup/components/GRIThreatsPanel";
-import AdaptationPanel          from "@/features/climate-lookup/components/AdaptationPanel";
-import TerritorialContextPanel  from "@/features/climate-lookup/components/TerritorialContextPanel";
-import AIPanel                  from "@/features/climate-lookup/components/AIPanel";
 import AnalysisLoading          from "@/features/climate-lookup/components/AnalysisLoading";
+import AdaptationPanel          from "@/features/climate-lookup/components/AdaptationPanel";
+import ExecutiveSummaryCard     from "@/features/climate-lookup/components/ExecutiveSummaryCard";
+import RiskPeriodSection        from "@/features/climate-lookup/components/RiskPeriodSection";
+import ScientificFooter         from "@/features/climate-lookup/components/ScientificFooter";
 
 export default function ClimateRiskLookup() {
   // ── UI state only ─────────────────────────────────────────────────────────
@@ -40,14 +34,10 @@ export default function ClimateRiskLookup() {
     error,
     hasResults,
     consolidatedRisks,
-    executiveSummary,
+    narrativeReport,
     projections,
     rawResponse,
-    signals,
-    risks,
-    griHazards,
     adaptations,
-    narrative,
     metadata,
     territorialCtx,
     docContext,
@@ -72,17 +62,20 @@ export default function ClimateRiskLookup() {
     reset();
   }, [reset]);
 
-  // ── Search handler ────────────────────────────────────────────────────────
   const handleSearch = useCallback(async () => {
     const latNum = parseFloat(lat);
     const lngNum = parseFloat(lng);
     if (isNaN(latNum) || latNum < -90  || latNum > 90)  { toast.error("Latitud inválida");  return; }
     if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) { toast.error("Longitud inválida"); return; }
-
     setMarkerPos([latNum, lngNum]);
     setFlyTarget({ pos: [latNum, lngNum], zoom: 14 });
     await analyze({ lat: latNum, lon: lngNum });
   }, [lat, lng, analyze]);
+
+  // ── Period-grouped risks ──────────────────────────────────────────────────
+  const historicalRisks = consolidatedRisks.filter(r => r.period === 'historico');
+  const midTermRisks    = consolidatedRisks.filter(r => r.period === 'mediano_plazo');
+  const longTermRisks   = consolidatedRisks.filter(r => r.period === 'largo_plazo');
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -90,7 +83,7 @@ export default function ClimateRiskLookup() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Análisis de Riesgo Climático</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Selecciona un punto en el mapa para analizar riesgos y proyecciones climáticas de esa zona
+          Selecciona un punto en el mapa para analizar riesgos y proyecciones climáticas
         </p>
       </div>
 
@@ -103,7 +96,8 @@ export default function ClimateRiskLookup() {
           flyTarget={flyTarget}
         />
 
-        <div className="space-y-4 overflow-y-auto" style={{ maxHeight: "82vh" }}>
+        <div className="space-y-5 overflow-y-auto" style={{ maxHeight: "82vh" }}>
+          {/* Search / coordinates form */}
           <Card>
             <CardContent className="pt-4 space-y-4">
               <SearchPanel onLocationSelect={handleLocationSelect} />
@@ -115,16 +109,16 @@ export default function ClimateRiskLookup() {
                   <Label htmlFor="lat" className="text-xs text-muted-foreground">Latitud</Label>
                   <Input
                     id="lat" type="number" step="any" placeholder="-12.0464" value={lat}
-                    onChange={(e) => setLat(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                    onChange={e => setLat(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && handleSearch()}
                   />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="lng" className="text-xs text-muted-foreground">Longitud</Label>
                   <Input
                     id="lng" type="number" step="any" placeholder="-77.0428" value={lng}
-                    onChange={(e) => setLng(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                    onChange={e => setLng(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && handleSearch()}
                   />
                 </div>
               </div>
@@ -165,65 +159,59 @@ export default function ClimateRiskLookup() {
           )}
 
           {hasResults && !loading && (
-            <>
-              {/* Consolidated risk preview — Sprint 14 (non-destructive) */}
-              {consolidatedRisks.length > 0 && executiveSummary && (
-                <Card className="border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10">
-                  <CardContent className="pt-4 pb-4 space-y-3">
-                    <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide">
-                      Resumen normalizado · {consolidatedRisks.length} riesgo{consolidatedRisks.length !== 1 ? 's' : ''} consolidado{consolidatedRisks.length !== 1 ? 's' : ''}
-                    </p>
-                    <p className="text-sm text-foreground leading-relaxed">{executiveSummary}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {consolidatedRisks.map(r => (
-                        <span
-                          key={r.id}
-                          className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border bg-background text-foreground"
-                        >
-                          {r.displayName}
-                          <span className="text-muted-foreground">·</span>
-                          <span className="text-muted-foreground">{r.period.replace('_', ' ')}</span>
-                        </span>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+            <div className="space-y-6">
+              {/* 1 — Executive summary (hero) */}
+              <ExecutiveSummaryCard narrativeReport={narrativeReport} />
+
+              {/* 2 — Historical risks */}
+              {historicalRisks.length > 0 && (
+                <RiskPeriodSection
+                  period="historico"
+                  risks={historicalRisks}
+                  narrativeText={narrativeReport?.historicalNarrative}
+                />
               )}
 
-              {/* Layer9 projections */}
-              <ProjectionScenarioCard
-                projectionContext={projections}
-                traceability={metadata}
-              />
+              {/* 3 — Mid-term projections */}
+              {midTermRisks.length > 0 && (
+                <RiskPeriodSection
+                  period="mediano_plazo"
+                  risks={midTermRisks}
+                  narrativeText={narrativeReport?.midTermNarrative}
+                  projections={projections}
+                />
+              )}
 
-              <NarrativePanel
-                narrative={narrative}
-                location={rawResponse?.location}
-                metadata={metadata}
-              />
-              <SignalsPanel    signals={signals} />
-              <RisksPanel      risks={risks} />
-              <GRIThreatsPanel hazards={griHazards} />
+              {/* 4 — Long-term projections */}
+              {longTermRisks.length > 0 && (
+                <RiskPeriodSection
+                  period="largo_plazo"
+                  risks={longTermRisks}
+                  narrativeText={narrativeReport?.longTermNarrative}
+                  projections={projections}
+                />
+              )}
+
+              {/* 5 — Adaptation */}
               <AdaptationPanel adaptations={adaptations} />
-            </>
-          )}
 
-          <MethodologyPanel metadata={metadata} />
-          <TerritorialContextPanel data={territorialCtx} />
-
-          {hasResults && !loading && (
-            <Card className="bg-card border-border shadow-sm">
-              <CardContent className="pt-4 pb-4">
-                <AIPanel analysis={rawResponse} docContext={docContext} />
-              </CardContent>
-            </Card>
+              {/* 6 — Scientific detail (collapsed) */}
+              <ScientificFooter
+                metadata={metadata}
+                territorialCtx={territorialCtx}
+                rawResponse={rawResponse}
+                docContext={docContext}
+              />
+            </div>
           )}
 
           {!hasResults && !loading && !error && (
             <div className="text-center py-12">
               <MapPin className="w-8 h-8 mx-auto mb-2 text-muted-foreground/30" />
               <p className="text-sm font-semibold text-muted-foreground">Selecciona un punto en el mapa</p>
-              <p className="text-xs mt-1 text-muted-foreground">o ingresa coordenadas para analizar los riesgos climáticos</p>
+              <p className="text-xs mt-1 text-muted-foreground">
+                o ingresa coordenadas para analizar los riesgos climáticos
+              </p>
             </div>
           )}
         </div>

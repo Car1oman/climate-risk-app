@@ -9,5 +9,10 @@ export { default as TerritorialContextPanel } from "./components/TerritorialCont
 export { default as AIPanel }                 from "./components/AIPanel";
 export { default as AnalysisLoading }         from "./components/AnalysisLoading";
 export { TraceBadges, TraceabilityDetails }   from "./components/TraceabilityWidgets";
+// Sprint 16 — narrative UI
+export { default as ExecutiveSummaryCard }    from "./components/ExecutiveSummaryCard";
+export { default as ConsolidatedRiskCard }    from "./components/ConsolidatedRiskCard";
+export { default as RiskPeriodSection }       from "./components/RiskPeriodSection";
+export { default as ScientificFooter }        from "./components/ScientificFooter";
 export * from "./constants";
 export * from "./utils";
