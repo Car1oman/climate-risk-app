@@ -10,7 +10,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Database,
-  CloudUpload,
   SearchCheck,
   FolderOpen,
 } from "lucide-react";
@@ -25,7 +24,6 @@ import {
 
 const navItems = [
   { icon: SearchCheck, label: "Consulta de Riesgos", path: "/" },
-  { icon: CloudUpload, label: "Datos Climáticos", path: "/climate-upload" },
   { icon: FolderOpen, label: "Documentos", path: "/documentos" },
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: Map, label: "Mapa de Riesgos", path: "/map" },
