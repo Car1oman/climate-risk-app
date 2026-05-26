@@ -5,7 +5,6 @@ import {
   Building2,
   Bell,
   FileText,
-  Settings,
   Shield,
   ChevronLeft,
   ChevronRight,
@@ -31,7 +30,6 @@ const navItems = [
   { icon: Database, label: "Gestión de Datos", path: "/data-management" },
   { icon: Bell, label: "Alertas", path: "/alerts" },
   { icon: FileText, label: "Reporte TCFD", path: "/report" },
-  { icon: Settings, label: "Configuración", path: "/settings" },
 ];
 
 export default function Sidebar() {

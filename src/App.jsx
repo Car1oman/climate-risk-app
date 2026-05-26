@@ -8,7 +8,6 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import LoginPage from '@/pages/LoginPage';
 
 import AppLayout from './components/layout/AppLayout';
-import AppSettings from './pages/AppSettings';
 import ClimateRiskLookup from './pages/ClimateRiskLookup';
 import DocumentosClimaticos from './pages/DocumentosClimaticos';
 import Dashboard from './pages/Dashboard';
@@ -25,8 +24,7 @@ const AuthenticatedApp = () => {
       <Route element={<AppLayout />}>
         <Route path="/" element={<ClimateRiskLookup />} />
 <Route path="/documentos" element={<DocumentosClimaticos />} />
-        <Route path="/settings" element={<AppSettings />} />
-        <Route path="/dashboard" element={<Dashboard />} />
+<Route path="/dashboard" element={<Dashboard />} />
         <Route path="/map" element={<RiskMap />} />
         <Route path="/assets" element={<Assets />} />
         <Route path="/assets/:id" element={<AssetDetail />} />

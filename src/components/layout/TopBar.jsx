@@ -5,7 +5,6 @@ import { Globe } from "lucide-react";
 const PAGE_TITLES = {
   "/":                   { title: "Consulta de Riesgos Climáticos", sub: "Banco Mundial · CMIP6 · SSP" },
   "/climate-risk-lookup":{ title: "Consulta de Riesgos Climáticos", sub: "Banco Mundial · CMIP6 · SSP" },
-  "/settings":           { title: "Configuración",                  sub: "Preferencias de la plataforma" },
 };
 
 export default function TopBar() {
