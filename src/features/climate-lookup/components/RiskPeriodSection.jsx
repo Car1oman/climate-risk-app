@@ -49,7 +49,15 @@ export default function RiskPeriodSection({
   const config = PERIOD_CONFIG[period] ?? PERIOD_CONFIG.historico;
   const setActiveScenario = onScenarioChange ?? (() => {});
 
-  if (!risks?.length && !narrativeText) return null;
+  if (!risks?.length && !narrativeText) {
+    return (
+      <div className="rounded-xl border border-border bg-secondary/30 px-5 py-8 text-center">
+        <p className="text-sm text-muted-foreground">
+          Sin proyecciones disponibles para este escenario.
+        </p>
+      </div>
+    );
+  }
 
   const activeSSP = SCENARIOS.find(s => s.value === activeScenario)?.sspKey ?? 'ssp245';
   const windowKey = PERIOD_TO_WINDOW[period];

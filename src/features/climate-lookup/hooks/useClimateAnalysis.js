@@ -14,7 +14,7 @@
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { analyzeClimateRisk, fetchDocumentContext, fetchTerritorialContext } from '@/lib/api';
-import { normalizeRisks } from '@/domain/normalizeRisks';
+import { normalizeRisks, groupByRiskType } from '@/domain/normalizeRisks';
 import { buildNarrativeReport } from '@/domain/buildNarrativeReport';
 import { SECTORS } from '@/features/climate-lookup/constants';
 
@@ -68,6 +68,12 @@ export function useClimateAnalysis(sector) {
     const found = SECTORS.find(s => s.value === sector);
     return found?.label ?? sector;
   }, [sector]);
+
+  // Timeline-grouped view — drives RiskTimeline component (Sprint 22)
+  const timelineRisks = useMemo(
+    () => groupByRiskType(consolidatedRisks),
+    [consolidatedRisks]
+  );
 
   const narrativeReport = useMemo(() => {
     if (!consolidatedRisks.length) return null;
@@ -126,6 +132,7 @@ export function useClimateAnalysis(sector) {
 
     // ── Normalized data (Sprint 14+) ───────────────────────────────────────────
     consolidatedRisks,
+    timelineRisks,      // ConsolidatedRiskTimeline[] — grouped by riskType (Sprint 22)
     narrativeReport,    // NarrativeReport: includes executiveSummary, periodNarratives, risks
     projections,        // Layer9: { scenarios, time_windows, projections, narratives, uncertainty }
 

@@ -58,8 +58,10 @@ export default function ClimateRiskLookup() {
   const [tileLayer,      setTileLayer]      = useState("osm");
   const [markerPos,      setMarkerPos]      = useState(null);
   const [flyTarget,      setFlyTarget]      = useState(null);
-  // Shared emission scenario — drives RiskTimeline + RiskPeriodTabs
-  const [activeScenario, setActiveScenario] = useState("emisiones_moderadas");
+  // Shared temporal period — drives ExecutiveSummaryCard, RiskPeriodTabs, AdaptationPanel
+  const [selectedPeriod,  setSelectedPeriod]  = useState("historico");
+  // Shared emission scenario — drives RiskTimeline + RiskPeriodTabs + ExecutiveSummaryCard
+  const [activeScenario,  setActiveScenario]  = useState("emisiones_moderadas");
 
   // ── All data / async logic lives in the hook ──────────────────────────────
   const {
@@ -67,6 +69,7 @@ export default function ClimateRiskLookup() {
     error,
     hasResults,
     consolidatedRisks,
+    timelineRisks,
     narrativeReport,
     projections,
     rawResponse,
@@ -101,6 +104,8 @@ export default function ClimateRiskLookup() {
     if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) { toast.error("Longitud inválida"); return; }
     setMarkerPos([latNum, lngNum]);
     setFlyTarget({ pos: [latNum, lngNum], zoom: 14 });
+    setSelectedPeriod("historico");
+    setActiveScenario("emisiones_moderadas");
     await analyze({ lat: latNum, lon: lngNum });
   }, [lat, lng, analyze]);
 
@@ -205,14 +210,19 @@ export default function ClimateRiskLookup() {
 
           {hasResults && !loading && (
             <div className="space-y-5">
-              {/* 1 — Executive briefing (hero — answers 4 questions) */}
-              <ExecutiveSummaryCard narrativeReport={narrativeReport} />
+              {/* 1 — Executive briefing (hero — period + scenario aware) */}
+              <ExecutiveSummaryCard
+                narrativeReport={narrativeReport}
+                consolidatedRisks={consolidatedRisks}
+                selectedPeriod={selectedPeriod}
+                activeScenario={activeScenario}
+              />
 
               {hasRisks ? (
                 <>
-                  {/* 2 — Temporal evolution (multi-period risks only) */}
+                  {/* 2 — Temporal evolution — driven by groupByRiskType() timeline model */}
                   <RiskTimeline
-                    consolidatedRisks={consolidatedRisks}
+                    timelineRisks={timelineRisks}
                     activeScenario={activeScenario}
                   />
 
@@ -223,13 +233,18 @@ export default function ClimateRiskLookup() {
                     longTermRisks={longTermRisks}
                     narrativeReport={narrativeReport}
                     projections={projections}
+                    selectedPeriod={selectedPeriod}
+                    onPeriodChange={setSelectedPeriod}
                     activeScenario={activeScenario}
                     onScenarioChange={setActiveScenario}
                   />
 
-                  {/* 4 — Priority adaptation actions (from ConsolidatedRisk model) */}
+                  {/* 4 — Priority adaptation actions (period-aware) */}
                   <Suspense fallback={null}>
-                    <AdaptationPanel consolidatedRisks={consolidatedRisks} />
+                    <AdaptationPanel
+                      consolidatedRisks={consolidatedRisks}
+                      selectedPeriod={selectedPeriod}
+                    />
                   </Suspense>
                 </>
               ) : (

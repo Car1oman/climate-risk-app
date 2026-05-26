@@ -8,7 +8,19 @@ const CONFIDENCE_CONFIG = {
   baja:  { label: 'Baja confianza',  dot: 'bg-rose-500',    text: 'text-rose-600 dark:text-rose-400'       },
 };
 
-const EFFECTIVENESS_ORDER = { alta: 0, media: 1, baja: 2 };
+const PERIOD_NARRATIVE_KEY = {
+  historico:     'historicalNarrative',
+  mediano_plazo: 'midTermNarrative',
+  largo_plazo:   'longTermNarrative',
+};
+
+const PERIOD_LABEL = {
+  historico:     'Período histórico',
+  mediano_plazo: 'Proyección 2040–2059',
+  largo_plazo:   'Proyección 2060–2079',
+};
+
+const CONF_RANK = { alta: 3, media: 2, baja: 1 };
 
 function getTopAction(risks) {
   for (const eff of ['alta', 'media']) {
@@ -20,11 +32,14 @@ function getTopAction(risks) {
   return null;
 }
 
-function getTopImpacts(risks) {
+// Scenario-aware impact collector: uses scenarioVariants when available
+export function getTopImpactsWithScenario(risks, activeScenario) {
   const seen = new Set();
   const result = [];
   for (const risk of risks ?? []) {
-    for (const impact of risk.impacts ?? []) {
+    const variant = activeScenario && risk.scenarioVariants?.[activeScenario];
+    const impacts = variant?.impacts?.length ? variant.impacts : (risk.impacts ?? []);
+    for (const impact of impacts) {
       if (!seen.has(impact) && result.length < 2) {
         seen.add(impact);
         result.push(impact);
@@ -34,36 +49,72 @@ function getTopImpacts(risks) {
   return result;
 }
 
+// Period-filtered unique risks (no riskType duplicates within the period)
+export function getPeriodRisks(consolidatedRisks, selectedPeriod, fallbackRisks) {
+  if (!consolidatedRisks?.length) return fallbackRisks ?? [];
+  const filtered = consolidatedRisks.filter(r => r.period === selectedPeriod);
+  return filtered.length > 0 ? filtered : (fallbackRisks ?? []);
+}
+
+// Top confidence from a risk list, scenario-aware
+export function getPeriodConfidence(risks, activeScenario) {
+  return risks.reduce((best, r) => {
+    const variant = activeScenario && r.scenarioVariants?.[activeScenario];
+    const c = variant?.confidence ?? r.confidence ?? 'baja';
+    return CONF_RANK[c] > CONF_RANK[best] ? c : best;
+  }, 'baja');
+}
+
 /**
- * ExecutiveSummaryCard — Sprint 20.
- * Briefing ejecutivo: responde 4 preguntas en < 20 segundos.
- *   1. ¿Qué riesgos existen?         → pills de fenómenos
- *   2. ¿Qué podría pasar?             → impactos operativos top
- *   3. ¿Qué tan confiable es?         → badge de confianza
- *   4. ¿Qué hacer?                    → acción prioritaria
+ * ExecutiveSummaryCard — Sprint 22.
+ * Briefing ejecutivo reactivo: responde 4 preguntas en < 20 segundos.
+ * Actualiza contenido según selectedPeriod + activeScenario.
+ *
+ *   1. ¿Qué riesgos existen?         → pills del período seleccionado
+ *   2. ¿Qué podría pasar?             → narrativa del período + impactos scenario-aware
+ *   3. ¿Qué tan confiable es?         → badge de confianza del período/escenario
+ *   4. ¿Qué hacer?                    → acción prioritaria del período
  */
-export default function ExecutiveSummaryCard({ narrativeReport }) {
+export default function ExecutiveSummaryCard({
+  narrativeReport,
+  consolidatedRisks,
+  selectedPeriod = 'historico',
+  activeScenario = 'emisiones_moderadas',
+}) {
   if (!narrativeReport) return null;
 
-  const { executiveSummary, sectorLabel, locationLabel, risks, confidence, analysisDate } = narrativeReport;
-  const conf = CONFIDENCE_CONFIG[confidence] ?? CONFIDENCE_CONFIG.media;
+  const { sectorLabel, locationLabel, analysisDate } = narrativeReport;
 
-  // 1. Unique risk pills (no period duplicates)
-  const uniqueRisks = (risks ?? []).filter(
+  // 1. Period-specific risks (fallback to all risks for pill display)
+  const periodRisks = getPeriodRisks(consolidatedRisks, selectedPeriod, narrativeReport.risks);
+
+  // 2. Unique risk pills for the current period
+  const uniqueRisks = periodRisks.filter(
     (r, i, arr) => arr.findIndex(x => x.riskType === r.riskType) === i
   );
 
-  // 2. Top operational impacts (max 2)
-  const topImpacts = getTopImpacts(uniqueRisks);
+  // 3. Period-specific narrative (historical / midTerm / longTerm)
+  const narrativeKey = PERIOD_NARRATIVE_KEY[selectedPeriod];
+  const periodNarrative = (narrativeKey && narrativeReport[narrativeKey]) || narrativeReport.executiveSummary;
 
-  // 3. Top adaptation action
-  const topAction = getTopAction(risks ?? []);
+  // 4. Scenario-aware top impacts
+  const topImpacts = getTopImpactsWithScenario(periodRisks, activeScenario);
+
+  // 5. Top adaptation action from the current period
+  const topAction = getTopAction(periodRisks);
+
+  // 6. Period + scenario confidence
+  const periodConf = periodRisks.length
+    ? getPeriodConfidence(periodRisks, activeScenario)
+    : (narrativeReport.confidence ?? 'baja');
+  const conf = CONFIDENCE_CONFIG[periodConf] ?? CONFIDENCE_CONFIG.media;
 
   const formattedDate = analysisDate
     ? new Date(analysisDate).toLocaleDateString('es-PE', { day: 'numeric', month: 'short', year: 'numeric' })
     : null;
 
-  const hasLowConfidence = confidence === 'baja';
+  const hasLowConfidence = periodConf === 'baja';
+  const periodLabel = PERIOD_LABEL[selectedPeriod];
 
   return (
     <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
@@ -81,9 +132,16 @@ export default function ExecutiveSummaryCard({ narrativeReport }) {
         {/* Header row */}
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1 min-w-0">
-            <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-              Evaluación de riesgo climático
-            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+                Evaluación de riesgo climático
+              </p>
+              {periodLabel && (
+                <span className="text-[9px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-secondary border border-border text-muted-foreground">
+                  {periodLabel}
+                </span>
+              )}
+            </div>
             <h2 className="text-xl font-bold text-foreground leading-tight">{locationLabel}</h2>
             <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
               <span className="flex items-center gap-1.5">
@@ -110,7 +168,7 @@ export default function ExecutiveSummaryCard({ narrativeReport }) {
           </div>
         </div>
 
-        {/* 1 — Qué riesgos existen */}
+        {/* 1 — Qué riesgos existen (period-filtered pills) */}
         {uniqueRisks.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {uniqueRisks.map(r => {
@@ -130,12 +188,14 @@ export default function ExecutiveSummaryCard({ narrativeReport }) {
           </div>
         )}
 
-        {/* 2 — Qué podría pasar (executive narrative) */}
-        <p className="text-sm leading-relaxed text-foreground border-l-2 border-primary/30 pl-4 py-0.5">
-          {executiveSummary}
-        </p>
+        {/* 2 — Qué podría pasar (period-specific narrative) */}
+        {periodNarrative && (
+          <p className="text-sm leading-relaxed text-foreground border-l-2 border-primary/30 pl-4 py-0.5">
+            {periodNarrative}
+          </p>
+        )}
 
-        {/* 3 — Impactos operativos top */}
+        {/* 3 — Impactos operativos top (scenario-aware) */}
         {topImpacts.length > 0 && (
           <div className="rounded-lg bg-secondary/50 border border-border/60 px-3 py-2.5 space-y-1.5">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
@@ -152,7 +212,7 @@ export default function ExecutiveSummaryCard({ narrativeReport }) {
           </div>
         )}
 
-        {/* 4 — Qué hacer */}
+        {/* 4 — Qué hacer (period-specific top action) */}
         {topAction && (
           <div className="flex items-start gap-2.5 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-2.5">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" aria-hidden="true" />

@@ -29,11 +29,12 @@ const mvpNavItems = [
   { icon: CloudUpload, label: "Datos Climáticos", path: "/climate-upload" },
   { icon: FolderOpen, label: "Documentos", path: "/documentos" },
   { icon: Settings, label: "Configuración", path: "/settings" },
+    { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
 ];
 
 const comingSoonItems = [
-  { icon: LayoutDashboard, label: "Dashboard" },
-  { icon: Map, label: "Mapa de Riesgos" },
+
+  
   { icon: Building2, label: "Activos" },
   { icon: Database, label: "Gestión de Datos" },
   { icon: Bell, label: "Alertas" },

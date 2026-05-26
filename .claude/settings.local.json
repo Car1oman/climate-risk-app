@@ -127,7 +127,14 @@
       "PowerShell(cd \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\"; $env:PATH = \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64;\" + $env:PATH; & npm run build 2>&1 | Select-Object -Last 30)",
       "PowerShell(cd \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\"; $env:PATH = \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64;\" + $env:PATH; $result = & npm run build 2>&1; $result | Select-Object -Last 25; Write-Host \"Exit: $LASTEXITCODE\")",
       "Bash(\"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\" --test tests/frontend/normalizeRisks.test.js tests/frontend/buildNarrativeReport.test.js tests/frontend/sanitizeNarrative.test.js)",
-      "Bash(\"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\" --test tests/ --test-reporter=spec)"
+      "Bash(\"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\" --test tests/ --test-reporter=spec)",
+      "Bash(\"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\" --test tests/frontend/sprint22_interactive_timeline.test.js)",
+      "Bash(\"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\" --test tests/frontend/*.test.js)",
+      "Bash(\"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\node.exe\" \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\\\\node_modules\\\\vite\\\\bin\\\\vite.js\" build)",
+      "PowerShell(cd \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\"; $env:PATH = \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64;\" + $env:PATH; node node_modules/vite/bin/vite.js build 2>&1)",
+      "PowerShell($env:PATH = \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64;\" + $env:PATH; Set-Location \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\"; node node_modules/vite/bin/vite.js build; Write-Host \"EXIT CODE: $LASTEXITCODE\")",
+      "PowerShell($env:PATH = \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64;\" + $env:PATH; Set-Location \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\"; $output = node node_modules/vite/bin/vite.js build 2>&1; Write-Host \"Lines: $\\($output.Count\\)\"; $output | Select-Object -Last 20)",
+      "PowerShell(Get-ChildItem \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\\\\dist\\\\assets\" | Sort-Object LastWriteTime -Descending | Select-Object -First 15 | Format-Table Name, @{N=\"KB\";E={[math]::Round\\($_.Length/1KB,0\\)}}, LastWriteTime)"
     ],
     "additionalDirectories": [
       "d:\\Usuarios\\PM75161698\\Desktop\\datarisk\\climate-risk-app",

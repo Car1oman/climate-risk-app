@@ -1,44 +1,49 @@
 // @ts-nocheck
 /**
- * RiskTimeline — Sprint 19.
+ * RiskTimeline — Sprint 22.
  *
+ * Driven by ConsolidatedRiskTimeline[] (produced by groupByRiskType() in the hook).
  * Shows how each risk type evolves across historical → mid-term → long-term
  * horizons as a visual narrative progression.
  *
  * Props:
- *   consolidatedRisks  ConsolidatedRisk[]  — all risks (all periods)
- *   activeScenario     string              — 'emisiones_moderadas' | 'altas_emisiones'
+ *   timelineRisks  ConsolidatedRiskTimeline[]  — timeline model from useClimateAnalysis
+ *   activeScenario string                      — 'emisiones_moderadas' | 'altas_emisiones'
  */
 
-import { buildTemporalEvolutionSentence } from '@/domain/buildOperationalNarrative';
 import { RISK_TYPE_DISPLAY } from '@/constants/riskTypes';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const PERIOD_NODE = {
-  historico:     { label: 'Históricamente', period: '1980–2014', dotColor: 'bg-slate-400'       },
-  mediano_plazo: { label: 'Hacia 2050',     period: '2040–2059', dotColor: 'bg-amber-400'        },
-  largo_plazo:   { label: 'Hacia 2070',     period: '2060–2079', dotColor: 'bg-orange-500'       },
+  historical:  { label: 'Históricamente', period: '1980–2014', dotColor: 'bg-slate-400'  },
+  mediumTerm:  { label: 'Hacia 2050',     period: '2040–2059', dotColor: 'bg-amber-400'  },
+  longTerm:    { label: 'Hacia 2070',     period: '2060–2079', dotColor: 'bg-orange-500' },
 };
 
-const PERIOD_ORDER = ['historico', 'mediano_plazo', 'largo_plazo'];
+const PERIOD_ORDER = ['historical', 'mediumTerm', 'longTerm'];
 
-// Short descriptive text per (riskType × period × scenario) — concise for inline use
-function getNodeSummary(risk, activeScenario) {
-  if (!risk) return null;
-  if (risk.period === 'historico') {
-    return risk.narrativeText;
-  }
-  const variant = activeScenario && risk.scenarioVariants?.[activeScenario];
-  return variant?.narrativeText || risk.narrativeText;
+// Map activeScenario slug to ConsolidatedRiskTimeline's scenario key
+const SCENARIO_TO_KEY = {
+  'emisiones_moderadas': 'moderateEmissions',
+  'altas_emisiones':     'highEmissions',
+};
+
+/**
+ * Extracts the narrative for a given period node from a ConsolidatedRiskTimeline,
+ * respecting the active emission scenario for projection periods.
+ */
+function getTimelineNodeNarrative(timeline, period, activeScenario) {
+  if (period === 'historical') return timeline.historical?.narrative ?? null;
+  const scenarioKey = SCENARIO_TO_KEY[activeScenario] ?? 'moderateEmissions';
+  if (period === 'mediumTerm') return timeline.mediumTerm?.[scenarioKey]?.narrative ?? null;
+  if (period === 'longTerm')   return timeline.longTerm?.[scenarioKey]?.narrative ?? null;
+  return null;
 }
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
-function TimelineNode({ nodeConfig, risk, activeScenario, isLast }) {
-  if (!risk) return null;
-  const summary = getNodeSummary(risk, activeScenario);
-
+function TimelineNode({ nodeConfig, narrative, isLast }) {
   return (
     <div className="flex gap-3 relative">
       {/* Vertical line connector */}
@@ -50,7 +55,10 @@ function TimelineNode({ nodeConfig, risk, activeScenario, isLast }) {
       )}
 
       {/* Dot */}
-      <div className={`w-[18px] h-[18px] rounded-full flex-shrink-0 mt-0.5 ring-2 ring-background ${nodeConfig.dotColor}`} aria-hidden="true" />
+      <div
+        className={`w-[18px] h-[18px] rounded-full flex-shrink-0 mt-0.5 ring-2 ring-background ${nodeConfig.dotColor}`}
+        aria-hidden="true"
+      />
 
       {/* Content */}
       <div className="pb-4 min-w-0 flex-1">
@@ -60,24 +68,21 @@ function TimelineNode({ nodeConfig, risk, activeScenario, isLast }) {
             {nodeConfig.period}
           </span>
         </div>
-        {summary && (
-          <p className="text-[11px] text-muted-foreground leading-relaxed mt-1">
-            {summary}
-          </p>
+        {narrative && (
+          <p className="text-[11px] text-muted-foreground leading-relaxed mt-1">{narrative}</p>
         )}
       </div>
     </div>
   );
 }
 
-function RiskTimelineRow({ riskType, risksByPeriod, activeScenario }) {
-  const meta = RISK_TYPE_DISPLAY[riskType];
+function RiskTimelineRow({ timeline, activeScenario }) {
+  const meta = RISK_TYPE_DISPLAY[timeline.riskType];
   if (!meta) return null;
 
-  const presentPeriods = PERIOD_ORDER.filter(p => risksByPeriod[p]);
-  if (presentPeriods.length < 2) return null; // only show if ≥ 2 periods exist
-
-  const evolutionSentence = buildTemporalEvolutionSentence(riskType);
+  // Only render rows that span at least 2 temporal periods
+  const presentPeriods = PERIOD_ORDER.filter(p => timeline[p] != null);
+  if (presentPeriods.length < 2) return null;
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
@@ -86,7 +91,9 @@ function RiskTimelineRow({ riskType, risksByPeriod, activeScenario }) {
         <span className="text-base leading-none flex-shrink-0" aria-hidden="true">{meta.icon}</span>
         <div className="min-w-0">
           <p className={`text-sm font-semibold leading-tight ${meta.textColor}`}>{meta.label}</p>
-          <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{evolutionSentence}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+            {timeline.evolutionSentence}
+          </p>
         </div>
       </div>
 
@@ -96,8 +103,7 @@ function RiskTimelineRow({ riskType, risksByPeriod, activeScenario }) {
           <TimelineNode
             key={period}
             nodeConfig={PERIOD_NODE[period]}
-            risk={risksByPeriod[period]}
-            activeScenario={activeScenario}
+            narrative={getTimelineNodeNarrative(timeline, period, activeScenario)}
             isLast={idx === presentPeriods.length - 1}
           />
         ))}
@@ -108,27 +114,16 @@ function RiskTimelineRow({ riskType, risksByPeriod, activeScenario }) {
 
 // ─── Main component ────────────────────────────────────────────────────────────
 
-/**
- * Groups consolidated risks by riskType and renders one timeline row per
- * phenomenon that spans multiple temporal periods.
- */
-export default function RiskTimeline({ consolidatedRisks, activeScenario }) {
-  if (!consolidatedRisks?.length) return null;
+export default function RiskTimeline({ timelineRisks, activeScenario }) {
+  if (!timelineRisks?.length) return null;
 
-  // Build map: riskType → { historico?: risk, mediano_plazo?: risk, largo_plazo?: risk }
-  const grouped = {};
-  for (const risk of consolidatedRisks) {
-    if (!grouped[risk.riskType]) grouped[risk.riskType] = {};
-    grouped[risk.riskType][risk.period] = risk;
-  }
-
-  // Only include types that span at least 2 temporal periods
-  const multiPeriodTypes = Object.keys(grouped).filter(rt => {
-    const periods = Object.keys(grouped[rt]);
-    return periods.length >= 2;
+  // Only include risk types that span at least 2 temporal periods
+  const multiPeriodTimelines = timelineRisks.filter(t => {
+    const count = PERIOD_ORDER.filter(p => t[p] != null).length;
+    return count >= 2;
   });
 
-  if (multiPeriodTypes.length === 0) return null;
+  if (multiPeriodTimelines.length === 0) return null;
 
   return (
     <section className="space-y-3">
@@ -140,11 +135,10 @@ export default function RiskTimeline({ consolidatedRisks, activeScenario }) {
       </div>
 
       <div className="space-y-3">
-        {multiPeriodTypes.map(riskType => (
+        {multiPeriodTimelines.map(timeline => (
           <RiskTimelineRow
-            key={riskType}
-            riskType={riskType}
-            risksByPeriod={grouped[riskType]}
+            key={timeline.riskType}
+            timeline={timeline}
             activeScenario={activeScenario}
           />
         ))}

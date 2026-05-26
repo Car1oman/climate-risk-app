@@ -14,12 +14,18 @@ const TIMEFRAME_LABEL = {
   largo:     'Largo plazo',
 };
 
+const PERIOD_CONTEXT_LABEL = {
+  historico:     null,
+  mediano_plazo: 'Para 2040–2059',
+  largo_plazo:   'Para 2060–2079',
+};
+
 const EFFECTIVENESS_ORDER = { alta: 0, media: 1, baja: 2 };
 
-function collectMeasures(consolidatedRisks) {
+function collectMeasures(risks) {
   const seen = new Set();
   const result = [];
-  for (const risk of consolidatedRisks) {
+  for (const risk of risks) {
     for (const m of risk.adaptationMeasures ?? []) {
       if (!seen.has(m.id)) {
         seen.add(m.id);
@@ -33,23 +39,45 @@ function collectMeasures(consolidatedRisks) {
 }
 
 /**
- * AdaptationPanel — Sprint 20.
- * Powered exclusively by ConsolidatedRisk.adaptationMeasures — no raw API.
+ * AdaptationPanel — Sprint 22.
+ * Period-aware: prioritizes measures from the selected period's risks.
+ * Falls back to all risks when the selected period has fewer than 2 measures.
  *
  * @param {ConsolidatedRisk[]} consolidatedRisks
+ * @param {string}             selectedPeriod
  */
-export default function AdaptationPanel({ consolidatedRisks }) {
+export default function AdaptationPanel({ consolidatedRisks, selectedPeriod }) {
   if (!consolidatedRisks?.length) return null;
 
-  const measures = collectMeasures(consolidatedRisks);
+  // Collect measures from the selected period first
+  const periodRisks = selectedPeriod
+    ? consolidatedRisks.filter(r => r.period === selectedPeriod)
+    : consolidatedRisks;
+
+  const periodMeasures = collectMeasures(periodRisks);
+
+  // Supplement with all-period measures if period-specific ones are too few
+  const measures = periodMeasures.length >= 2
+    ? periodMeasures
+    : collectMeasures(consolidatedRisks);
+
   if (!measures.length) return null;
+
+  const periodContextLabel = selectedPeriod ? PERIOD_CONTEXT_LABEL[selectedPeriod] : null;
 
   return (
     <section className="space-y-3">
       <div className="flex items-center gap-2">
         <Leaf className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" aria-hidden="true" />
         <h3 className="text-sm font-semibold text-foreground">Medidas de adaptación prioritarias</h3>
-        <span className="text-[10px] text-muted-foreground ml-auto">{measures.length} acción{measures.length !== 1 ? 'es' : ''}</span>
+        {periodContextLabel && (
+          <span className="text-[9px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-secondary border border-border text-muted-foreground ml-1">
+            {periodContextLabel}
+          </span>
+        )}
+        <span className="text-[10px] text-muted-foreground ml-auto">
+          {measures.length} acción{measures.length !== 1 ? 'es' : ''}
+        </span>
       </div>
 
       <div className="rounded-xl border border-border bg-card overflow-hidden divide-y divide-border/40">
