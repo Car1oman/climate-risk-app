@@ -797,3 +797,237 @@ describe('normalizeRisks — no-duplicate validation (regression)', () => {
     }
   });
 });
+
+// ─── Sprint 21: groupByRiskType ───────────────────────────────────────────────
+// Inline mirror of groupByRiskType() from src/domain/normalizeRisks.ts.
+// Tests the derived timeline model built from the flat ConsolidatedRisk[].
+
+function groupByRiskType(risks) {
+  if (!risks?.length) return [];
+  const map = new Map();
+  for (const risk of risks) {
+    const { riskType } = risk;
+    if (!map.has(riskType)) {
+      map.set(riskType, {
+        riskType,
+        displayName:        risk.displayName,
+        adaptationMeasures: [],
+      });
+    }
+    const timeline = map.get(riskType);
+    const existingIds = new Set(timeline.adaptationMeasures.map(a => a.id));
+    for (const m of (risk.adaptationMeasures ?? [])) {
+      if (!existingIds.has(m.id)) {
+        timeline.adaptationMeasures.push(m);
+        existingIds.add(m.id);
+      }
+    }
+    if (risk.period === 'historico') {
+      timeline.historical = {
+        narrative:  risk.narrativeText,
+        impacts:    risk.impacts,
+        evidence:   risk.evidence,
+        confidence: risk.confidence,
+      };
+    } else if (risk.period === 'mediano_plazo') {
+      const v = risk.scenarioVariants ?? {};
+      timeline.mediumTerm = {
+        moderateEmissions: v.emisiones_moderadas
+          ? { narrative: v.emisiones_moderadas.narrativeText, impacts: v.emisiones_moderadas.impacts, confidence: v.emisiones_moderadas.confidence, trendDirection: 'increasing' }
+          : undefined,
+        highEmissions: v.altas_emisiones
+          ? { narrative: v.altas_emisiones.narrativeText, impacts: v.altas_emisiones.impacts, confidence: v.altas_emisiones.confidence, trendDirection: 'increasing' }
+          : undefined,
+      };
+    } else if (risk.period === 'largo_plazo') {
+      const v = risk.scenarioVariants ?? {};
+      timeline.longTerm = {
+        moderateEmissions: v.emisiones_moderadas
+          ? { narrative: v.emisiones_moderadas.narrativeText, impacts: v.emisiones_moderadas.impacts, confidence: v.emisiones_moderadas.confidence, trendDirection: 'increasing' }
+          : undefined,
+        highEmissions: v.altas_emisiones
+          ? { narrative: v.altas_emisiones.narrativeText, impacts: v.altas_emisiones.impacts, confidence: v.altas_emisiones.confidence, trendDirection: 'increasing' }
+          : undefined,
+      };
+    }
+  }
+  return [...map.values()];
+}
+
+const makeTimelineRisk = (overrides) => ({
+  id:               `${overrides.riskType ?? 'lluvias_extremas'}_${overrides.period ?? 'mediano_plazo'}`,
+  riskType:         'lluvias_extremas',
+  displayName:      'Lluvias extremas',
+  period:           'mediano_plazo',
+  scenario:         'emisiones_moderadas',
+  confidence:       'alta',
+  narrativeText:    'Precipitaciones que superan los umbrales históricos.',
+  keyMetric:        null,
+  impacts:          [],
+  evidence:         [],
+  adaptationMeasures: [],
+  rawSources:       ['signals'],
+  scenarioVariants: {},
+  ...overrides,
+});
+
+describe('groupByRiskType — Sprint 21', () => {
+  it('returns empty array for empty input', () => {
+    assert.deepEqual(groupByRiskType([]), []);
+  });
+
+  it('returns empty array for null input', () => {
+    assert.deepEqual(groupByRiskType(null), []);
+  });
+
+  it('produces one timeline per unique riskType', () => {
+    const risks = [
+      makeTimelineRisk({ riskType: 'lluvias_extremas', period: 'historico'     }),
+      makeTimelineRisk({ riskType: 'lluvias_extremas', period: 'mediano_plazo' }),
+      makeTimelineRisk({ riskType: 'calor_extremo',    period: 'mediano_plazo', displayName: 'Calor extremo' }),
+    ];
+    const result = groupByRiskType(risks);
+    assert.equal(result.length, 2, 'Must produce one ConsolidatedRiskTimeline per riskType');
+  });
+
+  it('populates historical when historico period present', () => {
+    const risks = [makeTimelineRisk({ period: 'historico', narrativeText: 'Obs. históricas.' })];
+    const [tl] = groupByRiskType(risks);
+    assert.ok(tl.historical, 'historical must be populated');
+    assert.equal(tl.historical.narrative, 'Obs. históricas.');
+  });
+
+  it('historical is absent when no historico entry exists', () => {
+    const risks = [makeTimelineRisk({ period: 'mediano_plazo' })];
+    const [tl] = groupByRiskType(risks);
+    assert.equal(tl.historical, undefined, 'historical must be absent');
+  });
+
+  it('populates mediumTerm from mediano_plazo entry with scenarioVariants', () => {
+    const variants = {
+      emisiones_moderadas: { narrativeText: 'Moderado.', impacts: ['A'], confidence: 'media' },
+      altas_emisiones:     { narrativeText: 'Alto.',     impacts: ['A', 'B'], confidence: 'alta' },
+    };
+    const risks = [makeTimelineRisk({ period: 'mediano_plazo', scenarioVariants: variants })];
+    const [tl] = groupByRiskType(risks);
+    assert.ok(tl.mediumTerm, 'mediumTerm must be populated');
+    assert.ok(tl.mediumTerm.moderateEmissions, 'moderateEmissions must exist');
+    assert.ok(tl.mediumTerm.highEmissions, 'highEmissions must exist');
+  });
+
+  it('populates longTerm from largo_plazo entry with scenarioVariants', () => {
+    const variants = {
+      emisiones_moderadas: { narrativeText: 'Largo moderado.', impacts: [], confidence: 'media' },
+      altas_emisiones:     { narrativeText: 'Largo alto.',     impacts: [], confidence: 'alta'  },
+    };
+    const risks = [makeTimelineRisk({ period: 'largo_plazo', scenarioVariants: variants })];
+    const [tl] = groupByRiskType(risks);
+    assert.ok(tl.longTerm, 'longTerm must be populated');
+    assert.ok(tl.longTerm.moderateEmissions, 'moderateEmissions must exist in longTerm');
+    assert.ok(tl.longTerm.highEmissions, 'highEmissions must exist in longTerm');
+  });
+
+  it('moderateEmissions and highEmissions narratives differ in mediumTerm', () => {
+    const variants = {
+      emisiones_moderadas: { narrativeText: 'Texto moderado.', impacts: [], confidence: 'media' },
+      altas_emisiones:     { narrativeText: 'Texto alto diferente.', impacts: [], confidence: 'alta' },
+    };
+    const risks = [makeTimelineRisk({ period: 'mediano_plazo', scenarioVariants: variants })];
+    const [tl] = groupByRiskType(risks);
+    assert.notEqual(
+      tl.mediumTerm.moderateEmissions.narrative,
+      tl.mediumTerm.highEmissions.narrative,
+      'Moderate and high scenarios must have different narratives in timeline'
+    );
+  });
+
+  it('highEmissions confidence is alta, moderateEmissions confidence is media', () => {
+    const variants = {
+      emisiones_moderadas: { narrativeText: 'M.', impacts: [], confidence: 'media' },
+      altas_emisiones:     { narrativeText: 'A.', impacts: [], confidence: 'alta'  },
+    };
+    const risks = [makeTimelineRisk({ period: 'mediano_plazo', scenarioVariants: variants })];
+    const [tl] = groupByRiskType(risks);
+    assert.equal(tl.mediumTerm.moderateEmissions.confidence, 'media');
+    assert.equal(tl.mediumTerm.highEmissions.confidence, 'alta');
+  });
+
+  it('deduplicates adaptationMeasures with same id across periods', () => {
+    const adapt = [{ id: 'a1', name: 'Drenaje mejorado', timeframe: 'mediano', effectiveness: 'alta' }];
+    const risks = [
+      makeTimelineRisk({ period: 'mediano_plazo', adaptationMeasures: adapt }),
+      makeTimelineRisk({ period: 'largo_plazo',   adaptationMeasures: adapt }),
+    ];
+    const [tl] = groupByRiskType(risks);
+    assert.equal(tl.adaptationMeasures.length, 1, 'Duplicate adaptation measure must not appear twice');
+  });
+
+  it('aggregates distinct adaptationMeasures from multiple periods', () => {
+    const risks = [
+      makeTimelineRisk({ period: 'mediano_plazo', adaptationMeasures: [{ id: 'a1', name: 'Drenaje', timeframe: 'mediano', effectiveness: 'alta' }] }),
+      makeTimelineRisk({ period: 'largo_plazo',   adaptationMeasures: [{ id: 'a2', name: 'Alerta temprana', timeframe: 'corto', effectiveness: 'alta' }] }),
+    ];
+    const [tl] = groupByRiskType(risks);
+    assert.equal(tl.adaptationMeasures.length, 2, 'Distinct adaptations across periods must both appear');
+  });
+
+  it('full 3-period timeline populates historical + mediumTerm + longTerm', () => {
+    const variants = {
+      emisiones_moderadas: { narrativeText: 'M.', impacts: [], confidence: 'media' },
+      altas_emisiones:     { narrativeText: 'A.', impacts: [], confidence: 'alta'  },
+    };
+    const risks = [
+      makeTimelineRisk({ period: 'historico',     scenarioVariants: {}       }),
+      makeTimelineRisk({ period: 'mediano_plazo', scenarioVariants: variants }),
+      makeTimelineRisk({ period: 'largo_plazo',   scenarioVariants: variants }),
+    ];
+    const [tl] = groupByRiskType(risks);
+    assert.ok(tl.historical,  'historical must be present for 3-period risk');
+    assert.ok(tl.mediumTerm,  'mediumTerm must be present for 3-period risk');
+    assert.ok(tl.longTerm,    'longTerm must be present for 3-period risk');
+  });
+
+  it('preserves insertion order of riskType in output', () => {
+    const risks = [
+      makeTimelineRisk({ riskType: 'calor_extremo',    displayName: 'Calor extremo',    period: 'historico' }),
+      makeTimelineRisk({ riskType: 'lluvias_extremas', displayName: 'Lluvias extremas', period: 'historico' }),
+      makeTimelineRisk({ riskType: 'sequia',           displayName: 'Sequía',           period: 'historico' }),
+    ];
+    const result = groupByRiskType(risks);
+    assert.equal(result[0].riskType, 'calor_extremo',    'First riskType must preserve insertion order');
+    assert.equal(result[1].riskType, 'lluvias_extremas', 'Second riskType must preserve insertion order');
+    assert.equal(result[2].riskType, 'sequia',           'Third riskType must preserve insertion order');
+  });
+
+  it('single-period risk (only mediano_plazo) has no historical or longTerm', () => {
+    const risks = [makeTimelineRisk({ period: 'mediano_plazo', scenarioVariants: {} })];
+    const [tl] = groupByRiskType(risks);
+    assert.equal(tl.historical, undefined, 'historical must be absent for single mid-term entry');
+    assert.equal(tl.longTerm,   undefined, 'longTerm must be absent for single mid-term entry');
+  });
+
+  it('multiple distinct riskTypes produce correct timelines', () => {
+    const risks = [
+      makeTimelineRisk({ riskType: 'lluvias_extremas', period: 'historico', displayName: 'Lluvias extremas' }),
+      makeTimelineRisk({ riskType: 'lluvias_extremas', period: 'mediano_plazo', scenarioVariants: {
+        emisiones_moderadas: { narrativeText: 'M.', impacts: [], confidence: 'media' },
+      }}),
+      makeTimelineRisk({ riskType: 'sequia', period: 'largo_plazo', displayName: 'Sequía', scenarioVariants: {
+        altas_emisiones: { narrativeText: 'A.', impacts: [], confidence: 'alta' },
+      }}),
+    ];
+    const result = groupByRiskType(risks);
+    assert.equal(result.length, 2, 'Two distinct riskTypes must produce 2 timelines');
+
+    const lluvias = result.find(t => t.riskType === 'lluvias_extremas');
+    const sequia  = result.find(t => t.riskType === 'sequia');
+
+    assert.ok(lluvias.historical, 'lluvias timeline must have historical');
+    assert.ok(lluvias.mediumTerm, 'lluvias timeline must have mediumTerm');
+    assert.equal(lluvias.longTerm, undefined, 'lluvias timeline must NOT have longTerm');
+
+    assert.equal(sequia.historical,  undefined, 'sequia timeline must NOT have historical');
+    assert.equal(sequia.mediumTerm,  undefined, 'sequia timeline must NOT have mediumTerm');
+    assert.ok(sequia.longTerm, 'sequia timeline must have longTerm');
+  });
+});

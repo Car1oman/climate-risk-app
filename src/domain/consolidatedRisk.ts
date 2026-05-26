@@ -108,6 +108,70 @@ export interface ConsolidatedRisk {
   scenarioVariants: Partial<Record<'emisiones_moderadas' | 'altas_emisiones', ScenarioVariant>>;
 }
 
+// ─── Timeline-oriented derived models ────────────────────────────────────────
+//
+// ConsolidatedRiskTimeline groups all temporal periods for a single phenomenon
+// into one object.  It is derived from ConsolidatedRisk[] by groupByRiskType()
+// in normalizeRisks.ts.  The flat ConsolidatedRisk[] remains the primary model.
+
+/**
+ * A single (scenario × period) projection snapshot with trend direction.
+ * Populated for mediumTerm and longTerm — not for historical data.
+ */
+export interface ScenarioProjection {
+  /** Plain-language narrative — no IPCC codes. */
+  narrative: string;
+  /** Bullet-ready operational impact strings. */
+  impacts: string[];
+  confidence: ConfidenceLabel;
+  /**
+   * Direction of projected change relative to historical baseline.
+   * Used to render trend arrows in the timeline UI.
+   */
+  trendDirection: 'increasing' | 'decreasing' | 'stable' | 'variable';
+}
+
+/**
+ * Full timeline for a single climate phenomenon across all temporal periods.
+ * One ConsolidatedRiskTimeline per riskType — regardless of how many periods
+ * exist in the ConsolidatedRisk[] flat list.
+ *
+ * Computed by groupByRiskType(risks, meta) in normalizeRisks.ts.
+ */
+export interface ConsolidatedRiskTimeline {
+  riskType: RiskTypeSlug;
+  displayName: string;
+  /** Emoji icon from RISK_TYPE_DISPLAY. */
+  icon: string;
+  /** Tailwind text color class from RISK_TYPE_DISPLAY. */
+  textColor: string;
+  /** One sentence describing how the phenomenon evolves over time. */
+  evolutionSentence: string;
+
+  /** Observations from 1980–2014.  Optional — may be absent if no historical data. */
+  historical?: {
+    narrative: string;
+    impacts: string[];
+    evidence: EvidenceRef[];
+    confidence: ConfidenceLabel;
+  };
+
+  /** Projections for 2040–2059.  Optional — may be absent. */
+  mediumTerm?: {
+    moderateEmissions?: ScenarioProjection;
+    highEmissions?: ScenarioProjection;
+  };
+
+  /** Projections for 2060–2079.  Optional — may be absent. */
+  longTerm?: {
+    moderateEmissions?: ScenarioProjection;
+    highEmissions?: ScenarioProjection;
+  };
+
+  /** Aggregated adaptation measures from all periods. */
+  adaptationMeasures: AdaptationSummary[];
+}
+
 // ─── Report-level model ───────────────────────────────────────────────────────
 
 /**

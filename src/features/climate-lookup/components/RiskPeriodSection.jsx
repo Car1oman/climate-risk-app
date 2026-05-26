@@ -1,5 +1,6 @@
 // @ts-nocheck
 import ConsolidatedRiskCard from "./ConsolidatedRiskCard";
+import { buildExecutiveNarrative } from '@/domain/sanitizeNarrative';
 
 const PERIOD_CONFIG = {
   historico: {
@@ -53,10 +54,13 @@ export default function RiskPeriodSection({
   const activeSSP = SCENARIOS.find(s => s.value === activeScenario)?.sspKey ?? 'ssp245';
   const windowKey = PERIOD_TO_WINDOW[period];
 
-  // Layer9 scenario-specific narrative (projection periods only)
-  const projNarrative = config.showScenario
+  // Layer9 scenario-specific narrative — sanitized to remove IPCC codes before display.
+  // buildExecutiveNarrative returns '' when text is empty or entirely technical codes,
+  // causing the fallback `narrativeText` (operational language) to render instead.
+  const rawProjNarrative = config.showScenario
     ? (projections?.narratives?.find(n => n.scenario === activeSSP && n.window === windowKey)?.text ?? null)
     : null;
+  const projNarrative = rawProjNarrative ? buildExecutiveNarrative(rawProjNarrative) : null;
 
   return (
     <section className="space-y-3">

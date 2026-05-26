@@ -14,6 +14,8 @@
 
 import type {
   ConsolidatedRisk,
+  ConsolidatedRiskTimeline,
+  ScenarioProjection,
   RiskTypeSlug,
   TemporalPeriod,
   ScenarioLabel,
@@ -24,7 +26,7 @@ import type {
 
 import { RISK_TYPE_DISPLAY, formatKeyMetric } from '../constants/riskTypes';
 import { toScenarioLabel, toTemporalPeriod } from '../constants/scenarios';
-import { buildScenarioVariants } from './buildOperationalNarrative';
+import { buildScenarioVariants, buildTemporalEvolutionSentence } from './buildOperationalNarrative';
 
 // ─── Semantic mapping tables ──────────────────────────────────────────────────
 
@@ -367,6 +369,113 @@ export function normalizeRisks(apiResponse: Record<string, unknown>): Consolidat
     if (confDiff !== 0) return confDiff;
     return periodOrder[a.period] - periodOrder[b.period];
   });
+}
+
+// ─── Timeline grouping ────────────────────────────────────────────────────────
+
+/**
+ * Default trend direction per risk type for climate-change projections.
+ * Used when building ScenarioProjection.trendDirection.
+ */
+const DEFAULT_TREND: Record<RiskTypeSlug, ScenarioProjection['trendDirection']> = {
+  lluvias_extremas: 'increasing',
+  calor_extremo:    'increasing',
+  sequia:           'increasing',
+  deslizamiento:    'increasing',
+  heladas:          'variable',
+  fenomeno_enso:    'variable',
+  inundacion:       'increasing',
+};
+
+/**
+ * Converts a ScenarioVariant (from ConsolidatedRisk) into a ScenarioProjection
+ * (the ConsolidatedRiskTimeline sub-model) adding trend direction.
+ */
+function variantToProjection(
+  variant: { narrativeText: string; impacts: string[]; confidence: ConfidenceLabel },
+  riskType: RiskTypeSlug
+): ScenarioProjection {
+  return {
+    narrative:      variant.narrativeText,
+    impacts:        variant.impacts,
+    confidence:     variant.confidence,
+    trendDirection: DEFAULT_TREND[riskType] ?? 'variable',
+  };
+}
+
+/**
+ * Groups a flat ConsolidatedRisk[] into ConsolidatedRiskTimeline[] — one object
+ * per unique riskType with all temporal periods nested inside.
+ *
+ * The flat model remains the canonical source; this is a read-only derived view
+ * used by timeline-aware UI components.
+ *
+ * @param risks  Output of normalizeRisks()
+ * @returns      One ConsolidatedRiskTimeline per unique riskType, sorted by the
+ *               order in which risk types first appear in the input array.
+ */
+export function groupByRiskType(risks: ConsolidatedRisk[]): ConsolidatedRiskTimeline[] {
+  if (!risks?.length) return [];
+
+  const timelineMap = new Map<RiskTypeSlug, ConsolidatedRiskTimeline>();
+
+  for (const risk of risks) {
+    const { riskType } = risk;
+
+    if (!timelineMap.has(riskType)) {
+      const meta = RISK_TYPE_DISPLAY[riskType];
+      timelineMap.set(riskType, {
+        riskType,
+        displayName:      meta?.label    ?? riskType,
+        icon:             meta?.icon     ?? '⚠️',
+        textColor:        meta?.textColor ?? 'text-foreground',
+        evolutionSentence: buildTemporalEvolutionSentence(riskType),
+        adaptationMeasures: [],
+      });
+    }
+
+    const timeline = timelineMap.get(riskType)!;
+
+    // Merge adaptation measures (deduplicate by id)
+    const existingIds = new Set(timeline.adaptationMeasures.map(a => a.id));
+    for (const measure of risk.adaptationMeasures) {
+      if (!existingIds.has(measure.id)) {
+        timeline.adaptationMeasures.push(measure);
+        existingIds.add(measure.id);
+      }
+    }
+
+    if (risk.period === 'historico') {
+      timeline.historical = {
+        narrative:  risk.narrativeText,
+        impacts:    risk.impacts,
+        evidence:   risk.evidence,
+        confidence: risk.confidence,
+      };
+    } else if (risk.period === 'mediano_plazo') {
+      const variants = risk.scenarioVariants;
+      timeline.mediumTerm = {
+        moderateEmissions: variants?.emisiones_moderadas
+          ? variantToProjection(variants.emisiones_moderadas, riskType)
+          : undefined,
+        highEmissions: variants?.altas_emisiones
+          ? variantToProjection(variants.altas_emisiones, riskType)
+          : undefined,
+      };
+    } else if (risk.period === 'largo_plazo') {
+      const variants = risk.scenarioVariants;
+      timeline.longTerm = {
+        moderateEmissions: variants?.emisiones_moderadas
+          ? variantToProjection(variants.emisiones_moderadas, riskType)
+          : undefined,
+        highEmissions: variants?.altas_emisiones
+          ? variantToProjection(variants.altas_emisiones, riskType)
+          : undefined,
+      };
+    }
+  }
+
+  return [...timelineMap.values()];
 }
 
 // ─── Executive summary builder ────────────────────────────────────────────────

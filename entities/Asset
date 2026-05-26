@@ -21,9 +21,10 @@
       "enum": [
         "spsa",
         "real_plaza",
-        "financiera_oh",
-        "inkafarma",
-        "promart"
+        "If XP",
+        "farmacias peruanas",
+        "promart",
+        "oechsle"
       ],
       "default": "spsa",
       "description": "Business unit / tenant"
