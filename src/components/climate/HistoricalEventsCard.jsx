@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { useState } from "react";
 import {
-  CalendarClock, Droplets, Thermometer, Wind, Mountain,
+  CalendarClock, Droplets, Thermometer, Mountain,
   Sun, Waves, AlertCircle, BookOpen, MapPin
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";

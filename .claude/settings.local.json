@@ -138,7 +138,12 @@
       "Bash(grep -r \"^[[:space:]]*//.*import\" src --include=\"*.jsx\" --include=\"*.tsx\" --include=\"*.js\" --include=\"*.ts\")",
       "Bash(xargs grep -l \"^[[:space:]]*//.*Dashboard\\\\|^[[:space:]]*//.*RiskMap\\\\|^[[:space:]]*//.*Assets\\\\|^[[:space:]]*//.*Report\\\\|^[[:space:]]*//.*Alerts\\\\|^[[:space:]]*//.*DataManagement\")",
       "Bash(npm run *)",
-      "PowerShell($nodeCmd = Get-Command node -ErrorAction SilentlyContinue; if \\($nodeCmd\\) { $nodeCmd.Source } else { \"not found\" }; Get-ChildItem \"C:\\\\Program Files\\\\nodejs\\\\\" -ErrorAction SilentlyContinue | Select-Object -First 3)"
+      "PowerShell($nodeCmd = Get-Command node -ErrorAction SilentlyContinue; if \\($nodeCmd\\) { $nodeCmd.Source } else { \"not found\" }; Get-ChildItem \"C:\\\\Program Files\\\\nodejs\\\\\" -ErrorAction SilentlyContinue | Select-Object -First 3)",
+      "Bash(Remove-Item \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\\\\src\\\\lib\\\\climateInterpretation.js\" -Force)",
+      "Bash(Remove-Item \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\\\\src\\\\components\\\\UserNotRegisteredError.jsx\" -Force)",
+      "Bash(Remove-Item \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\\\\src\\\\data\\\\alerts.js\" -Force)",
+      "Bash(Remove-Item \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\\\\src\\\\utils\\\\index.ts\" -Force)",
+      "Bash(Remove-Item \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\\\\src\\\\components\\\\ui\\\\sidebar.jsx\" -Force)"
     ],
     "additionalDirectories": [
       "d:\\Usuarios\\PM75161698\\Desktop\\datarisk\\climate-risk-app",
