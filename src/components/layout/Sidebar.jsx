@@ -11,7 +11,6 @@ import {
   ChevronRight,
   Database,
   CloudUpload,
-  Lock,
   SearchCheck,
   FolderOpen,
 } from "lucide-react";
@@ -24,21 +23,17 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-const mvpNavItems = [
+const navItems = [
   { icon: SearchCheck, label: "Consulta de Riesgos", path: "/" },
   { icon: CloudUpload, label: "Datos Climáticos", path: "/climate-upload" },
   { icon: FolderOpen, label: "Documentos", path: "/documentos" },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+  { icon: Map, label: "Mapa de Riesgos", path: "/map" },
+  { icon: Building2, label: "Activos", path: "/assets" },
+  { icon: Database, label: "Gestión de Datos", path: "/data-management" },
+  { icon: Bell, label: "Alertas", path: "/alerts" },
+  { icon: FileText, label: "Reporte TCFD", path: "/report" },
   { icon: Settings, label: "Configuración", path: "/settings" },
-    { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-];
-
-const comingSoonItems = [
-
-  
-  { icon: Building2, label: "Activos" },
-  { icon: Database, label: "Gestión de Datos" },
-  { icon: Bell, label: "Alertas" },
-  { icon: FileText, label: "Reporte TCFD" },
 ];
 
 export default function Sidebar() {
@@ -68,8 +63,7 @@ export default function Sidebar() {
 
         {/* Nav */}
         <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
-          {/* MVP items */}
-          {mvpNavItems.map((item) => {
+          {navItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (
               <Tooltip key={item.path}>
@@ -93,35 +87,6 @@ export default function Sidebar() {
               </Tooltip>
             );
           })}
-
-          {/* Próximamente section */}
-          <div className={cn("pt-3", !collapsed && "px-1")}>
-            {!collapsed && (
-              <div className="flex items-center gap-1.5 mb-2 px-2">
-                <Lock className="w-3 h-3 text-muted-foreground/50" />
-                <span className="text-[10px] font-semibold tracking-widest uppercase text-muted-foreground/50">
-                  Próximamente
-                </span>
-              </div>
-            )}
-            {collapsed && <div className="border-t border-sidebar-border mb-2" />}
-
-            {comingSoonItems.map((item) => (
-              <Tooltip key={item.label}>
-                <TooltipTrigger asChild>
-                  <div
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium cursor-not-allowed opacity-40 select-none"
-                  >
-                    <item.icon className="w-4 h-4 flex-shrink-0" />
-                    {!collapsed && <span>{item.label}</span>}
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="right">
-                  {collapsed ? item.label + " — " : ""}Disponible en versión 2
-                </TooltipContent>
-              </Tooltip>
-            ))}
-          </div>
         </nav>
 
         {/* Collapse toggle */}

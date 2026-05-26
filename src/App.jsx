@@ -12,9 +12,13 @@ import AppSettings from './pages/AppSettings';
 import ClimateDataUpload from './pages/ClimateDataUpload';
 import ClimateRiskLookup from './pages/ClimateRiskLookup';
 import DocumentosClimaticos from './pages/DocumentosClimaticos';
-
-// Rutas MVP activas. Dashboard, RiskMap, Assets, AssetDetail, Alerts, Report,
-// DataManagement están desactivadas del flujo principal (versión 2).
+import Dashboard from './pages/Dashboard';
+import RiskMap from './pages/RiskMap';
+import Assets from './pages/Assets';
+import AssetDetail from './pages/AssetDetail';
+import Alerts from './pages/Alerts';
+import Report from './pages/Report';
+import DataManagement from './pages/DataManagement';
 
 const AuthenticatedApp = () => {
   return (
@@ -24,14 +28,13 @@ const AuthenticatedApp = () => {
         <Route path="/climate-upload" element={<ClimateDataUpload />} />
         <Route path="/documentos" element={<DocumentosClimaticos />} />
         <Route path="/settings" element={<AppSettings />} />
-        {/* Rutas desactivadas — redirigen al flujo principal hasta versión 2 */}
-        <Route path="/dashboard"        element={<Navigate to="/" replace />} />
-        <Route path="/map"              element={<Navigate to="/" replace />} />
-        <Route path="/assets"           element={<Navigate to="/" replace />} />
-        <Route path="/assets/:id"       element={<Navigate to="/" replace />} />
-        <Route path="/alerts"           element={<Navigate to="/" replace />} />
-        <Route path="/report"           element={<Navigate to="/" replace />} />
-        <Route path="/data-management"  element={<Navigate to="/" replace />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/map" element={<RiskMap />} />
+        <Route path="/assets" element={<Assets />} />
+        <Route path="/assets/:id" element={<AssetDetail />} />
+        <Route path="/alerts" element={<Alerts />} />
+        <Route path="/report" element={<Report />} />
+        <Route path="/data-management" element={<DataManagement />} />
         <Route path="/climate-risk-lookup" element={<Navigate to="/" replace />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
