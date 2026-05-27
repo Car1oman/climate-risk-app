@@ -3,6 +3,19 @@
 
 import type { ScenarioLabel, TemporalPeriod } from '../domain/consolidatedRisk';
 
+// ─── Known temporal periods + invariant guard ─────────────────────────────────
+
+export const KNOWN_PERIODS: readonly TemporalPeriod[] = [
+  'historico', 'corto_plazo', 'mediano_plazo', 'largo_plazo',
+] as const;
+
+/** DEV-only: warns if period is not a known TemporalPeriod. */
+export function assertKnownPeriod(period: string): asserts period is TemporalPeriod {
+  if (import.meta.env.DEV && !(KNOWN_PERIODS as readonly string[]).includes(period)) {
+    console.warn(`[temporal] Unknown TemporalPeriod "${period}". Known: ${KNOWN_PERIODS.join(', ')}.`);
+  }
+}
+
 // ─── SSP → human label ────────────────────────────────────────────────────────
 
 /** Maps any SSP variant (as returned by the API) to a human-readable string. */
@@ -55,7 +68,7 @@ export const TIME_WINDOWS_UI: Record<TemporalPeriod | string, TimeWindowDisplay>
   },
   corto_plazo: {
     label: 'Corto plazo',
-    description: 'Próxima década',
+    description: 'Proyección 2020–2039',
     period: '2020–2039',
   },
   mediano_plazo: {
@@ -70,7 +83,7 @@ export const TIME_WINDOWS_UI: Record<TemporalPeriod | string, TimeWindowDisplay>
   },
   // API aliases
   historical:  { label: 'Histórico',     description: 'Período de referencia observada', period: '1980–2014' },
-  short_term:  { label: 'Corto plazo',   description: 'Próxima década',                  period: '2020–2039' },
+  short_term:  { label: 'Corto plazo',   description: 'Proyección 2020–2039',             period: '2020–2039' },
   mid_term:    { label: 'Mediano plazo', description: 'Próximos 15–35 años',             period: '2040–2059' },
   long_term:   { label: 'Largo plazo',   description: 'Próximos 35–55 años',            period: '2060–2080' },
 };
@@ -89,6 +102,13 @@ export const HORIZON_TO_PERIOD: Record<string, TemporalPeriod> = {
 
 /** Converts an API horizon key to a canonical TemporalPeriod. */
 export function toTemporalPeriod(raw: string | null | undefined): TemporalPeriod {
-  if (!raw) return 'mediano_plazo';
-  return HORIZON_TO_PERIOD[raw.trim()] ?? 'mediano_plazo';
+  if (!raw) {
+    if (import.meta.env.DEV) console.warn('[temporal] toTemporalPeriod: empty/null horizon — defaulting to mediano_plazo');
+    return 'mediano_plazo';
+  }
+  const result = HORIZON_TO_PERIOD[raw.trim()];
+  if (!result && import.meta.env.DEV) {
+    console.warn(`[temporal] toTemporalPeriod: unknown horizon "${raw}" — defaulting to mediano_plazo`);
+  }
+  return result ?? 'mediano_plazo';
 }

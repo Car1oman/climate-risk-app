@@ -72,6 +72,15 @@ export default function RiskPeriodTabs({
 
   const currentTab = available.find(t => t.key === activeTab) ?? available[0];
 
+  if (import.meta.env.DEV) {
+    if (!(currentTab.key in risksMap)) {
+      console.warn(`[RiskPeriodTabs] Tab "${currentTab.key}" not in risksMap — add prop + map entry.`);
+    }
+    if (!(currentTab.key in narrativeMap)) {
+      console.warn(`[RiskPeriodTabs] Tab "${currentTab.key}" not in narrativeMap — NarrativeReport field missing.`);
+    }
+  }
+
   return (
     <section className="space-y-4">
       {/* Period tab selector */}

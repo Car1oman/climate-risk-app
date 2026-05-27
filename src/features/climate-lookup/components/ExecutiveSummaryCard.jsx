@@ -97,6 +97,9 @@ export default function ExecutiveSummaryCard({
 
   // 3. Period-specific narrative (historical / midTerm / longTerm)
   const narrativeKey = PERIOD_NARRATIVE_KEY[selectedPeriod];
+  if (import.meta.env.DEV && !narrativeKey) {
+    console.warn(`[ExecutiveSummaryCard] Unknown selectedPeriod "${selectedPeriod}". Known: ${Object.keys(PERIOD_NARRATIVE_KEY).join(', ')}.`);
+  }
   const periodNarrative = (narrativeKey && narrativeReport[narrativeKey]) || narrativeReport.executiveSummary;
 
   // 4. Scenario-aware top impacts

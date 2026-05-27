@@ -51,6 +51,9 @@ export default function RiskPeriodSection({
   activeScenario = 'emisiones_moderadas',
   onScenarioChange,
 }) {
+  if (import.meta.env.DEV && !PERIOD_CONFIG[period]) {
+    console.warn(`[RiskPeriodSection] Unknown period "${period}". Known: ${Object.keys(PERIOD_CONFIG).join(', ')}.`);
+  }
   const config = PERIOD_CONFIG[period] ?? PERIOD_CONFIG.historico;
   const setActiveScenario = onScenarioChange ?? (() => {});
 
@@ -66,6 +69,9 @@ export default function RiskPeriodSection({
 
   const activeSSP = SCENARIOS.find(s => s.value === activeScenario)?.sspKey ?? 'ssp245';
   const windowKey = PERIOD_TO_WINDOW[period];
+  if (import.meta.env.DEV && config.showScenario && !windowKey) {
+    console.warn(`[RiskPeriodSection] Period "${period}" has showScenario:true but no PERIOD_TO_WINDOW entry — Layer9 narrative skipped.`);
+  }
 
   // Layer9 scenario-specific narrative — sanitized to remove IPCC codes before display.
   // buildExecutiveNarrative returns '' when text is empty or entirely technical codes,

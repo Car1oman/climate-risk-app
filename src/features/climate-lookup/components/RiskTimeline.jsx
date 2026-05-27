@@ -36,10 +36,15 @@ const SCENARIO_TO_KEY = {
  */
 function getTimelineNodeNarrative(timeline, period, activeScenario) {
   if (period === 'historical') return timeline.historical?.narrative ?? null;
-  const scenarioKey = SCENARIO_TO_KEY[activeScenario] ?? 'moderateEmissions';
-  if (period === 'shortTerm')  return timeline.shortTerm?.[scenarioKey]?.narrative ?? null;
-  if (period === 'mediumTerm') return timeline.mediumTerm?.[scenarioKey]?.narrative ?? null;
-  if (period === 'longTerm')   return timeline.longTerm?.[scenarioKey]?.narrative ?? null;
+  const scenarioKey = SCENARIO_TO_KEY[activeScenario];
+  if (import.meta.env.DEV && !scenarioKey) {
+    console.warn(`[RiskTimeline] Unknown activeScenario "${activeScenario}" — falling back to moderateEmissions.`);
+  }
+  const key = scenarioKey ?? 'moderateEmissions';
+  if (period === 'shortTerm')  return timeline.shortTerm?.[key]?.narrative ?? null;
+  if (period === 'mediumTerm') return timeline.mediumTerm?.[key]?.narrative ?? null;
+  if (period === 'longTerm')   return timeline.longTerm?.[key]?.narrative ?? null;
+  if (import.meta.env.DEV) console.warn(`[RiskTimeline] getTimelineNodeNarrative: unhandled period "${period}".`);
   return null;
 }
 
@@ -101,14 +106,21 @@ function RiskTimelineRow({ timeline, activeScenario }) {
 
       {/* Timeline nodes */}
       <div className="px-4 pt-3 pb-1">
-        {presentPeriods.map((period, idx) => (
-          <TimelineNode
-            key={period}
-            nodeConfig={PERIOD_NODE[period]}
-            narrative={getTimelineNodeNarrative(timeline, period, activeScenario)}
-            isLast={idx === presentPeriods.length - 1}
-          />
-        ))}
+        {presentPeriods.map((period, idx) => {
+          const nodeConfig = PERIOD_NODE[period];
+          if (!nodeConfig) {
+            if (import.meta.env.DEV) console.warn(`[RiskTimeline] No PERIOD_NODE config for "${period}" — skipping node.`);
+            return null;
+          }
+          return (
+            <TimelineNode
+              key={period}
+              nodeConfig={nodeConfig}
+              narrative={getTimelineNodeNarrative(timeline, period, activeScenario)}
+              isLast={idx === presentPeriods.length - 1}
+            />
+          );
+        })}
       </div>
     </div>
   );
