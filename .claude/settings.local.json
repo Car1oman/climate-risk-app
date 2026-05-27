@@ -157,7 +157,18 @@
       "PowerShell($env:PATH = \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64;$env:PATH\"; cd \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\"; npm run build > \"C:\\\\Temp\\\\build_out.txt\" 2>&1; $LASTEXITCODE)",
       "PowerShell(New-Item -ItemType Directory -Force \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\\\\build-log\" | Out-Null; $env:PATH = \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64;$env:PATH\"; cd \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\"; npm run build > \".\\\\build-log\\\\out.txt\" 2>&1; $LASTEXITCODE)",
       "PowerShell($env:PATH = \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64;$env:PATH\"; cd \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\"; $proc = Start-Process -FilePath \"npm\" -ArgumentList \"run\",\"build\" -NoNewWindow -Wait -PassThru; Write-Host \"Exit: $\\($proc.ExitCode\\)\")",
-      "PowerShell($env:PATH = \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64;$env:PATH\"; cd \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\"; & \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\npm.cmd\" run build; Write-Host \"EXIT:$LASTEXITCODE\")"
+      "PowerShell($env:PATH = \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64;$env:PATH\"; cd \"D:\\\\Usuarios\\\\PM75161698\\\\Desktop\\\\datarisk\\\\climate-risk-app\"; & \"D:\\\\Usuarios\\\\PM75161698\\\\node-v24.15.0-win-x64\\\\node-v24.15.0-win-x64\\\\npm.cmd\" run build; Write-Host \"EXIT:$LASTEXITCODE\")",
+      "Bash(npm test *)",
+      "Bash(ls /d/Usuarios/PM75161698/AppData/Local/Programs/ 2>/dev/null | grep -i node || ls \"/c/Program Files/nodejs\" 2>/dev/null | head -5)",
+      "Read(//d/Usuarios/PM75161698/AppData/Local/Programs//**)",
+      "Read(//c/Program Files/**)",
+      "Bash(find /d/Usuarios/PM75161698/AppData/Local/ -name \"node.exe\" 2>/dev/null | grep -v RECYCLE | head -3)",
+      "Read(//d/Usuarios/PM75161698/AppData/Local//**)",
+      "Bash(find /d/Usuarios/PM75161698 -maxdepth 4 -name \"node.exe\" 2>/dev/null | grep -v RECYCLE | grep -v AppData | head -5 ; ls \"/d/Usuarios/PM75161698/AppData/Roaming/nvm\" 2>/dev/null | head -5)",
+      "Read(//d/Usuarios/PM75161698/**)",
+      "Read(//d/Usuarios/PM75161698/AppData/Roaming/**)",
+      "Bash(/d/Usuarios/PM75161698/node-v24.15.0-win-x64/node-v24.15.0-win-x64/node.exe --version)",
+      "Bash(/d/Usuarios/PM75161698/node-v24.15.0-win-x64/node-v24.15.0-win-x64/node.exe --input-type=module)"
     ],
     "additionalDirectories": [
       "d:\\Usuarios\\PM75161698\\Desktop\\datarisk\\climate-risk-app",

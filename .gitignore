@@ -34,3 +34,4 @@ dist-ssr
 *.md
 !README.md
 docs/*.md
+codegraph/*
