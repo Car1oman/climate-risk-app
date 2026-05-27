@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Loader2, BookOpen } from "lucide-react";
-import { API_URL } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
 
 export default function AIPanel({ analysis, docContext }) {
@@ -39,7 +39,7 @@ Elabora un análisis ejecutivo breve y accionable con:
 
 Responde en español. Usa lenguaje claro y directo, sin términos técnicos científicos. No inventes datos que no estén en el contexto.`;
 
-      const res  = await fetch(`${API_URL}/api/ai`, {
+      const res  = await apiFetch('/api/ai', {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ prompt }),

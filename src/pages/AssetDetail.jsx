@@ -1,6 +1,6 @@
 // @ts-nocheck - react-leaflet prop types break due to leaflet module stub; runtime is correct
 import { useState, useEffect } from "react";
-import { API_URL, fetchAssetDetail } from "@/lib/api";
+import { apiFetch, fetchAssetDetail } from "@/lib/api";
 import { formatCurrency, getRiskColor, cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
 import { ArrowLeft, MapPin, Sparkles, Loader2 } from "lucide-react";
@@ -91,7 +91,7 @@ Condicion: ${asset.condition || "propio"}
 Genera exactamente 3 recomendaciones de adaptacion climatica especificas para esta tienda. No uses scores, urgencias numericas ni impacto financiero estimado. Enfocate en evidencia, senales observadas, trazabilidad y medidas operativas verificables. Formato Markdown con bullets.`;
 
     try {
-      const res = await fetch(`${API_URL}/api/ai`, {
+      const res = await apiFetch('/api/ai', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt }),

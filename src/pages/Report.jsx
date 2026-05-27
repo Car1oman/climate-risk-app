@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAssets } from "@/hooks/useAssets";
-import { API_URL } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { exportEnterprisePdf } from "@/lib/enterprisePdfReport";
 import { Button } from "@/components/ui/button";
 import { Download, FileText, Loader2 } from "lucide-react";
@@ -59,7 +59,7 @@ Genera el reporte en formato TCFD con las secciones:
 
 Formato Markdown. No uses scores, rankings numericos, urgencia numerica ni rangos de impacto financiero. Se especifico con fuentes, periodos, escenarios SSP, niveles de confianza y recomendaciones accionables.`;
 
-      const response = await fetch(`${API_URL}/api/ai`, {
+      const response = await apiFetch('/api/ai', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt }),
