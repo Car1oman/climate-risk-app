@@ -4,7 +4,9 @@
  * Assembles the top-level NarrativeReport from ConsolidatedRisk[].
  * Produces four narrative texts:
  *   - executiveSummary : hero paragraph (all horizons combined)
- *   - historicalNarrative : past-observation risks
+ *   - executiveSummary : hero paragraph (all horizons combined)
+ *   - historicalNarrative : past-observation risks (1981–2014)
+ *   - nearTermNarrative   : near-term projection risks (2020–2039)
  *   - midTermNarrative  : 2040–2059 risks
  *   - longTermNarrative : 2060–2079 risks
  */
@@ -31,6 +33,7 @@ export function buildNarrativeReport(
 ): NarrativeReport {
   const executiveSummary    = buildOperationalExecutiveSummary(risks, locationLabel, sectorLabel);
   const historicalNarrative = buildOperationalPeriodNarrative(risks, 'historico');
+  const nearTermNarrative   = buildOperationalPeriodNarrative(risks, 'corto_plazo');
   const midTermNarrative    = buildOperationalPeriodNarrative(risks, 'mediano_plazo');
   const longTermNarrative   = buildOperationalPeriodNarrative(risks, 'largo_plazo');
 
@@ -51,6 +54,7 @@ export function buildNarrativeReport(
     locationLabel,
     executiveSummary,
     historicalNarrative,
+    nearTermNarrative,
     midTermNarrative,
     longTermNarrative,
     risks,

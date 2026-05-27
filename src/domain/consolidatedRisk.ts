@@ -184,6 +184,8 @@ export interface NarrativeReport {
   executiveSummary: string;
   /** Plain-language paragraph for past observations. Empty string if no historical risks. */
   historicalNarrative: string;
+  /** Plain-language paragraph for near-term projections (2020–2039). Empty string if no near-term risks. */
+  nearTermNarrative: string;
   /** Plain-language paragraph for mid-term projections (2040–2059). */
   midTermNarrative: string;
   /** Plain-language paragraph for long-term projections (2060–2079). */
