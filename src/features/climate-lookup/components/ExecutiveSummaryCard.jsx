@@ -10,12 +10,14 @@ const CONFIDENCE_CONFIG = {
 
 const PERIOD_NARRATIVE_KEY = {
   historico:     'historicalNarrative',
+  corto_plazo:   'nearTermNarrative',
   mediano_plazo: 'midTermNarrative',
   largo_plazo:   'longTermNarrative',
 };
 
 const PERIOD_LABEL = {
   historico:     'Período histórico',
+  corto_plazo:   'Proyección 2020–2039',
   mediano_plazo: 'Proyección 2040–2059',
   largo_plazo:   'Proyección 2060–2079',
 };

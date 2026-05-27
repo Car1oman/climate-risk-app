@@ -7,6 +7,10 @@ const PERIOD_CONFIG = {
     description: 'Fenómenos observados en el período de referencia (1980–2014)',
     showScenario: false,
   },
+  corto_plazo: {
+    description: 'Proyecciones para 2020–2039',
+    showScenario: true,
+  },
   mediano_plazo: {
     description: 'Proyecciones para 2040–2059',
     showScenario: true,
@@ -23,8 +27,9 @@ const SCENARIOS = [
 ];
 
 const PERIOD_TO_WINDOW = {
+  corto_plazo:   'near_term',
   mediano_plazo: 'mid_term',
-  largo_plazo:   'long_term',
+  largo_plazo:   'far_term',
 };
 
 /**

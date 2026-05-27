@@ -3,9 +3,10 @@ import { useMemo } from "react";
 import RiskPeriodSection from "./RiskPeriodSection";
 
 const PERIOD_TABS = [
-  { key: 'historico',     label: 'Histórico',     period: '1980–2014' },
-  { key: 'mediano_plazo', label: 'Mediano plazo',  period: '2040–2059' },
-  { key: 'largo_plazo',   label: 'Largo plazo',    period: '2060–2079' },
+  { key: 'historico',     label: 'Histórico',      period: '1980–2014' },
+  { key: 'corto_plazo',   label: 'Corto plazo',    period: '2020–2039' },
+  { key: 'mediano_plazo', label: 'Mediano plazo',   period: '2040–2059' },
+  { key: 'largo_plazo',   label: 'Largo plazo',     period: '2060–2079' },
 ];
 
 /**
@@ -26,6 +27,7 @@ const PERIOD_TABS = [
  */
 export default function RiskPeriodTabs({
   historicalRisks,
+  shortTermRisks,
   midTermRisks,
   longTermRisks,
   narrativeReport,
@@ -38,11 +40,12 @@ export default function RiskPeriodTabs({
   const available = useMemo(() => {
     const map = {
       historico:     historicalRisks,
+      corto_plazo:   shortTermRisks,
       mediano_plazo: midTermRisks,
       largo_plazo:   longTermRisks,
     };
     return PERIOD_TABS.filter(t => (map[t.key]?.length ?? 0) > 0);
-  }, [historicalRisks, midTermRisks, longTermRisks]);
+  }, [historicalRisks, shortTermRisks, midTermRisks, longTermRisks]);
 
   // Resolve controlled selectedPeriod: if parent value isn't available, fall back to first tab.
   const activeTab = useMemo(() => {
@@ -55,12 +58,14 @@ export default function RiskPeriodTabs({
 
   const narrativeMap = {
     historico:     narrativeReport?.historicalNarrative,
+    corto_plazo:   narrativeReport?.nearTermNarrative,
     mediano_plazo: narrativeReport?.midTermNarrative,
     largo_plazo:   narrativeReport?.longTermNarrative,
   };
 
   const risksMap = {
     historico:     historicalRisks,
+    corto_plazo:   shortTermRisks,
     mediano_plazo: midTermRisks,
     largo_plazo:   longTermRisks,
   };

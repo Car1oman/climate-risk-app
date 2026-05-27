@@ -452,6 +452,16 @@ export function groupByRiskType(risks: ConsolidatedRisk[]): ConsolidatedRiskTime
         evidence:   risk.evidence,
         confidence: risk.confidence,
       };
+    } else if (risk.period === 'corto_plazo') {
+      const variants = risk.scenarioVariants;
+      timeline.shortTerm = {
+        moderateEmissions: variants?.emisiones_moderadas
+          ? variantToProjection(variants.emisiones_moderadas, riskType)
+          : undefined,
+        highEmissions: variants?.altas_emisiones
+          ? variantToProjection(variants.altas_emisiones, riskType)
+          : undefined,
+      };
     } else if (risk.period === 'mediano_plazo') {
       const variants = risk.scenarioVariants;
       timeline.mediumTerm = {

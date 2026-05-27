@@ -156,6 +156,12 @@ export interface ConsolidatedRiskTimeline {
     confidence: ConfidenceLabel;
   };
 
+  /** Projections for 2020–2039.  Optional — may be absent. */
+  shortTerm?: {
+    moderateEmissions?: ScenarioProjection;
+    highEmissions?: ScenarioProjection;
+  };
+
   /** Projections for 2040–2059.  Optional — may be absent. */
   mediumTerm?: {
     moderateEmissions?: ScenarioProjection;

@@ -114,6 +114,10 @@ export default function ClimateRiskLookup() {
     () => consolidatedRisks.filter(r => r.period === 'historico'),
     [consolidatedRisks]
   );
+  const shortTermRisks = useMemo(
+    () => consolidatedRisks.filter(r => r.period === 'corto_plazo'),
+    [consolidatedRisks]
+  );
   const midTermRisks = useMemo(
     () => consolidatedRisks.filter(r => r.period === 'mediano_plazo'),
     [consolidatedRisks]
@@ -226,9 +230,10 @@ export default function ClimateRiskLookup() {
                     activeScenario={activeScenario}
                   />
 
-                  {/* 3 — Period detail — tabbed: Histórico | Mediano | Largo plazo */}
+                  {/* 3 — Period detail — tabbed: Histórico | Corto | Mediano | Largo plazo */}
                   <RiskPeriodTabs
                     historicalRisks={historicalRisks}
+                    shortTermRisks={shortTermRisks}
                     midTermRisks={midTermRisks}
                     longTermRisks={longTermRisks}
                     narrativeReport={narrativeReport}

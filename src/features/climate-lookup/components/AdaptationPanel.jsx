@@ -16,6 +16,7 @@ const TIMEFRAME_LABEL = {
 
 const PERIOD_CONTEXT_LABEL = {
   historico:     null,
+  corto_plazo:   'Para 2020–2039',
   mediano_plazo: 'Para 2040–2059',
   largo_plazo:   'Para 2060–2079',
 };

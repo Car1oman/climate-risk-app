@@ -17,11 +17,12 @@ import { RISK_TYPE_DISPLAY } from '@/constants/riskTypes';
 
 const PERIOD_NODE = {
   historical:  { label: 'Históricamente', period: '1980–2014', dotColor: 'bg-slate-400'  },
+  shortTerm:   { label: 'Hacia 2030',     period: '2020–2039', dotColor: 'bg-yellow-400' },
   mediumTerm:  { label: 'Hacia 2050',     period: '2040–2059', dotColor: 'bg-amber-400'  },
   longTerm:    { label: 'Hacia 2070',     period: '2060–2079', dotColor: 'bg-orange-500' },
 };
 
-const PERIOD_ORDER = ['historical', 'mediumTerm', 'longTerm'];
+const PERIOD_ORDER = ['historical', 'shortTerm', 'mediumTerm', 'longTerm'];
 
 // Map activeScenario slug to ConsolidatedRiskTimeline's scenario key
 const SCENARIO_TO_KEY = {
@@ -36,6 +37,7 @@ const SCENARIO_TO_KEY = {
 function getTimelineNodeNarrative(timeline, period, activeScenario) {
   if (period === 'historical') return timeline.historical?.narrative ?? null;
   const scenarioKey = SCENARIO_TO_KEY[activeScenario] ?? 'moderateEmissions';
+  if (period === 'shortTerm')  return timeline.shortTerm?.[scenarioKey]?.narrative ?? null;
   if (period === 'mediumTerm') return timeline.mediumTerm?.[scenarioKey]?.narrative ?? null;
   if (period === 'longTerm')   return timeline.longTerm?.[scenarioKey]?.narrative ?? null;
   return null;
