@@ -5,6 +5,103 @@ import { Sparkles, Loader2, BookOpen } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
 
+function AISection({ icon, label, children }) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1.5">
+        <span className="text-primary">{icon}</span>
+        {label}
+      </p>
+      {children}
+    </div>
+  );
+}
+
+function AIBulletList({ items }) {
+  if (!items?.length) return null;
+  return (
+    <ul className="space-y-1">
+      {items.map((item, i) => (
+        <li key={i} className="text-sm leading-5 text-foreground flex items-start gap-2">
+          <span className="mt-1.5 block h-1.5 w-1.5 shrink-0 rounded-full bg-primary/40" />
+          {item}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function AIAnalysisView({ data, onReset }) {
+  const isEmpty = !data?.contextualSummary && !data?.operationalImplications?.length;
+
+  if (isEmpty) {
+    return (
+      <div className="space-y-3">
+        <div className="rounded-xl border border-border bg-secondary p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <p className="text-sm font-semibold text-foreground">Análisis IA</p>
+            <span className="rounded-full bg-primary/15 dark:bg-primary/25 px-2.5 py-1 text-[11px] font-bold text-primary">IA</span>
+          </div>
+          <p className="text-sm text-muted-foreground italic">No se pudo estructurar la respuesta.</p>
+        </div>
+        <ButtonsFooter onReset={onReset} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-xl border border-border bg-secondary p-4 shadow-sm space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+            <Sparkles className="w-4 h-4 text-primary" />
+            Análisis IA
+          </p>
+          {data.confidenceStatement && (
+            <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary border border-primary/20">
+              {data.confidenceStatement}
+            </span>
+          )}
+        </div>
+
+        {data.contextualSummary && (
+          <AISection icon={<Sparkles className="w-3 h-3" />} label="PERFIL DE RIESGO">
+            <p className="text-sm leading-6 text-foreground">{data.contextualSummary}</p>
+          </AISection>
+        )}
+
+        {data.operationalImplications?.length > 0 && (
+          <AISection icon={<Sparkles className="w-3 h-3" />} label="IMPACTOS OPERACIONALES">
+            <AIBulletList items={data.operationalImplications} />
+          </AISection>
+        )}
+
+        {data.adaptationFraming && (
+          <AISection icon={<Sparkles className="w-3 h-3" />} label="ACCIÓN RECOMENDADA">
+            <p className="text-sm leading-6 text-foreground">{data.adaptationFraming}</p>
+          </AISection>
+        )}
+
+        {data.disclaimer && (
+          <p className="text-[11px] leading-5 text-muted-foreground italic border-t border-border/40 pt-3">
+            {data.disclaimer}
+          </p>
+        )}
+      </div>
+      <ButtonsFooter onReset={onReset} />
+    </div>
+  );
+}
+
+function ButtonsFooter({ onReset }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <Button size="sm" variant="secondary" onClick={onReset}>Regenerar</Button>
+      <p className="text-[11px] text-muted-foreground">Valida las acciones con tu equipo técnico.</p>
+    </div>
+  );
+}
+
 export default function AIPanel({ analysis, docContext }) {
   const [loading, setLoading] = useState(false);
   const [text, setText]       = useState(null);
@@ -36,7 +133,6 @@ Elabora un análisis ejecutivo breve y accionable con:
 1. Perfil de riesgo (2–3 oraciones basadas en los datos anteriores)
 2. Impactos operacionales más probables para el sector (máx. 4 puntos concretos)
 3. Acciones recomendadas${docCount > 0 ? " — cuando sea pertinente, menciona los documentos de referencia disponibles" : ""} (máx. 3 puntos)
-// Instrucciones:
 Responde en español. Usa lenguaje claro y directo, sin términos técnicos científicos. No inventes datos que no estén en el contexto.`;
 
       const res  = await apiFetch('/api/ai', {
@@ -55,6 +151,13 @@ Responde en español. Usa lenguaje claro y directo, sin términos técnicos cien
       setLoading(false);
     }
   };
+
+  let parsed = null;
+  try {
+    parsed = text ? JSON.parse(text) : null;
+  } catch {
+    parsed = null;
+  }
 
   return (
     <div className="space-y-4">
@@ -82,6 +185,8 @@ Responde en español. Usa lenguaje claro y directo, sin términos técnicos cien
             ? <><Loader2 className="w-4 h-4 animate-spin" />Analizando con IA...</>
             : <><Sparkles className="w-4 h-4" />Generar recomendaciones</>}
         </Button>
+      ) : parsed ? (
+        <AIAnalysisView data={parsed} onReset={() => setText(null)} />
       ) : (
         <div className="space-y-3">
           <div className="rounded-xl border border-border bg-secondary p-4 shadow-sm">
@@ -91,10 +196,7 @@ Responde en español. Usa lenguaje claro y directo, sin términos técnicos cien
             </div>
             <div className="text-sm leading-6 text-foreground whitespace-pre-wrap">{text}</div>
           </div>
-          <div className="flex items-center justify-between gap-2">
-            <Button size="sm" variant="secondary" onClick={() => setText(null)}>Regenerar</Button>
-            <p className="text-[11px] text-muted-foreground">Valida las acciones con tu equipo técnico.</p>
-          </div>
+          <ButtonsFooter onReset={() => setText(null)} />
         </div>
       )}
     </div>
