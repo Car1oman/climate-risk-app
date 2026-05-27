@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 
 export const API_URL = import.meta.env.VITE_API_URL || 'https://climate-risk-app-91ev.onrender.com';
 
-async function apiFetch(path, options = {}) {
+export async function apiFetch(path, options = {}) {
   const { data: { session } } = await supabase.auth.getSession();
   const authHeader = session?.access_token
     ? { Authorization: `Bearer ${session.access_token}` }
