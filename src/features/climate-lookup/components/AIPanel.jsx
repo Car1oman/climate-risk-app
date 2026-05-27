@@ -36,7 +36,7 @@ Elabora un análisis ejecutivo breve y accionable con:
 1. Perfil de riesgo (2–3 oraciones basadas en los datos anteriores)
 2. Impactos operacionales más probables para el sector (máx. 4 puntos concretos)
 3. Acciones recomendadas${docCount > 0 ? " — cuando sea pertinente, menciona los documentos de referencia disponibles" : ""} (máx. 3 puntos)
-
+// Instrucciones:
 Responde en español. Usa lenguaje claro y directo, sin términos técnicos científicos. No inventes datos que no estén en el contexto.`;
 
       const res  = await apiFetch('/api/ai', {
