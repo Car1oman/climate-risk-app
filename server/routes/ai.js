@@ -126,10 +126,14 @@ router.post('/', requireAuth, aiLimiter, validate(aiPromptSchema), async (req, r
         max_tokens: 4096,
       });
 
-      const text = result.content[0].text;
+      const blocks = result.content;
+      const textBlock = Array.isArray(blocks)
+        ? blocks.find(b => b.type === 'text')
+        : null;
+      const text = textBlock?.text ?? '';
 
       if (!text) {
-        console.error('[ai] Claude devolvió respuesta sin texto');
+        console.error('[ai] Respuesta sin texto. Content:', JSON.stringify(blocks).slice(0, 500));
         return res.status(500).json({ error: 'El modelo no generó contenido.' });
       }
 
