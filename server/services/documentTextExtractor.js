@@ -5,7 +5,7 @@
  * El límite por documento evita contextos demasiado grandes para la IA.
  */
 
-import pdfParse from 'pdf-parse';
+import { PDFParse } from 'pdf-parse';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 
@@ -15,7 +15,10 @@ const MAX_CHARS_PER_DOC = 3_000;
  * Extrae texto de un buffer PDF.
  */
 async function extractPDF(buffer) {
-  const result = await pdfParse(buffer);
+  const pdf = new PDFParse({ data: buffer });
+  await pdf.load();
+  const result = await pdf.getText();
+  await pdf.destroy();
   return result.text || '';
 }
 
