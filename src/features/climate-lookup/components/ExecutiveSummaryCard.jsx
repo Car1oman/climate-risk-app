@@ -83,7 +83,12 @@ export default function ExecutiveSummaryCard({
   selectedPeriod = 'historico',
   activeScenario = 'emisiones_moderadas',
 }) {
-  if (!narrativeReport) return null;
+  if (!narrativeReport) {
+    if (import.meta.env.DEV) {
+      console.warn('[ExecutiveSummaryCard] narrativeReport es null/undefined — verificar buildNarrativeReport() en useClimateAnalysis.');
+    }
+    return null;
+  }
 
   const { sectorLabel, locationLabel, analysisDate } = narrativeReport;
 

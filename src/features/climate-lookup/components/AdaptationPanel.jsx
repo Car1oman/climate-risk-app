@@ -62,7 +62,15 @@ export default function AdaptationPanel({ consolidatedRisks, selectedPeriod }) {
     ? periodMeasures
     : collectMeasures(consolidatedRisks);
 
-  if (!measures.length) return null;
+  if (!measures.length) {
+    if (import.meta.env.DEV) {
+      console.warn(
+        `[AdaptationPanel] Sin medidas de adaptación para período="${selectedPeriod}". ` +
+        `consolidatedRisks.length=${consolidatedRisks.length}. Verificar adaptationMeasures en normalizeRisks().`
+      );
+    }
+    return null;
+  }
 
   const periodContextLabel = selectedPeriod ? PERIOD_CONTEXT_LABEL[selectedPeriod] : null;
 

@@ -54,7 +54,26 @@ export default function RiskPeriodTabs({
     return keys.includes(selectedPeriod) ? selectedPeriod : keys[0];
   }, [available, selectedPeriod]);
 
-  if (!available.length) return null;
+  if (!available.length) {
+    if (import.meta.env.DEV) {
+      console.warn(
+        '[RiskPeriodTabs] Sin tabs disponibles aunque el componente está montado. ' +
+        `histórico=${historicalRisks?.length ?? 'nil'}, corto=${shortTermRisks?.length ?? 'nil'}, ` +
+        `mediano=${midTermRisks?.length ?? 'nil'}, largo=${longTermRisks?.length ?? 'nil'}. ` +
+        'Verificar claves de período en normalizeRisks().'
+      );
+      return (
+        <div className="rounded-xl border border-dashed border-amber-400 bg-amber-50/50 dark:bg-amber-950/20 px-5 py-6 text-center space-y-1">
+          <p className="text-xs font-medium text-amber-700 dark:text-amber-300">[DEV] RiskPeriodTabs: sin tabs disponibles</p>
+          <p className="text-[11px] text-amber-600 dark:text-amber-400">
+            histórico={historicalRisks?.length ?? 'nil'} · corto={shortTermRisks?.length ?? 'nil'} · mediano={midTermRisks?.length ?? 'nil'} · largo={longTermRisks?.length ?? 'nil'}
+          </p>
+          <p className="text-[10px] text-amber-500 dark:text-amber-500 mt-1">Ver normalizeRisks() → campo period</p>
+        </div>
+      );
+    }
+    return null;
+  }
 
   const narrativeMap = {
     historico:     narrativeReport?.historicalNarrative,

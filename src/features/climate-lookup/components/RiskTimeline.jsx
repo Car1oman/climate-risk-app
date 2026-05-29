@@ -85,7 +85,12 @@ function TimelineNode({ nodeConfig, narrative, isLast }) {
 
 function RiskTimelineRow({ timeline, activeScenario }) {
   const meta = RISK_TYPE_DISPLAY[timeline.riskType];
-  if (!meta) return null;
+  if (!meta) {
+    if (import.meta.env.DEV) {
+      console.warn(`[RiskTimelineRow] riskType desconocido: "${timeline.riskType}" — agregar a RISK_TYPE_DISPLAY.`);
+    }
+    return null;
+  }
 
   // Only render rows that span at least 2 temporal periods
   const presentPeriods = PERIOD_ORDER.filter(p => timeline[p] != null);
@@ -129,7 +134,12 @@ function RiskTimelineRow({ timeline, activeScenario }) {
 // ─── Main component ────────────────────────────────────────────────────────────
 
 export default function RiskTimeline({ timelineRisks, activeScenario }) {
-  if (!timelineRisks?.length) return null;
+  if (!timelineRisks?.length) {
+    if (import.meta.env.DEV && timelineRisks == null) {
+      console.warn('[RiskTimeline] timelineRisks es null/undefined — verificar useClimateAnalysis → groupByRiskType().');
+    }
+    return null;
+  }
 
   // Only include risk types that span at least 2 temporal periods
   const multiPeriodTimelines = timelineRisks.filter(t => {
