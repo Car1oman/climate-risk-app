@@ -58,8 +58,8 @@ export default function ClimateRiskLookup() {
   const [tileLayer,      setTileLayer]      = useState("osm");
   const [markerPos,      setMarkerPos]      = useState(null);
   const [flyTarget,      setFlyTarget]      = useState(null);
-  // Shared temporal period — drives ExecutiveSummaryCard, RiskPeriodTabs, AdaptationPanel
-  const [selectedPeriod,  setSelectedPeriod]  = useState("historico");
+  // Shared temporal period — null until RiskPeriodTabs resolves first available from data
+  const [selectedPeriod,  setSelectedPeriod]  = useState(null);
   // Shared emission scenario — drives RiskTimeline + RiskPeriodTabs + ExecutiveSummaryCard
   const [activeScenario,  setActiveScenario]  = useState("emisiones_moderadas");
 
@@ -104,7 +104,6 @@ export default function ClimateRiskLookup() {
     if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) { toast.error("Longitud inválida"); return; }
     setMarkerPos([latNum, lngNum]);
     setFlyTarget({ pos: [latNum, lngNum], zoom: 14 });
-    setSelectedPeriod("historico");
     setActiveScenario("emisiones_moderadas");
     await analyze({ lat: latNum, lon: lngNum });
   }, [lat, lng, analyze]);
