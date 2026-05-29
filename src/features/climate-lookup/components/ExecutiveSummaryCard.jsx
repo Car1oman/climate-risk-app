@@ -44,11 +44,10 @@ export function getTopImpactsWithScenario(risks, activeScenario) {
   return result;
 }
 
-// Period-filtered unique risks (no riskType duplicates within the period)
-export function getPeriodRisks(consolidatedRisks, selectedPeriod, fallbackRisks) {
-  if (!consolidatedRisks?.length) return fallbackRisks ?? [];
-  const filtered = consolidatedRisks.filter(r => r.period === selectedPeriod);
-  return filtered.length > 0 ? filtered : (fallbackRisks ?? []);
+// Period-filtered unique risks — returns [] when period is null/unset or has no data
+export function getPeriodRisks(consolidatedRisks, selectedPeriod) {
+  if (!consolidatedRisks?.length || selectedPeriod == null) return [];
+  return consolidatedRisks.filter(r => r.period === selectedPeriod);
 }
 
 // Top confidence from a risk list, scenario-aware
@@ -73,7 +72,7 @@ export function getPeriodConfidence(risks, activeScenario) {
 export default function ExecutiveSummaryCard({
   narrativeReport,
   consolidatedRisks,
-  selectedPeriod = 'historico',
+  selectedPeriod,
   activeScenario = 'emisiones_moderadas',
 }) {
   if (!narrativeReport) {
@@ -85,8 +84,8 @@ export default function ExecutiveSummaryCard({
 
   const { sectorLabel, locationLabel, analysisDate } = narrativeReport;
 
-  // 1. Period-specific risks (fallback to all risks for pill display)
-  const periodRisks = getPeriodRisks(consolidatedRisks, selectedPeriod, narrativeReport.risks);
+  // 1. Period-specific risks — empty when period is null/unset
+  const periodRisks = getPeriodRisks(consolidatedRisks, selectedPeriod);
 
   // 2. Unique risk pills for the current period
   const uniqueRisks = periodRisks.filter(
