@@ -92,8 +92,16 @@ export default function ExecutiveSummaryCard({
     (r, i, arr) => arr.findIndex(x => x.riskType === r.riskType) === i
   );
 
-  // 3. Brief overview narrative — executiveSummary (cross-period overview, not duplicated in RiskPeriodSection)
-  const briefNarrative = narrativeReport.executiveSummary || null;
+  // 3. Brief narrative — period-specific when selectedPeriod is set, executiveSummary otherwise
+  const PERIOD_NARRATIVE_MAP = {
+    historico:     narrativeReport.historicalNarrative,
+    corto_plazo:   narrativeReport.nearTermNarrative,
+    mediano_plazo: narrativeReport.midTermNarrative,
+    largo_plazo:   narrativeReport.longTermNarrative,
+  };
+  const briefNarrative = (selectedPeriod && PERIOD_NARRATIVE_MAP[selectedPeriod])
+    || narrativeReport.executiveSummary
+    || null;
 
   // 4. Top adaptation action from the current period
   const topAction = getTopAction(periodRisks);
@@ -183,7 +191,7 @@ export default function ExecutiveSummaryCard({
           </div>
         )}
 
-        {/* 2 — Visión general (executiveSummary — no duplica narrativa de RiskPeriodSection) */}
+        {/* 2 — Narrativa del período seleccionado (o executiveSummary si no hay período) */}
         {briefNarrative && (
           <p className="text-sm leading-relaxed text-foreground border-l-2 border-primary/30 pl-4 py-0.5">
             {briefNarrative}

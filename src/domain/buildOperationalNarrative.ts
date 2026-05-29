@@ -77,6 +77,26 @@ const LONG_TERM_PROJECTION_HIGH: Record<string, string> = {
   inundacion:       'exposición elevada y recurrente a inundaciones con daños estructurales frecuentes',
 };
 
+const SHORT_TERM_PROJECTION: Record<string, string> = {
+  lluvias_extremas: 'mayor frecuencia de lluvias intensas',
+  calor_extremo:    'temperaturas más elevadas con mayor frecuencia de episodios cálidos',
+  sequia:           'períodos de déficit hídrico más frecuentes',
+  deslizamiento:    'mayor susceptibilidad a movimientos de terreno',
+  heladas:          'variabilidad en la intensidad de heladas',
+  fenomeno_enso:    'variabilidad climática interanual incrementada',
+  inundacion:       'mayor probabilidad de inundaciones y desbordes',
+};
+
+const SHORT_TERM_PROJECTION_HIGH: Record<string, string> = {
+  lluvias_extremas: 'mayor frecuencia e intensidad de lluvias extremas',
+  calor_extremo:    'temperaturas significativamente más elevadas con mayor frecuencia de eventos extremos',
+  sequia:           'déficit hídrico más acentuado y frecuente',
+  deslizamiento:    'mayor riesgo de inestabilidad de laderas y movimientos de terreno',
+  heladas:          'mayor variabilidad e intensidad en episodios de heladas',
+  fenomeno_enso:    'mayor variabilidad climática con eventos El Niño / La Niña más frecuentes e intensos',
+  inundacion:       'mayor exposición a inundaciones y eventos de desborde',
+};
+
 // ─── Additional impacts under high-emissions scenario ─────────────────────────
 
 const HIGH_EMISSION_EXTRA_IMPACTS: Record<string, string[]> = {
@@ -260,6 +280,16 @@ function buildScenarioNarrativeText(
       ? 'Bajo un escenario de altas emisiones a largo plazo, se proyecta'
       : 'A largo plazo, bajo emisiones moderadas, se proyecta';
     return `${lead} ${phrase ?? riskType}, con afectación sobre la infraestructura y las operaciones.`;
+  }
+
+  if (period === 'corto_plazo') {
+    const phrase = scenario === 'altas_emisiones'
+      ? SHORT_TERM_PROJECTION_HIGH[riskType]
+      : SHORT_TERM_PROJECTION[riskType];
+    const lead = scenario === 'altas_emisiones'
+      ? 'Bajo altas emisiones, en el corto plazo se anticipa'
+      : 'En el corto plazo, bajo emisiones moderadas, se anticipa';
+    return `${lead} ${phrase ?? riskType}.`;
   }
 
   return '';

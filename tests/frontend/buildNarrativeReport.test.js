@@ -668,3 +668,103 @@ describe('NarrativeReport — scenarioVariants field presence (regression)', () 
     assert.deepEqual(resultRisk.scenarioVariants, variants, 'scenarioVariants must be preserved in the report');
   });
 });
+
+// ─── I-3 fix: corto_plazo scenario narratives ────────────────────────────────
+// Mirrors the SHORT_TERM_PROJECTION / SHORT_TERM_PROJECTION_HIGH pattern
+// added to buildOperationalNarrative.ts.  These inline copies validate the
+// architectural contract without importing the TypeScript module.
+
+const SHORT_TERM_PROJ_MOD = {
+  lluvias_extremas: 'mayor frecuencia de lluvias intensas',
+  calor_extremo:    'temperaturas más elevadas con mayor frecuencia de episodios cálidos',
+  sequia:           'períodos de déficit hídrico más frecuentes',
+};
+
+const SHORT_TERM_PROJ_HIGH = {
+  lluvias_extremas: 'mayor frecuencia e intensidad de lluvias extremas',
+  calor_extremo:    'temperaturas significativamente más elevadas con mayor frecuencia de eventos extremos',
+  sequia:           'déficit hídrico más acentuado y frecuente',
+};
+
+function buildScenarioNarrativeTextCorto(riskType, period, scenario) {
+  if (period === 'historico') return '';
+  if (period === 'mediano_plazo') {
+    const phrase = scenario === 'altas_emisiones' ? MID_TERM_PROJ_HIGH[riskType] : MID_TERM_PROJ_MOD[riskType];
+    const lead = scenario === 'altas_emisiones'
+      ? 'Bajo altas emisiones, hacia mediados de siglo esta zona podría experimentar'
+      : 'Hacia mediados de siglo, bajo emisiones moderadas, esta zona podría experimentar';
+    return `${lead} ${phrase ?? riskType}.`;
+  }
+  if (period === 'largo_plazo') {
+    const phrase = scenario === 'altas_emisiones' ? LONG_TERM_PROJ_HIGH[riskType] : LONG_TERM_PROJ_MOD[riskType];
+    const lead = scenario === 'altas_emisiones'
+      ? 'Bajo un escenario de altas emisiones a largo plazo, se proyecta'
+      : 'A largo plazo, bajo emisiones moderadas, se proyecta';
+    return `${lead} ${phrase ?? riskType}, con afectación sobre la infraestructura y las operaciones.`;
+  }
+  if (period === 'corto_plazo') {
+    const phrase = scenario === 'altas_emisiones' ? SHORT_TERM_PROJ_HIGH[riskType] : SHORT_TERM_PROJ_MOD[riskType];
+    const lead = scenario === 'altas_emisiones'
+      ? 'Bajo altas emisiones, en el corto plazo se anticipa'
+      : 'En el corto plazo, bajo emisiones moderadas, se anticipa';
+    return `${lead} ${phrase ?? riskType}.`;
+  }
+  return '';
+}
+
+describe('buildScenarioVariants — corto_plazo scenario narratives (I-3 fix)', () => {
+  it('corto_plazo moderate narrative is non-empty', () => {
+    const text = buildScenarioNarrativeTextCorto('lluvias_extremas', 'corto_plazo', 'emisiones_moderadas');
+    assert.ok(text.length > 10, 'corto_plazo moderate narrative must not be empty (was always "" before fix)');
+  });
+
+  it('corto_plazo high-emissions narrative is non-empty', () => {
+    const text = buildScenarioNarrativeTextCorto('lluvias_extremas', 'corto_plazo', 'altas_emisiones');
+    assert.ok(text.length > 10, 'corto_plazo high narrative must not be empty');
+  });
+
+  it('corto_plazo moderate uses "En el corto plazo" lead', () => {
+    const text = buildScenarioNarrativeTextCorto('sequia', 'corto_plazo', 'emisiones_moderadas');
+    assert.ok(
+      text.toLowerCase().includes('corto plazo'),
+      'Must include "corto plazo" — not mid/long temporal framing'
+    );
+    assert.ok(text.toLowerCase().includes('moderadas'), 'Must mention emisiones moderadas');
+  });
+
+  it('corto_plazo high uses "altas emisiones" lead', () => {
+    const text = buildScenarioNarrativeTextCorto('calor_extremo', 'corto_plazo', 'altas_emisiones');
+    assert.ok(text.toLowerCase().includes('altas emisiones'), 'Must mention altas emisiones');
+    assert.ok(text.toLowerCase().includes('corto plazo'), 'Must include "corto plazo" horizon');
+  });
+
+  it('corto_plazo moderate and high produce different texts', () => {
+    const mod  = buildScenarioNarrativeTextCorto('lluvias_extremas', 'corto_plazo', 'emisiones_moderadas');
+    const high = buildScenarioNarrativeTextCorto('lluvias_extremas', 'corto_plazo', 'altas_emisiones');
+    assert.notEqual(mod, high, 'Scenarios must produce different narratives for corto_plazo');
+  });
+
+  it('corto_plazo does NOT use mediados de siglo framing', () => {
+    const text = buildScenarioNarrativeTextCorto('sequia', 'corto_plazo', 'emisiones_moderadas');
+    assert.ok(!text.includes('mediados de siglo'), 'corto_plazo must not use mid-century framing');
+    assert.ok(!text.includes('largo plazo'), 'corto_plazo must not use long-term framing');
+  });
+
+  it('historico still returns empty string (no regression)', () => {
+    assert.equal(buildScenarioNarrativeTextCorto('lluvias_extremas', 'historico', 'emisiones_moderadas'), '');
+    assert.equal(buildScenarioNarrativeTextCorto('lluvias_extremas', 'historico', 'altas_emisiones'), '');
+  });
+
+  it('mediano_plazo still uses mid-century framing (no regression)', () => {
+    const text = buildScenarioNarrativeTextCorto('lluvias_extremas', 'mediano_plazo', 'emisiones_moderadas');
+    assert.ok(text.includes('mediados de siglo'), 'mediano_plazo must still use mid-century framing');
+  });
+
+  it('largo_plazo still uses long-term framing (no regression)', () => {
+    const text = buildScenarioNarrativeTextCorto('sequia', 'largo_plazo', 'emisiones_moderadas');
+    assert.ok(
+      text.includes('largo plazo') || text.includes('A largo'),
+      'largo_plazo must still use long-term framing'
+    );
+  });
+});
