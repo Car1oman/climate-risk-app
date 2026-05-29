@@ -76,7 +76,7 @@ function TimelineNode({ nodeConfig, narrative, isLast }) {
           </span>
         </div>
         {narrative && (
-          <p className="text-[11px] text-muted-foreground leading-relaxed mt-1">{narrative}</p>
+          <p className="text-[11px] text-muted-foreground leading-snug mt-1 line-clamp-2">{narrative}</p>
         )}
       </div>
     </div>

@@ -8,13 +8,6 @@ const CONFIDENCE_CONFIG = {
   baja:  { label: 'Baja confianza',  dot: 'bg-rose-500',    text: 'text-rose-600 dark:text-rose-400'       },
 };
 
-const PERIOD_NARRATIVE_KEY = {
-  historico:     'historicalNarrative',
-  corto_plazo:   'nearTermNarrative',
-  mediano_plazo: 'midTermNarrative',
-  largo_plazo:   'longTermNarrative',
-};
-
 const PERIOD_LABEL = {
   historico:     'Período histórico',
   corto_plazo:   'Proyección 2020–2039',
@@ -100,20 +93,13 @@ export default function ExecutiveSummaryCard({
     (r, i, arr) => arr.findIndex(x => x.riskType === r.riskType) === i
   );
 
-  // 3. Period-specific narrative (historical / midTerm / longTerm)
-  const narrativeKey = PERIOD_NARRATIVE_KEY[selectedPeriod];
-  if (import.meta.env.DEV && !narrativeKey) {
-    console.warn(`[ExecutiveSummaryCard] Unknown selectedPeriod "${selectedPeriod}". Known: ${Object.keys(PERIOD_NARRATIVE_KEY).join(', ')}.`);
-  }
-  const periodNarrative = (narrativeKey && narrativeReport[narrativeKey]) || narrativeReport.executiveSummary;
+  // 3. Brief overview narrative — executiveSummary (cross-period overview, not duplicated in RiskPeriodSection)
+  const briefNarrative = narrativeReport.executiveSummary || null;
 
-  // 4. Scenario-aware top impacts
-  const topImpacts = getTopImpactsWithScenario(periodRisks, activeScenario);
-
-  // 5. Top adaptation action from the current period
+  // 4. Top adaptation action from the current period
   const topAction = getTopAction(periodRisks);
 
-  // 6. Period + scenario confidence
+  // 5. Period + scenario confidence
   const periodConf = periodRisks.length
     ? getPeriodConfidence(periodRisks, activeScenario)
     : (narrativeReport.confidence ?? 'baja');
@@ -198,31 +184,14 @@ export default function ExecutiveSummaryCard({
           </div>
         )}
 
-        {/* 2 — Qué podría pasar (period-specific narrative) */}
-        {periodNarrative && (
+        {/* 2 — Visión general (executiveSummary — no duplica narrativa de RiskPeriodSection) */}
+        {briefNarrative && (
           <p className="text-sm leading-relaxed text-foreground border-l-2 border-primary/30 pl-4 py-0.5">
-            {periodNarrative}
+            {briefNarrative}
           </p>
         )}
 
-        {/* 3 — Impactos operativos top (scenario-aware) */}
-        {topImpacts.length > 0 && (
-          <div className="rounded-lg bg-secondary/50 border border-border/60 px-3 py-2.5 space-y-1.5">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-              Posibles afectaciones
-            </p>
-            <ul className="space-y-0.5">
-              {topImpacts.map((impact, i) => (
-                <li key={i} className="text-xs text-foreground/75 flex items-start gap-2">
-                  <span className="text-muted-foreground/60 flex-shrink-0 mt-0.5" aria-hidden="true">–</span>
-                  {impact}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* 4 — Qué hacer (period-specific top action) */}
+        {/* 3 — Acción prioritaria del período */}
         {topAction && (
           <div className="flex items-start gap-2.5 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-2.5">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" aria-hidden="true" />
