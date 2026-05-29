@@ -3,6 +3,16 @@
  * Mapea señales climáticas a impactos operacionales por sector,
  * calcula exposure_level, sensitivity_level y financial_impact_range.
  */
+import Anthropic from '@anthropic-ai/sdk';
+
+let _anthropic = null;
+function getAnthropicClient() {
+  if (_anthropic) return _anthropic;
+  const opts = { apiKey: process.env.ANTHROPIC_API_KEY };
+  if (process.env.ANTHROPIC_BASE_URL) opts.baseURL = process.env.ANTHROPIC_BASE_URL;
+  _anthropic = new Anthropic(opts);
+  return _anthropic;
+}
 
 // ─── Tabla de impactos operacionales por señal × sector ─────────────────────
 // Basada en catálogo documental de análisis de riesgo climático para Intercorp Retail
@@ -29,7 +39,7 @@ const OPERATIONAL_IMPACTS = {
     otros:          ['Restricción hídrica operativa', 'Riesgo en procesos que requieren agua'],
   },
   extreme_rain: {
-    retail:         ['Inundación de almacenes y tiendas', 'Interrupción logística', 'Daño a inventario'],
+    retail:         ['Inundación de almacenes y tiendas', 'Interrupción logística', 'Daño a inventario', 'Daños estructurales más frecuentes y costosos'],
     educacion:      ['Daño a infraestructura educativa', 'Suspensión de clases', 'Riesgo acceso a instalaciones'],
     salud:          ['Interrupción acceso a centros de salud', 'Daño a equipos médicos', 'Riesgo contaminación'],
     entretenimiento:['Cancelación de eventos', 'Daño a instalaciones', 'Riesgo para visitantes'],
@@ -43,7 +53,7 @@ const OPERATIONAL_IMPACTS = {
     otros:          ['↑ costos energéticos estructurales', 'Adaptación de procesos operativos'],
   },
   flood_risk: {
-    retail:         ['Interrupción operativa por inundación', 'Daño a infraestructura y equipos', 'Riesgo logístico y de acceso'],
+    retail:         ['Interrupción operativa por inundación', 'Daño a infraestructura y equipos', 'Riesgo logístico y de acceso', 'Daños estructurales más frecuentes y costosos'],
     educacion:      ['Daño estructural a instalaciones', 'Interrupción del servicio educativo'],
     salud:          ['Interrupción crítica de servicios de salud', 'Daño a equipos médicos de alto valor'],
     entretenimiento:['Daño a instalaciones recreativas', 'Cancelación prolongada de operaciones'],
@@ -230,6 +240,8 @@ export async function assessBusinessRisk(signalOutput, { sector, asset_type = nu
 }
 
 async function generateImpactsViaAI(signal, sectorKey, docContext) {
+  if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
+
   const signalType  = signal.signalType  ?? 'unknown';
   const signalLabel = signal.signalLabel ?? signalType;
   const horizon     = signal.horizon     ?? 'corto_plazo';
@@ -245,16 +257,16 @@ Formato de respuesta (JSON válido):
 }
 Responde SOLO con el JSON. Máximo 4 impactos. Cada impacto debe ser una frase específica y accionable, sin jerga técnica científica.`;
 
-  const res = await fetch(process.env.AI_ENDPOINT || 'http://localhost:3001/api/ai', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt }),
+  const client = getAnthropicClient();
+  const model  = process.env.AI_MODEL || 'openrouter/free';
+
+  const result = await client.messages.create({
+    model,
+    messages: [{ role: 'user', content: prompt }],
+    max_tokens: 512,
   });
 
-  if (!res.ok) throw new Error(`AI request failed: ${res.status}`);
-
-  const data = await res.json();
-  const text = typeof data === 'string' ? data : (data.response ?? '{}');
+  const text = result.content.find(b => b.type === 'text')?.text ?? '{}';
   const parsed = JSON.parse(text);
 
   if (!Array.isArray(parsed.impacts) || parsed.impacts.length === 0) throw new Error('AI returned empty impacts');
