@@ -16,6 +16,7 @@ import { getGriRiskByLocation } from '../services/griRiskService.js';
 import { getTerritorialContext } from '../services/worldBankService.js';
 import { supabase } from '../supabaseClient.js';
 import { climateCache, CACHE_TTL } from '../shared/cache.js';
+import { getDocumentosEnrichment } from '../services/documentosEnrichmentService.js';
 
 // ── Fase 2: Backend Layers ────────────────────────────────────────────────────
 import { fusionClimateData }    from '../layers/Layer1_ClimateDataFusion.js';
@@ -673,10 +674,18 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
       signalOutput = { signals: [], signals_count: 0, dominant_signal: null };
     }
 
+    // ── Contexto documental (opcional, no bloqueante) ─────────────────────────
+    let docContext;
+    try {
+      docContext = await getDocumentosEnrichment();
+    } catch {
+      docContext = null;
+    }
+
     // ── Capa 3: Evaluación de riesgo de negocio ─────────────────────────────
     let businessRiskOutput;
     try {
-      businessRiskOutput = assessBusinessRisk(signalOutput, { sector, asset_type });
+      businessRiskOutput = await assessBusinessRisk(signalOutput, { sector, asset_type, docContext });
       partialResult.layer3 = 'ok';
     } catch (err) {
       console.error('[v2] Layer3 falló:', err.message);
@@ -702,7 +711,7 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
             transformation: trace.transformation_applied ?? null,
           },
           scenario: trace.scenario_ssp ?? (fusedData.scenario ? String(fusedData.scenario).toUpperCase() : null),
-          provenance: {
+          provenance: risk.provenance ?? {
             source_origin: trace.source_origin ?? null,
             responsible_endpoint: trace.responsible_endpoint ?? null,
             climate_model_badge: trace.climate_model_badge ?? null,
@@ -793,6 +802,11 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
           .filter(([k, v]) => v === true)
           .map(([k]) => k),
         layers_status: partialResult,
+        document_context: docContext ? {
+          total:      docContext.total,
+          categories: Object.keys(docContext.by_category ?? {}),
+        } : null,
+        provenance: narrativeOutput.generated_from,
         ...(Object.keys(errors).length > 0 ? { layer_errors: errors } : {}),
       },
     });

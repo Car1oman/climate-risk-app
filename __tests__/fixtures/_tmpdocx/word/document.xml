@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>Informe de Riesgos Operativos</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Region: Ica - Sector: Agricultura</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Riesgo principal: Estres hidrico por sequia prolongada</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Fuente: WRI Aqueduct 4.0 / SENAMHI</w:t></w:r></w:p>
+    <w:p><w:r><w:br/><w:t>Impacto: -30% rendimiento</w:t></w:r></w:p>
+  </w:body>
+</w:document>

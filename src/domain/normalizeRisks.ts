@@ -280,6 +280,11 @@ export function normalizeRisks(apiResponse: Record<string, unknown>): Consolidat
       entry.impacts = dedupeStrings([...entry.impacts, ...impacts]);
     }
 
+    const provenance = risk['provenance'] as string | undefined;
+    if (provenance && !entry.provenance) {
+      entry.provenance = provenance;
+    }
+
     if (!entry.rawSources.includes('risks')) entry.rawSources.push('risks');
   }
 

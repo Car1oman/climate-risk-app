@@ -176,35 +176,91 @@ function calcSensitivityLevel(sectorKey, asset_type) {
 /**
  * Función principal exportada.
  * @param {Object} signalOutput - Output de Layer 2
- * @param {Object} params - { sector, asset_type? }
- * @returns {{ risks: Array, overall_exposure: string }}
+ * @param {Object} params - { sector, asset_type?, docContext? }
+ * @returns {Promise<{ risks: Array, overall_exposure: string }>}
  */
-export function assessBusinessRisk(signalOutput, { sector, asset_type = null }) {
+export async function assessBusinessRisk(signalOutput, { sector, asset_type = null, docContext = null }) {
   const { signals } = signalOutput;
   const sectorKey = normalizeSector(sector);
 
-  const risks = signals.map(signal => {
-    const impacts = OPERATIONAL_IMPACTS[signal.signalType]?.[sectorKey]
-      ?? OPERATIONAL_IMPACTS[signal.signalType]?.otros
-      ?? ['Impacto operacional no especificado'];
+  const hasDocs = docContext?.by_category?.impacto?.length > 0
+               || docContext?.by_category?.riesgo?.length > 0;
+
+  const risks = [];
+  for (const signal of signals) {
+    let impacts;
+    let provenanceLabel = 'Catálogo interno de referencia';
+
+    if (hasDocs) {
+      try {
+        const aiResult = await generateImpactsViaAI(signal, sectorKey, docContext);
+        impacts = aiResult.impacts;
+        provenanceLabel = aiResult.provenance;
+      } catch {
+        impacts = OPERATIONAL_IMPACTS[signal.signalType]?.[sectorKey]
+               ?? OPERATIONAL_IMPACTS[signal.signalType]?.otros
+               ?? ['Impacto operacional no especificado'];
+      }
+    } else {
+      impacts = OPERATIONAL_IMPACTS[signal.signalType]?.[sectorKey]
+             ?? OPERATIONAL_IMPACTS[signal.signalType]?.otros
+             ?? ['Impacto operacional no especificado'];
+    }
 
     const financialRange = FINANCIAL_RANGES[signal.signalType]?.[sectorKey]
       ?? FINANCIAL_RANGES[signal.signalType]?.otros
       ?? { min_usd: 0, max_usd: 0 };
 
-    return {
+    risks.push({
       signal,
-      source_traceability:   signal.source_traceability ?? null,
-      operational_impacts:   impacts,
-      exposure_level:        calcExposureLevel([signal]),
-      sensitivity_level:     calcSensitivityLevel(sectorKey, asset_type),
+      source_traceability:    signal.source_traceability ?? null,
+      operational_impacts:    impacts,
+      exposure_level:         calcExposureLevel([signal]),
+      sensitivity_level:      calcSensitivityLevel(sectorKey, asset_type),
       financial_impact_range: financialRange,
-    };
-  });
+      provenance:             provenanceLabel,
+    });
+  }
 
   return {
     risks,
     overall_exposure: calcExposureLevel(signals),
     sector_key:       sectorKey,
+  };
+}
+
+async function generateImpactsViaAI(signal, sectorKey, docContext) {
+  const signalType  = signal.signalType  ?? 'unknown';
+  const signalLabel = signal.signalLabel ?? signalType;
+  const horizon     = signal.horizon     ?? 'corto_plazo';
+  const docSection  = docContext?.ai_context ?? '';
+
+  const prompt = `Eres un analista de riesgos climáticos. Basándote exclusivamente en los documentos de referencia disponibles, genera impactos operativos concretos para el sector "${sectorKey}" ante la señal climática "${signalLabel}" (horizonte: ${horizon}).
+Documentos de referencia:
+${docSection}
+Formato de respuesta (JSON válido):
+{
+  "impacts": ["impacto 1", "impacto 2", "impacto 3"],
+  "provenance": "Generado a partir de documentos de referencia: [nombre_docs]"
+}
+Responde SOLO con el JSON. Máximo 4 impactos. Cada impacto debe ser una frase específica y accionable, sin jerga técnica científica.`;
+
+  const res = await fetch(process.env.AI_ENDPOINT || 'http://localhost:3001/api/ai', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt }),
+  });
+
+  if (!res.ok) throw new Error(`AI request failed: ${res.status}`);
+
+  const data = await res.json();
+  const text = typeof data === 'string' ? data : (data.response ?? '{}');
+  const parsed = JSON.parse(text);
+
+  if (!Array.isArray(parsed.impacts) || parsed.impacts.length === 0) throw new Error('AI returned empty impacts');
+
+  return {
+    impacts:    parsed.impacts.slice(0, 4),
+    provenance: parsed.provenance ?? 'Generado con IA a partir de documentos de referencia',
   };
 }

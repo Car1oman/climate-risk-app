@@ -100,6 +100,8 @@ export interface ConsolidatedRisk {
   adaptationMeasures: AdaptationSummary[];
   /** Internal: which API sources contributed to this entry. */
   rawSources: ('signals' | 'risks' | 'gri')[];
+  /** Provenance label from Layer3 (e.g. "Catálogo interno de referencia" or IA-generated). */
+  provenance?: string;
   /**
    * Per-scenario variants for projection periods (mediano_plazo, largo_plazo).
    * Empty object for 'historico'.  Populated by normalizeRisks() via

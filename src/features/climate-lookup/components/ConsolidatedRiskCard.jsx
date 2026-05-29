@@ -64,6 +64,11 @@ export default function ConsolidatedRiskCard({ risk, activeScenario }) {
             Respaldado por {evidenceCount} fuente{evidenceCount !== 1 ? 's' : ''} científica{evidenceCount !== 1 ? 's' : ''}
           </p>
         )}
+        {risk.provenance && (
+          <p className="text-[10px] text-muted-foreground/50 italic mt-1">
+            Basado en {risk.provenance}
+          </p>
+        )}
       </div>
 
       {/* Expandable: impactos + adaptaciones (sin métricas crudas) */}
