@@ -38,7 +38,7 @@ export default function ConsolidatedRiskCard({ risk, activeScenario }) {
   const evidenceCount = risk.evidence?.length ?? 0;
 
   return (
-    <div className={`rounded-xl border ${meta.borderColor} ${meta.bgColor} overflow-hidden`}>
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
       {/* Main visible section */}
       <div className="p-4 space-y-2.5">
 
