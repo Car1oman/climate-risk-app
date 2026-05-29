@@ -39,28 +39,12 @@ function collectMeasures(risks) {
   );
 }
 
-/**
- * AdaptationPanel — Sprint 22.
- * Period-aware: prioritizes measures from the selected period's risks.
- * Falls back to all risks when the selected period has fewer than 2 measures.
- *
- * @param {ConsolidatedRisk[]} consolidatedRisks
- * @param {string}             selectedPeriod
- */
 export default function AdaptationPanel({ consolidatedRisks, selectedPeriod }) {
   if (!consolidatedRisks?.length) return null;
+  if (!selectedPeriod) return null;
 
-  // Collect measures from the selected period first
-  const periodRisks = selectedPeriod
-    ? consolidatedRisks.filter(r => r.period === selectedPeriod)
-    : consolidatedRisks;
-
-  const periodMeasures = collectMeasures(periodRisks);
-
-  // Supplement with all-period measures if period-specific ones are too few
-  const measures = periodMeasures.length >= 2
-    ? periodMeasures
-    : collectMeasures(consolidatedRisks);
+  const periodRisks = consolidatedRisks.filter(r => r.period === selectedPeriod);
+  const measures = collectMeasures(periodRisks);
 
   if (!measures.length) {
     if (import.meta.env.DEV) {
