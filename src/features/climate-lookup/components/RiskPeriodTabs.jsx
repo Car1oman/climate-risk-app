@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import RiskPeriodSection from "./RiskPeriodSection";
 
 const PERIOD_TABS = [
@@ -53,6 +53,14 @@ export default function RiskPeriodTabs({
     const keys = available.map(t => t.key);
     return keys.includes(selectedPeriod) ? selectedPeriod : keys[0];
   }, [available, selectedPeriod]);
+
+  // Sync parent when activeTab was corrected (selectedPeriod not in available).
+  // Runs only when activeTab or selectedPeriod changes; condition prevents loop.
+  useEffect(() => {
+    if (activeTab !== null && activeTab !== selectedPeriod) {
+      onPeriodChange?.(activeTab);
+    }
+  }, [activeTab, selectedPeriod, onPeriodChange]);
 
   if (!available.length) {
     if (import.meta.env.DEV) {
