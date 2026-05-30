@@ -1,0 +1,17 @@
+{
+  "name": "Intercorp Retail - Clima",
+  "short_name": "Climate Risk",
+  "description": "Climate risk assessment for Intercorp Retail",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#16150f",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
