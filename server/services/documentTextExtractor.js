@@ -10,6 +10,8 @@ import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 
 const MAX_CHARS_PER_DOC = 3_000;
+// Sin límite (0) para la ruta de indexación de embeddings
+const NO_LIMIT = 0;
 
 /**
  * Extrae texto de un buffer PDF.
@@ -64,9 +66,10 @@ async function extractDocx(buffer) {
  *
  * @param {Buffer} buffer        - Contenido del archivo
  * @param {string} tipo          - 'pdf' | 'xlsx' | 'xls' | 'docx' | 'doc'
+ * @param {number} maxChars      - Límite de caracteres (0 = sin límite)
  * @returns {Promise<string>}    - Texto extraído (vacío si no se pudo extraer)
  */
-export async function extractText(buffer, tipo) {
+export async function extractText(buffer, tipo, maxChars = MAX_CHARS_PER_DOC) {
   try {
     let text = '';
 
@@ -95,11 +98,21 @@ export async function extractText(buffer, tipo) {
       .replace(/\n{3,}/g, '\n\n')
       .trim();
 
-    return cleaned.length > MAX_CHARS_PER_DOC
-      ? cleaned.slice(0, MAX_CHARS_PER_DOC) + '\n[...truncado...]'
+    return (maxChars > 0 && cleaned.length > maxChars)
+      ? cleaned.slice(0, maxChars) + '\n[...truncado...]'
       : cleaned;
   } catch (err) {
     console.warn(`[extractText] Error extrayendo texto (${tipo}):`, err.message);
     return '';
   }
+}
+
+/**
+ * Extrae el texto completo sin truncado — usado para indexación de embeddings.
+ * @param {Buffer} buffer
+ * @param {string} tipo
+ * @returns {Promise<string>}
+ */
+export async function extractTextFull(buffer, tipo) {
+  return extractText(buffer, tipo, NO_LIMIT);
 }

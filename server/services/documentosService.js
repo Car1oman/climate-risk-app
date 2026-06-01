@@ -14,6 +14,8 @@
  *   ALTER TABLE archivos ADD COLUMN IF NOT EXISTS categoria TEXT;
  */
 import { supabase } from '../supabaseClient.js';
+import { extractTextFull } from './documentTextExtractor.js';
+import { indexDocument } from './documentEmbeddingService.js';
 
 // ── Constantes ──────────────────────────────────────────────────────────────
 
@@ -216,6 +218,25 @@ const uploadDocumento = async (file, descripcion, categoria) => {
   }
 
   console.log(`✅ Documento subido: ${nombreNorm} (${(file.size / 1024).toFixed(1)} KB)`);
+
+  // Indexación semántica en background — no bloquea la respuesta HTTP
+  setImmediate(async () => {
+    try {
+      const fullText = await extractTextFull(file.buffer, tipo);
+      if (fullText.trim()) {
+        const titulo = descripcion?.trim() || nombreNorm.replace(/[._-]/g, ' ').replace(/^\d+ /, '');
+        await indexDocument(dbData.id, fullText, {
+          nombre:    nombreNorm,
+          categoria: categoria || 'informe',
+          titulo,
+          tipo,
+        });
+      }
+    } catch (err) {
+      console.warn(`[documentos] Indexación background falló para "${nombreNorm}":`, err.message);
+    }
+  });
+
   return dbData;
 };
 

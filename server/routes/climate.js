@@ -16,7 +16,10 @@ import { getGriRiskByLocation } from '../services/griRiskService.js';
 import { getTerritorialContext } from '../services/worldBankService.js';
 import { supabase } from '../supabaseClient.js';
 import { climateCache, CACHE_TTL } from '../shared/cache.js';
-import { getDocumentosEnrichment } from '../services/documentosEnrichmentService.js';
+import {
+  getDocumentosEnrichment,
+  getSemanticContext,
+} from '../services/documentosEnrichmentService.js';
 
 // ── Fase 2: Backend Layers ────────────────────────────────────────────────────
 import { fusionClimateData }    from '../layers/Layer1_ClimateDataFusion.js';
@@ -674,10 +677,20 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
       signalOutput = { signals: [], signals_count: 0, dominant_signal: null };
     }
 
-    // ── Contexto documental (opcional, no bloqueante) ─────────────────────────
+    // ── Contexto documental semántico (opcional, no bloqueante) ───────────────
+    // Construye una consulta con sector + ubicación para recuperar los chunks
+    // más relevantes vía pgvector. Si OPENAI_API_KEY no está configurada o no
+    // hay chunks indexados, usa el enriquecimiento legado (concatenación completa).
     let docContext;
     try {
-      docContext = await getDocumentosEnrichment();
+      const semanticQuery = [
+        `sector: ${sector}`,
+        `riesgos climáticos`,
+        `lat ${latNum} lon ${lonNum}`,
+      ].join(', ');
+
+      docContext = await getSemanticContext(semanticQuery, 8)
+        ?? await getDocumentosEnrichment();
     } catch {
       docContext = null;
     }
@@ -803,7 +816,8 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
           .map(([k]) => k),
         layers_status: partialResult,
         document_context: docContext ? {
-          total:      docContext.total,
+          total:      docContext.total ?? docContext.topK ?? 0,
+          mode:       docContext.mode ?? 'legacy',
           categories: Object.keys(docContext.by_category ?? {}),
         } : null,
         provenance: narrativeOutput.generated_from,

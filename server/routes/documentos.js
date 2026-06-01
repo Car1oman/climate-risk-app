@@ -6,7 +6,12 @@ import {
   deleteDocumento,
   CATEGORIAS,
 } from '../services/documentosService.js';
-import { getDocumentosEnrichment } from '../services/documentosEnrichmentService.js';
+import {
+  getDocumentosEnrichment,
+  getSemanticContext,
+} from '../services/documentosEnrichmentService.js';
+import { indexDocument } from '../services/documentEmbeddingService.js';
+import { extractTextFull } from '../services/documentTextExtractor.js';
 import { climateCache, CACHE_TTL } from '../shared/cache.js';
 import { requireAuth } from '../middleware/auth.js';
 import { strictLimiter } from '../middleware/rateLimiter.js';
@@ -83,9 +88,45 @@ router.get('/categorias', (_req, res) => {
   res.json(CATEGORIAS);
 });
 
-// GET /api/documentos/context
-// Catálogo de documentos subidos para enriquecer prompts de IA — caché 30 min
+/**
+ * GET /api/documentos/context
+ *
+ * Sin parámetros  → catálogo completo (legacy, caché 30 min).
+ * Con ?sector=, ?query=, o ?lat=&lon= → búsqueda semántica por similitud.
+ *
+ * Query params opcionales:
+ *   sector  - slug del sector (retail, agro, minería…)
+ *   lat/lon - coordenadas de la ubicación analizada
+ *   query   - texto libre adicional para la consulta semántica
+ *   topK    - cantidad de chunks a recuperar (default: 8)
+ */
 router.get('/context', async (req, res) => {
+  const { sector, lat, lon, query, topK } = req.query;
+
+  // ── Ruta semántica (cuando se proporciona contexto de consulta) ───────────
+  if (sector || query) {
+    const queryParts = [
+      sector && `sector: ${sector}`,
+      lat && lon && `ubicación lat ${lat} lon ${lon}`,
+      query,
+    ].filter(Boolean);
+
+    const queryText = queryParts.join(', ');
+    const k = parseInt(topK, 10) || 8;
+
+    const semanticCtx = await getSemanticContext(queryText, k);
+    if (semanticCtx) {
+      return res.json({
+        total:       semanticCtx.topK,
+        mode:        'semantic',
+        ai_context:  semanticCtx.ai_context,
+        by_category: {},   // shape legacy preservada para compatibilidad frontend
+      });
+    }
+    // Si OPENAI_API_KEY no está configurada o no hay chunks → fallback a legacy
+  }
+
+  // ── Ruta legacy: catálogo completo con caché 30 min ──────────────────────
   const cacheKey = 'documentos-context';
   const now = Date.now();
   const TTL_30MIN = 1000 * 60 * 30;
@@ -96,7 +137,64 @@ router.get('/context', async (req, res) => {
 
   const data = await getDocumentosEnrichment();
   if (data.total > 0) climateCache[cacheKey] = { data, timestamp: now };
-  return res.json(data); // nunca retorna 500 — los documentos son enriquecimiento opcional
+  return res.json(data); // nunca retorna 500
+});
+
+/**
+ * POST /api/documentos/reindex
+ * Re-indexa todos los documentos existentes con embeddings.
+ * Útil para migrar documentos subidos antes de activar el RAG.
+ */
+router.post('/reindex', requireAuth, strictLimiter, async (req, res) => {
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(503).json({
+      error: 'OPENAI_API_KEY no configurada — embeddings no disponibles',
+    });
+  }
+
+  const docs = await getDocumentos();
+  if (!docs.length) return res.json({ indexed: 0, failed: 0, total: 0 });
+
+  let indexed = 0;
+  let failed  = 0;
+  const errors = [];
+
+  for (const doc of docs) {
+    if (!doc.url) { failed++; continue; }
+
+    try {
+      const fetchRes = await fetch(doc.url);
+      if (!fetchRes.ok) throw new Error(`HTTP ${fetchRes.status}`);
+
+      const buffer   = Buffer.from(await fetchRes.arrayBuffer());
+      const fullText = await extractTextFull(buffer, doc.tipo);
+
+      if (!fullText.trim()) { failed++; continue; }
+
+      const titulo = doc.descripcion?.trim() ||
+        doc.nombre.replace(/[._-]/g, ' ').replace(/^\d+ /, '');
+
+      await indexDocument(doc.id, fullText, {
+        nombre:    doc.nombre,
+        categoria: doc.categoria || 'informe',
+        titulo,
+        tipo:      doc.tipo,
+      });
+
+      indexed++;
+    } catch (err) {
+      failed++;
+      errors.push({ nombre: doc.nombre, error: err.message });
+      console.warn(`[reindex] Falló "${doc.nombre}":`, err.message);
+    }
+  }
+
+  return res.json({
+    total:   docs.length,
+    indexed,
+    failed,
+    ...(errors.length ? { errors } : {}),
+  });
 });
 
 export default router;

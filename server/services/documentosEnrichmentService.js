@@ -1,5 +1,6 @@
 import { supabase } from '../supabaseClient.js';
 import { extractText } from './documentTextExtractor.js';
+import { searchSimilarChunks } from './documentEmbeddingService.js';
 
 const CATEGORY_LABELS = {
   riesgo:     'Análisis de riesgos climáticos',
@@ -36,6 +37,44 @@ async function fetchAndExtract(url, tipo) {
   } catch (err) {
     console.warn(`[documentosEnrichment] No se pudo extraer "${url}":`, err.message);
     return '';
+  }
+}
+
+/**
+ * Recupera los chunks más relevantes para un contexto de consulta usando
+ * búsqueda semántica por similitud coseno (pgvector).
+ *
+ * @param {string} queryText  Texto de la consulta: sector + ubicación + riesgos detectados
+ * @param {number} topK       Cantidad de chunks a recuperar (default: 8)
+ * @returns {Promise<{ mode: 'semantic', topK: number, ai_context: string, chunks: any[] } | null>}
+ */
+export async function getSemanticContext(queryText, topK = 8) {
+  if (!process.env.OPENAI_API_KEY) return null;
+
+  try {
+    const chunks = await searchSimilarChunks(queryText, topK);
+    if (!chunks.length) return null;
+
+    const contextLines = chunks.map((c) => {
+      const meta  = c.metadata || {};
+      const label = CATEGORY_LABELS[meta.categoria] || 'Documento de referencia';
+      const title = meta.titulo || meta.nombre || 'Documento';
+      return `[${label}: ${title}]\n${c.content}`;
+    });
+
+    const ai_context =
+      `A continuación fragmentos relevantes de documentos de referencia (recuperados por similitud semántica):\n\n` +
+      contextLines.join('\n\n');
+
+    return {
+      mode:       'semantic',
+      topK:       chunks.length,
+      ai_context,
+      chunks,
+    };
+  } catch (err) {
+    console.warn('[documentosEnrichment] Búsqueda semántica falló, usando fallback:', err.message);
+    return null;
   }
 }
 
