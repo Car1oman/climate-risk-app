@@ -7,8 +7,30 @@
  * ensoData is present. No existing narrative logic is modified.
  */
 
+import Anthropic from '@anthropic-ai/sdk';
+import { validateAIOutput }      from '../ai/scientificValidator.js';
 import { buildEnsoNarrative }    from '../services/ensoService.js';
 import { buildTerrainNarrative } from '../services/terrainService.js'; // Sprint 6
+
+let _anthropic = null;
+function getAnthropicClient() {
+  if (_anthropic) return _anthropic;
+  const opts = { apiKey: process.env.ANTHROPIC_API_KEY };
+  if (process.env.ANTHROPIC_BASE_URL) opts.baseURL = process.env.ANTHROPIC_BASE_URL;
+  _anthropic = new Anthropic(opts);
+  return _anthropic;
+}
+
+const LAYER6_SYSTEM_PROMPT = `Eres un redactor de análisis de riesgo climático científico para la plataforma DataRisk Peru.
+Tu tarea es generar resúmenes ejecutivos que sinteticen MÚLTIPLES señales climáticas co-ocurrentes en un solo párrafo coherente.
+
+REGLAS OBLIGATORIAS:
+- Usa SOLO los datos del pipeline (no inventes valores, porcentajes ni fechas).
+- No uses lenguaje determinístico: "causará", "garantiza", "inevitablemente", "con certeza".
+- No menciones cifras financieras ($, USD, S/.).
+- No uses lenguaje alarmista: "catástrofe", "colapso", "emergencia climática", "sin precedentes".
+- Responde ÚNICAMENTE con el texto del resumen (sin JSON, sin markdown, sin títulos).
+- Máximo 4 oraciones.`;
 
 // Nombres legibles de hazards GRI para el mensaje de contexto
 const GRI_HAZARD_LABELS = {
@@ -155,6 +177,25 @@ function buildMainSentence(contextualRisk, lat, lon) {
 }
 
 /**
+ * Genera oración de riesgo compuesto cuando hay múltiples señales activas simultáneas.
+ * Solo se activa con 2+ señales para evitar redundancia con buildMainSentence.
+ */
+function buildCompoundRiskSentence(signals) {
+  if (!signals || signals.length <= 1) return null;
+
+  // Excluir la señal dominante (ya cubierta en sentence1) y tomar hasta 3 adicionales
+  const secondary = signals.slice(1, 4);
+  const labels = secondary.map(s => SIGNAL_LABELS[s.signalType] ?? s.signalType);
+  if (labels.length === 0) return null;
+
+  const conjunction = labels.length === 1
+    ? labels[0]
+    : `${labels.slice(0, -1).join(', ')} y ${labels[labels.length - 1]}`;
+
+  return `Adicionalmente, el análisis detecta ${conjunction}, lo que aumenta la exposición compuesta del activo.`;
+}
+
+/**
  * Genera la segunda oración con evidencia, incertidumbre y adaptación disponible.
  */
 function buildContextSentence(contextualRisk, adaptations) {
@@ -178,6 +219,69 @@ function buildContextSentence(contextualRisk, adaptations) {
  *                            contextualRisks, adaptationOutput, sector, lat, lon }
  * @returns {{ executive_summary: string, key_metrics: Object, generated_from: Object }}
  */
+/**
+ * Mejora el executive_summary usando IA cuando hay múltiples señales.
+ * Sintetiza riesgos compuestos que la narrativa algorítmica no captura.
+ * No bloqueante: si falla, retorna narrativeOutput sin modificar.
+ *
+ * @param {Object} narrativeOutput     - Salida de generateNarrative()
+ * @param {Object} signalOutput        - Salida de detectSignals()
+ * @param {Object} businessRiskOutput  - Salida de assessBusinessRisk()
+ * @param {string} sector
+ * @returns {Promise<Object>}
+ */
+export async function enhanceNarrativeWithAI(narrativeOutput, signalOutput, businessRiskOutput, sector) {
+  if (!process.env.ANTHROPIC_API_KEY) return narrativeOutput;
+  const signals = signalOutput?.signals ?? [];
+  if (signals.length === 0) return narrativeOutput;
+
+  const signalDesc = signals
+    .map(s => {
+      const delta = s.delta != null ? `, delta +${s.delta.toFixed(1)}` : '';
+      const proj  = s.projected != null ? `, proyectado ${s.projected.toFixed(1)}` : '';
+      return `• ${s.signalType} (${s.horizon ?? 'corto_plazo'}${delta}${proj})`;
+    })
+    .join('\n');
+
+  const prompt = `Pipeline de riesgo climático — datos reales:
+
+Sector: ${sector}
+Exposición general: ${businessRiskOutput?.overall_exposure ?? 'no determinada'}
+
+Señales detectadas:
+${signalDesc}
+
+Narrativa algorítmica actual (base):
+${narrativeOutput.executive_summary}
+
+Genera un resumen ejecutivo mejorado que sintetice TODAS las señales (incluyendo riesgos compuestos si aplica).
+Responde SOLO con el texto del resumen. Sin JSON, sin markdown, sin encabezados. Máximo 4 oraciones.`;
+
+  try {
+    const client = getAnthropicClient();
+    const result = await client.messages.create({
+      model:    process.env.AI_MODEL || 'qwen/qwen3-8b:free',
+      system:   LAYER6_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 512,
+    });
+
+    const aiText = result.content.find(b => b.type === 'text')?.text?.trim() ?? '';
+    if (!aiText) return narrativeOutput;
+
+    const validation = validateAIOutput(aiText);
+    if (!validation.passed && !validation.autoFixable) {
+      console.warn('[Layer6] AI narrative violates guardrails, falling back to algorithmic');
+      return narrativeOutput;
+    }
+    const safeText = validation.autoFixable ? (validation.sanitizedText ?? aiText) : aiText;
+
+    return { ...narrativeOutput, executive_summary: safeText, narrative_ai_enhanced: true };
+  } catch {
+    return narrativeOutput;
+  }
+}
+
 export function generateNarrative({
   fusedData,
   signalOutput,
@@ -201,6 +305,7 @@ export function generateNarrative({
 
   // Construir executive_summary con datos numéricos reales
   const sentence1 = buildMainSentence(contextualRisk, latNum, lonNum);
+  const compoundSentence = buildCompoundRiskSentence(signals);
   const sentence2 = buildContextSentence(contextualRisk, adaptationOutput);
 
   // Sprint 5: ENSO narrative enrichment (appended, never replaces existing sentences)
@@ -208,7 +313,7 @@ export function generateNarrative({
   // Sprint 6: Terrain narrative enrichment (appended only when risk exceeds threshold)
   const terrainSentence = buildTerrainNarrative(terrainData);
 
-  const executive_summary = [sentence1, sentence2, ensoSentence, terrainSentence]
+  const executive_summary = [sentence1, compoundSentence, sentence2, ensoSentence, terrainSentence]
     .filter(Boolean)
     .join(' ') || buildFallbackSummary(fusedData);
 

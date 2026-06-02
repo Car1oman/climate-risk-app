@@ -25,8 +25,8 @@ import {
 import { fusionClimateData }    from '../layers/Layer1_ClimateDataFusion.js';
 import { detectSignals }        from '../layers/Layer2_SignalEngine.js';
 import { assessBusinessRisk }   from '../layers/Layer3_BusinessRiskEngine.js';
-import { getAdaptations }       from '../layers/Layer5_AdaptationEngine.js';
-import { generateNarrative }    from '../layers/Layer6_NarrativeEngine.js';
+import { getAdaptations, enrichAdaptationsWithAI } from '../layers/Layer5_AdaptationEngine.js';
+import { generateNarrative, enhanceNarrativeWithAI } from '../layers/Layer6_NarrativeEngine.js';
 import { buildProjectionContext } from '../scientific/projection.js';
 
 const router = express.Router();
@@ -651,6 +651,14 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'lat y lon deben ser números válidos' });
   }
 
+  // ── Cache de respuestas (10 min) ────────────────────────────────────────────
+  const v2CacheKey = `v2-${latNum.toFixed(4)}-${lonNum.toFixed(4)}-${sector}-${scenario || 'pesimista'}`;
+  const now = Date.now();
+  if (climateCache[v2CacheKey] && now - climateCache[v2CacheKey].timestamp < CACHE_TTL) {
+    console.log('[v2] Cache hit:', v2CacheKey);
+    return res.json(climateCache[v2CacheKey].data);
+  }
+
   const partialResult = {};
   const errors = {};
 
@@ -678,16 +686,25 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
     }
 
     // ── Contexto documental semántico (opcional, no bloqueante) ───────────────
-    // Construye una consulta con sector + ubicación para recuperar los chunks
-    // más relevantes vía pgvector. Si OPENAI_API_KEY no está configurada o no
-    // hay chunks indexados, usa el enriquecimiento legado (concatenación completa).
+    // Consulta pgvector refinada con las señales detectadas en Layer2 para que
+    // los chunks recuperados sean específicos a los hazards activos, no genéricos.
     let docContext;
     try {
+      const signalTerms = (signalOutput.signals ?? [])
+        .slice(0, 3)
+        .map(s => {
+          const delta = s.delta != null ? ` +${s.delta.toFixed(1)}` : '';
+          return `${s.signalType}${delta} ${s.horizon ?? ''}`.trim();
+        })
+        .filter(Boolean)
+        .join('; ');
+
       const semanticQuery = [
         `sector: ${sector}`,
         `riesgos climáticos`,
         `lat ${latNum} lon ${lonNum}`,
-      ].join(', ');
+        signalTerms,
+      ].filter(Boolean).join(', ');
 
       docContext = await getSemanticContext(semanticQuery, 8)
         ?? await getDocumentosEnrichment();
@@ -752,6 +769,16 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
       adaptationOutput = { adaptations: [] };
     }
 
+    // ── Capa 5 enriquecimiento IA (opcional, no bloqueante) ─────────────────
+    if (process.env.ANTHROPIC_API_KEY && docContext?.ai_context && signalOutput.signals?.length > 0) {
+      try {
+        adaptationOutput = await enrichAdaptationsWithAI(adaptationOutput, signalOutput, sector, docContext);
+        partialResult.layer5_ai = 'ok';
+      } catch (err) {
+        console.warn('[v2] Layer5 AI enrichment failed, usando catálogo base:', err.message);
+      }
+    }
+
     // ── Capa 6: Narrativa ───────────────────────────────────────────────────
     let narrativeOutput;
     try {
@@ -772,6 +799,16 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
       narrativeOutput = { executive_summary: 'No disponible', key_metrics: {}, generated_from: {} };
     }
 
+    // ── Capa 6 enriquecimiento IA (opcional, no bloqueante) ─────────────────
+    if (process.env.ANTHROPIC_API_KEY && signalOutput.signals?.length > 0) {
+      try {
+        narrativeOutput = await enhanceNarrativeWithAI(narrativeOutput, signalOutput, businessRiskOutput, sector);
+        partialResult.layer6_ai = 'ok';
+      } catch (err) {
+        console.warn('[v2] Layer6 AI enhancement failed, usando narrativa algorítmica:', err.message);
+      }
+    }
+
     // ── Capa 9: Escenarios de proyección ────────────────────────────────────
     let projectionOutput;
     try {
@@ -783,7 +820,7 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
     }
 
     // ── Respuesta final ─────────────────────────────────────────────────────
-    return res.json({
+    const responseBody = {
       location: {
         lat:        latNum,
         lon:        lonNum,
@@ -823,7 +860,9 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
         provenance: narrativeOutput.generated_from,
         ...(Object.keys(errors).length > 0 ? { layer_errors: errors } : {}),
       },
-    });
+    };
+    climateCache[v2CacheKey] = { data: responseBody, timestamp: Date.now() };
+    return res.json(responseBody);
   } catch (err) {
     console.error('[v2] Error inesperado:', err.message);
     return res.status(500).json({

@@ -103,61 +103,57 @@ function ButtonsFooter({ onReset }) {
 }
 
 export default function AIPanel({ analysis, docContext }) {
-  const [loading, setLoading] = useState(false);
-  const [text, setText]       = useState(null);
+  const [loading, setLoading]           = useState(false);
+  const [streamedText, setStreamedText] = useState('');
+  const [parsed, setParsed]             = useState(null);
   const docCount = docContext?.total || 0;
+
+  const handleReset = () => { setStreamedText(''); setParsed(null); };
 
   const handleGenerate = async () => {
     if (!analysis) return;
     setLoading(true);
-    setText(null);
+    setStreamedText('');
+    setParsed(null);
+
     try {
       const { narrative, risks, signals, metadata } = analysis;
-      const summary  = narrative?.executive_summary ?? "";
-      const topRisks = (risks ?? []).slice(0, 3).map(r =>
-        `- ${r.signal?.signalType ?? "senal climatica"}: ${(r.operational_impacts ?? []).slice(0, 2).join(", ")}`
-      ).join("\n");
-      const sigCount = signals?.signals_count ?? 0;
-      const docSection = docContext?.ai_context ? `\n${docContext.ai_context}\n` : "";
 
-      const prompt = `Eres asesor experto en riesgos climáticos para operaciones de ${metadata?.sector ?? "retail"} en Perú.
-
-Resumen ejecutivo del análisis:
-${summary}
-
-Señales detectadas: ${sigCount}
-Riesgos principales:
-${topRisks || "Sin riesgos detectados"}
-${docSection}
-Elabora un análisis ejecutivo breve y accionable con:
-1. Perfil de riesgo (2–3 oraciones basadas en los datos anteriores)
-2. Impactos operacionales más probables para el sector (máx. 4 puntos concretos)
-3. Acciones recomendadas${docCount > 0 ? " — cuando sea pertinente, menciona los documentos de referencia disponibles" : ""} (máx. 3 puntos)
-Responde en español. Usa lenguaje claro y directo, sin términos técnicos científicos. No inventes datos que no estén en el contexto.`;
-
-      const res  = await apiFetch('/api/ai', {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ prompt }),
+      // Enviar datos estructurados al backend — el prompt se construye en el servidor.
+      // Usa /api/ai/stream para recibir la respuesta progresivamente (sin spinner ciego).
+      const res = await apiFetch('/api/ai/stream', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ narrative, risks, signals, metadata, docContext }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Error al generar recomendaciones");
-      const result = typeof data === "string" ? data : data.response ?? "";
-      if (!result) throw new Error("La IA no devolvió texto. Intenta de nuevo.");
-      setText(result);
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData?.error || 'Error al generar análisis');
+      }
+
+      // Leer el stream chunk a chunk y mostrar el texto en tiempo real
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        accumulated += decoder.decode(value, { stream: true });
+        setStreamedText(accumulated);
+      }
+
+      // Intentar parsear JSON al finalizar (strip de fencing por si acaso)
+      const stripped = accumulated.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+      try { setParsed(JSON.parse(stripped)); } catch { setParsed(null); }
+
     } catch (err) {
-      toast.error(err.message || "Error al generar recomendaciones");
+      toast.error(err.message || 'Error al generar recomendaciones');
     } finally {
       setLoading(false);
     }
   };
-
-  let parsed = null;
-  try {
-    parsed = text ? JSON.parse(text) : null;
-  } catch {
-    parsed = null;
-  }
 
   return (
     <div className="space-y-4">
@@ -174,19 +170,40 @@ Responde en español. Usa lenguaje claro y directo, sin términos técnicos cien
         {docCount > 0 && (
           <span className="inline-flex items-center gap-1 rounded-full border border-border bg-secondary px-3 py-1 text-[11px] font-semibold text-secondary-foreground">
             <BookOpen className="w-3.5 h-3.5" />
-            {docCount} documento{docCount !== 1 ? "s" : ""}
+            {docCount} documento{docCount !== 1 ? 's' : ''}
           </span>
         )}
       </div>
 
-      {!text ? (
-        <Button className="w-full gap-2" size="sm" onClick={handleGenerate} disabled={loading || !analysis}>
-          {loading
-            ? <><Loader2 className="w-4 h-4 animate-spin" />Analizando con IA...</>
-            : <><Sparkles className="w-4 h-4" />Generar recomendaciones</>}
+      {!streamedText && !loading ? (
+        <Button className="w-full gap-2" size="sm" onClick={handleGenerate} disabled={!analysis}>
+          <Sparkles className="w-4 h-4" />
+          Generar recomendaciones
         </Button>
+      ) : loading && !streamedText ? (
+        <Button className="w-full gap-2" size="sm" disabled>
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Conectando con IA...
+        </Button>
+      ) : loading ? (
+        // Streaming en progreso — mostrar texto parcial con cursor animado
+        <div className="space-y-3">
+          <div className="rounded-xl border border-border bg-secondary p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                Analizando con IA...
+              </p>
+              <span className="rounded-full bg-primary/15 dark:bg-primary/25 px-2.5 py-1 text-[11px] font-bold text-primary">IA</span>
+            </div>
+            <div className="text-sm leading-6 text-foreground whitespace-pre-wrap">
+              {streamedText}
+              <span className="inline-block w-0.5 h-4 bg-primary ml-0.5 animate-pulse" />
+            </div>
+          </div>
+        </div>
       ) : parsed ? (
-        <AIAnalysisView data={parsed} onReset={() => setText(null)} />
+        <AIAnalysisView data={parsed} onReset={handleReset} />
       ) : (
         <div className="space-y-3">
           <div className="rounded-xl border border-border bg-secondary p-4 shadow-sm">
@@ -194,9 +211,9 @@ Responde en español. Usa lenguaje claro y directo, sin términos técnicos cien
               <p className="text-sm font-semibold text-foreground">Análisis IA</p>
               <span className="rounded-full bg-primary/15 dark:bg-primary/25 px-2.5 py-1 text-[11px] font-bold text-primary">IA</span>
             </div>
-            <div className="text-sm leading-6 text-foreground whitespace-pre-wrap">{text}</div>
+            <div className="text-sm leading-6 text-foreground whitespace-pre-wrap">{streamedText}</div>
           </div>
-          <ButtonsFooter onReset={() => setText(null)} />
+          <ButtonsFooter onReset={handleReset} />
         </div>
       )}
     </div>

@@ -10,9 +10,9 @@ const router = express.Router();
 
 let anthropic = null;
 
-// Modelo gratuito vía OpenRouter — ruteo automático al mejor modelo free disponible.
-// Cambia a un slug específico (e.g. 'qwen/qwen3-coder:free') si prefieres uno fijo.
-const MODEL = 'openrouter/free';
+// Modelo configurable vía env. Default: qwen3-8b:free (rápido, consistente, sin cuota).
+// Alternativas gratuitas: 'meta-llama/llama-3.2-3b-instruct:free', 'mistralai/mistral-7b-instruct:free'
+const MODEL = process.env.AI_MODEL || 'qwen/qwen3-8b:free';
 
 // Master system prompt — enforces scientific guardrails on every Claude call.
 const SCIENTIFIC_SYSTEM_PROMPT = `SYSTEM PROMPT — DataRisk Climate Intelligence Platform v2.0
@@ -100,6 +100,44 @@ function userFriendlyError(err) {
   return 'Error al procesar la solicitud de IA. Revisa la consola del servidor para más detalles.';
 }
 
+/**
+ * Construye el prompt de análisis a partir de datos estructurados del pipeline.
+ * Centraliza la lógica en el backend para que el frontend solo envíe datos.
+ */
+function buildAnalysisPrompt({ narrative, risks, signals, metadata, docContext }) {
+  const sector   = metadata?.sector ?? 'retail';
+  const summary  = narrative?.executive_summary ?? '';
+  const sigCount = signals?.signals_count ?? 0;
+  const aiUsed   = (risks ?? []).some(r => r.ai_used) ? ' (impactos enriquecidos con IA)' : '';
+  const topRisks = (risks ?? [])
+    .filter(r => !r.is_compound)
+    .slice(0, 3)
+    .map(r => `- ${r.signal?.signalType ?? 'señal'}: ${(r.operational_impacts ?? []).slice(0, 2).join(', ')}`)
+    .join('\n');
+  const compound = (risks ?? []).find(r => r.is_compound);
+  const compoundLine = compound
+    ? `\nRiesgo compuesto detectado: ${compound.operational_impacts?.[0] ?? ''}`
+    : '';
+  const docSection = docContext?.ai_context
+    ? `\nDocumentos de referencia disponibles:\n${docContext.ai_context}\n`
+    : '';
+
+  return `Sector: ${sector}. Señales climáticas detectadas: ${sigCount}${aiUsed}.
+
+Resumen ejecutivo del pipeline:
+${summary}
+
+Riesgos principales:
+${topRisks || 'Sin riesgos detectados'}${compoundLine}
+${docSection}
+Elabora un análisis ejecutivo breve con:
+1. Perfil de riesgo compuesto (2-3 oraciones que sinteticen todas las señales, no solo la dominante)
+2. Impactos operacionales más probables para el sector (máx. 4 puntos concretos)
+3. Acciones de adaptación prioritarias${docContext?.ai_context ? ' — mencionando documentos de referencia si aplica' : ''} (máx. 3 puntos)
+Responde en español. Lenguaje ejecutivo claro. No inventes datos fuera del contexto.`;
+}
+
+// POST /api/ai — prompt libre → respuesta JSON validada (no streaming)
 router.post('/', requireAuth, aiLimiter, validate(aiPromptSchema), async (req, res) => {
   try {
     const { prompt } = req.body;
@@ -163,6 +201,96 @@ router.post('/', requireAuth, aiLimiter, validate(aiPromptSchema), async (req, r
   } catch (error) {
     console.error('[ai] Error inesperado:', error?.message ?? error);
     return res.status(500).json({ error: userFriendlyError(error) });
+  }
+});
+
+// POST /api/ai/analyze — datos estructurados del pipeline → respuesta JSON validada
+// Construye el prompt en el backend (evita lógica de prompt en el frontend).
+router.post('/analyze', requireAuth, aiLimiter, async (req, res) => {
+  try {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return res.status(503).json({
+        error: 'El análisis IA requiere ANTHROPIC_API_KEY. El análisis científico del pipeline está disponible sin IA.',
+      });
+    }
+
+    const { narrative, risks, signals, metadata, docContext } = req.body;
+    if (!narrative && !risks && !signals) {
+      return res.status(400).json({ error: 'Se requiere al menos narrative, risks o signals' });
+    }
+
+    if (!anthropic) anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    const prompt = buildAnalysisPrompt({ narrative, risks, signals, metadata, docContext });
+
+    const result = await anthropic.messages.create({
+      model:    MODEL,
+      system:   SCIENTIFIC_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 4096,
+    });
+
+    const textBlock = result.content?.find(b => b.type === 'text');
+    const text = textBlock?.text ?? '';
+    if (!text) return res.status(500).json({ error: 'El modelo no generó contenido.' });
+
+    const validation = validateAIOutput(text);
+    if (validation.passed) return res.json({ response: text });
+    if (validation.autoFixable) {
+      return res.json({ response: validation.sanitizedText, fallbackUsed: true });
+    }
+    return res.status(422).json({
+      error: 'La respuesta no cumple los estándares científicos. Intenta reformular.',
+      violations: validation.violations.map(v => v.type),
+    });
+
+  } catch (err) {
+    console.error('[ai/analyze] Error:', err?.message?.slice(0, 200));
+    return res.status(500).json({ error: userFriendlyError(err) });
+  }
+});
+
+// POST /api/ai/stream — datos estructurados → respuesta streaming (text/plain chunked)
+// El frontend lee con response.body.getReader() y muestra el texto progresivamente.
+router.post('/stream', requireAuth, aiLimiter, async (req, res) => {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(503).json({
+      error: 'El análisis IA requiere ANTHROPIC_API_KEY configurada.',
+    });
+  }
+
+  const { narrative, risks, signals, metadata, docContext } = req.body;
+  if (!narrative && !risks && !signals) {
+    return res.status(400).json({ error: 'Se requiere al menos narrative, risks o signals' });
+  }
+
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('X-Accel-Buffering', 'no'); // desactiva buffering en nginx/proxies
+  res.flushHeaders();
+
+  try {
+    if (!anthropic) anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    const prompt = buildAnalysisPrompt({ narrative, risks, signals, metadata, docContext });
+
+    const stream = anthropic.messages.stream({
+      model:    MODEL,
+      system:   SCIENTIFIC_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 4096,
+    });
+
+    stream.on('text', text => {
+      if (!res.writableEnded) res.write(text);
+    });
+
+    await stream.finalMessage();
+    if (!res.writableEnded) res.end();
+
+  } catch (err) {
+    console.error('[ai/stream] Error:', err?.message?.slice(0, 200));
+    if (!res.writableEnded) res.end();
   }
 });
 

@@ -206,6 +206,103 @@ const ADAPTATION_CATALOG = {
   ],
 };
 
+import Anthropic from '@anthropic-ai/sdk';
+import { validateAIOutput } from '../ai/scientificValidator.js';
+
+let _anthropic = null;
+function getAnthropicClient() {
+  if (_anthropic) return _anthropic;
+  const opts = { apiKey: process.env.ANTHROPIC_API_KEY };
+  if (process.env.ANTHROPIC_BASE_URL) opts.baseURL = process.env.ANTHROPIC_BASE_URL;
+  _anthropic = new Anthropic(opts);
+  return _anthropic;
+}
+
+const LAYER5_SYSTEM_PROMPT = `Eres un experto en adaptación al cambio climático para operaciones empresariales en Perú.
+Tu tarea es proponer medidas de adaptación adicionales basadas EXCLUSIVAMENTE en los documentos de referencia que recibes.
+
+REGLAS OBLIGATORIAS:
+- Solo usa información presente en los documentos. No inventes datos.
+- No menciones cifras financieras exactas sin respaldo documental ($, USD, S/.).
+- No uses lenguaje determinístico ni alarmista.
+- Responde ÚNICAMENTE con JSON válido (sin markdown, sin bloques de código).
+- Las medidas deben ser concretas, accionables y específicas al sector.`;
+
+/**
+ * Enriquece el catálogo de adaptaciones con 1-2 medidas contextuales generadas por IA
+ * basadas en los documentos de referencia disponibles. No bloqueante: si falla, retorna
+ * el catálogo original sin modificar.
+ *
+ * @param {Object} adaptationOutput - Salida de getAdaptations()
+ * @param {Object} signalOutput     - Salida de detectSignals()
+ * @param {string} sector           - Sector del activo
+ * @param {Object} docContext       - Contexto documental con ai_context
+ * @returns {Promise<Object>}
+ */
+export async function enrichAdaptationsWithAI(adaptationOutput, signalOutput, sector, docContext) {
+  if (!process.env.ANTHROPIC_API_KEY || !docContext?.ai_context) return adaptationOutput;
+  const signals = signalOutput?.signals ?? [];
+  if (signals.length === 0) return adaptationOutput;
+
+  const signalDesc = signals
+    .slice(0, 3)
+    .map(s => `${s.signalType}${s.delta != null ? ` (delta +${s.delta.toFixed(1)})` : ''} en ${s.horizon ?? 'corto_plazo'}`)
+    .join(', ');
+
+  const prompt = `Sector: "${sector}". Señales climáticas detectadas: ${signalDesc}.
+
+Documentos de referencia disponibles:
+${docContext.ai_context}
+
+Propón 2 medidas de adaptación adicionales específicas al contexto documental.
+Responde ÚNICAMENTE con JSON (sin markdown):
+{
+  "measures": [
+    {
+      "nombre": "Nombre concreto de la medida",
+      "descripcion": "Descripción operativa de 1-2 oraciones",
+      "donde_impacta": "Área o proceso afectado",
+      "horizonte_implementacion": "inmediato|corto|mediano|largo",
+      "efectividad": "alta|media|baja",
+      "is_ai_generated": true,
+      "provenance": "generado desde documentos de referencia"
+    }
+  ]
+}`;
+
+  try {
+    const client = getAnthropicClient();
+    const result = await client.messages.create({
+      model:    process.env.AI_MODEL || 'qwen/qwen3-8b:free',
+      system:   LAYER5_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 800,
+    });
+
+    const rawText = result.content.find(b => b.type === 'text')?.text ?? '{}';
+    const text = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+
+    const validation = validateAIOutput(text);
+    if (!validation.passed && !validation.autoFixable) return adaptationOutput;
+    const safeText = validation.autoFixable ? (validation.sanitizedText ?? text) : text;
+
+    const parsed = JSON.parse(safeText);
+    if (!Array.isArray(parsed.measures) || parsed.measures.length === 0) return adaptationOutput;
+
+    const newMeasures = parsed.measures.slice(0, 2);
+    const enriched = { ...adaptationOutput };
+    if (enriched.adaptations.length > 0) {
+      enriched.adaptations = [
+        { ...enriched.adaptations[0], measures: [...enriched.adaptations[0].measures, ...newMeasures] },
+        ...enriched.adaptations.slice(1),
+      ];
+    }
+    return enriched;
+  } catch {
+    return adaptationOutput;
+  }
+}
+
 /**
  * Función principal exportada.
  * @param {Object} contextualRiskOutput - Output descriptivo de interpretacion contextual
