@@ -1,18 +1,12 @@
 import express from 'express';
-import Anthropic from '@anthropic-ai/sdk';
 import { requireAuth } from '../middleware/auth.js';
 import { aiLimiter }   from '../middleware/rateLimiter.js';
 import { validate }    from '../middleware/validate.js';
 import { aiPromptSchema } from '../validators/ai.js';
 import { validateAIOutput } from '../ai/scientificValidator.js';
+import { callWithFallback, streamWithFallback } from '../lib/ai/client.js';
 
 const router = express.Router();
-
-let anthropic = null;
-
-// Modelo configurable vía env. Default: qwen3-8b:free (rápido, consistente, sin cuota).
-// Alternativas gratuitas: 'meta-llama/llama-3.2-3b-instruct:free', 'mistralai/mistral-7b-instruct:free'
-const MODEL = process.env.AI_MODEL || 'qwen/qwen3-8b:free';
 
 // Master system prompt — enforces scientific guardrails on every Claude call.
 const SCIENTIFIC_SYSTEM_PROMPT = `SYSTEM PROMPT — DataRisk Climate Intelligence Platform v2.0
@@ -152,49 +146,38 @@ router.post('/', requireAuth, aiLimiter, validate(aiPromptSchema), async (req, r
       });
     }
 
-    if (!anthropic) {
-      anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    }
-
     try {
-      const result = await anthropic.messages.create({
-        model: MODEL,
-        system: SCIENTIFIC_SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 4096,
-      });
-
-      const blocks = result.content;
-      const textBlock = Array.isArray(blocks)
-        ? blocks.find(b => b.type === 'text')
-        : null;
-      const text = textBlock?.text ?? '';
+      const { content: text, model, tier } = await callWithFallback(
+        [{ role: 'user', content: prompt }],
+        SCIENTIFIC_SYSTEM_PROMPT,
+        4096,
+      );
 
       if (!text) {
-        console.error('[ai] Respuesta sin texto. Content:', JSON.stringify(blocks).slice(0, 500));
+        console.error('[ai] Respuesta sin texto (tier %d, model %s)', tier, model);
         return res.status(500).json({ error: 'El modelo no generó contenido.' });
       }
 
       const validation = validateAIOutput(text);
 
       if (validation.passed) {
-        console.log('[ai] Respuesta generada con Claude — validación OK');
+        console.log(`[ai] OK — tier ${tier} (${model})`);
         return res.json({ response: text });
       }
 
       if (validation.autoFixable) {
-        console.warn(`[ai] Claude — auto-fix aplicado (${validation.violations.map(v => v.type).join(', ')})`);
+        console.warn(`[ai] auto-fix (${validation.violations.map(v => v.type).join(', ')}) — tier ${tier}`);
         return res.json({ response: validation.sanitizedText, fallbackUsed: true });
       }
 
-      console.error('[ai] Claude — violaciones no auto-corregibles:', validation.violations.map(v => v.type));
+      console.error('[ai] Violaciones no corregibles:', validation.violations.map(v => v.type));
       return res.status(422).json({
         error: 'La respuesta generada no cumple los estándares científicos de la plataforma. Intenta reformular la consulta.',
         violations: validation.violations.map(v => v.type),
       });
 
     } catch (err) {
-      console.error('[ai] Claude falló:', err?.message?.slice(0, 200));
+      console.error('[ai] Cascade falló:', err?.message?.slice(0, 200));
       return res.status(500).json({ error: userFriendlyError(err) });
     }
 
@@ -219,20 +202,18 @@ router.post('/analyze', requireAuth, aiLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Se requiere al menos narrative, risks o signals' });
     }
 
-    if (!anthropic) anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
     const prompt = buildAnalysisPrompt({ narrative, risks, signals, metadata, docContext });
 
-    const result = await anthropic.messages.create({
-      model:    MODEL,
-      system:   SCIENTIFIC_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 4096,
-    });
+    const { content: text, model, tier } = await callWithFallback(
+      [{ role: 'user', content: prompt }],
+      SCIENTIFIC_SYSTEM_PROMPT,
+      4096,
+    );
 
-    const textBlock = result.content?.find(b => b.type === 'text');
-    const text = textBlock?.text ?? '';
-    if (!text) return res.status(500).json({ error: 'El modelo no generó contenido.' });
+    if (!text) {
+      console.error('[ai/analyze] Respuesta sin texto (tier %d, model %s)', tier, model);
+      return res.status(500).json({ error: 'El modelo no generó contenido.' });
+    }
 
     const validation = validateAIOutput(text);
     if (validation.passed) return res.json({ response: text });
@@ -270,22 +251,15 @@ router.post('/stream', requireAuth, aiLimiter, async (req, res) => {
   res.flushHeaders();
 
   try {
-    if (!anthropic) anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
     const prompt = buildAnalysisPrompt({ narrative, risks, signals, metadata, docContext });
 
-    const stream = anthropic.messages.stream({
-      model:    MODEL,
-      system:   SCIENTIFIC_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 4096,
-    });
+    await streamWithFallback(
+      [{ role: 'user', content: prompt }],
+      SCIENTIFIC_SYSTEM_PROMPT,
+      4096,
+      text => { if (!res.writableEnded) res.write(text); },
+    );
 
-    stream.on('text', text => {
-      if (!res.writableEnded) res.write(text);
-    });
-
-    await stream.finalMessage();
     if (!res.writableEnded) res.end();
 
   } catch (err) {

@@ -206,17 +206,8 @@ const ADAPTATION_CATALOG = {
   ],
 };
 
-import Anthropic from '@anthropic-ai/sdk';
+import { callWithFallback } from '../lib/ai/client.js';
 import { validateAIOutput } from '../ai/scientificValidator.js';
-
-let _anthropic = null;
-function getAnthropicClient() {
-  if (_anthropic) return _anthropic;
-  const opts = { apiKey: process.env.ANTHROPIC_API_KEY };
-  if (process.env.ANTHROPIC_BASE_URL) opts.baseURL = process.env.ANTHROPIC_BASE_URL;
-  _anthropic = new Anthropic(opts);
-  return _anthropic;
-}
 
 const LAYER5_SYSTEM_PROMPT = `Eres un experto en adaptación al cambio climático para operaciones empresariales en Perú.
 Tu tarea es proponer medidas de adaptación adicionales basadas EXCLUSIVAMENTE en los documentos de referencia que recibes.
@@ -271,15 +262,12 @@ Responde ÚNICAMENTE con JSON (sin markdown):
 }`;
 
   try {
-    const client = getAnthropicClient();
-    const result = await client.messages.create({
-      model:    process.env.AI_MODEL || 'qwen/qwen3-8b:free',
-      system:   LAYER5_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 800,
-    });
-
-    const rawText = result.content.find(b => b.type === 'text')?.text ?? '{}';
+    const { content: rawContent } = await callWithFallback(
+      [{ role: 'user', content: prompt }],
+      LAYER5_SYSTEM_PROMPT,
+      800,
+    );
+    const rawText = rawContent || '{}';
     const text = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
 
     const validation = validateAIOutput(text);

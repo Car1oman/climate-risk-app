@@ -7,19 +7,11 @@
  * ensoData is present. No existing narrative logic is modified.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import { callWithFallback }      from '../lib/ai/client.js';
 import { validateAIOutput }      from '../ai/scientificValidator.js';
 import { buildEnsoNarrative }    from '../services/ensoService.js';
 import { buildTerrainNarrative } from '../services/terrainService.js'; // Sprint 6
 
-let _anthropic = null;
-function getAnthropicClient() {
-  if (_anthropic) return _anthropic;
-  const opts = { apiKey: process.env.ANTHROPIC_API_KEY };
-  if (process.env.ANTHROPIC_BASE_URL) opts.baseURL = process.env.ANTHROPIC_BASE_URL;
-  _anthropic = new Anthropic(opts);
-  return _anthropic;
-}
 
 const LAYER6_SYSTEM_PROMPT = `Eres un redactor de análisis de riesgo climático científico para la plataforma DataRisk Peru.
 Tu tarea es generar resúmenes ejecutivos que sinteticen MÚLTIPLES señales climáticas co-ocurrentes en un solo párrafo coherente.
@@ -258,15 +250,12 @@ Genera un resumen ejecutivo mejorado que sintetice TODAS las señales (incluyend
 Responde SOLO con el texto del resumen. Sin JSON, sin markdown, sin encabezados. Máximo 4 oraciones.`;
 
   try {
-    const client = getAnthropicClient();
-    const result = await client.messages.create({
-      model:    process.env.AI_MODEL || 'qwen/qwen3-8b:free',
-      system:   LAYER6_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 512,
-    });
-
-    const aiText = result.content.find(b => b.type === 'text')?.text?.trim() ?? '';
+    const { content: rawContent } = await callWithFallback(
+      [{ role: 'user', content: prompt }],
+      LAYER6_SYSTEM_PROMPT,
+      512,
+    );
+    const aiText = rawContent.trim();
     if (!aiText) return narrativeOutput;
 
     const validation = validateAIOutput(aiText);

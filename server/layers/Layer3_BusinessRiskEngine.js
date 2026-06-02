@@ -3,17 +3,8 @@
  * Mapea señales climáticas a impactos operacionales por sector,
  * calcula exposure_level, sensitivity_level y financial_impact_range.
  */
-import Anthropic from '@anthropic-ai/sdk';
+import { callWithFallback } from '../lib/ai/client.js';
 import { validateAIOutput } from '../ai/scientificValidator.js';
-
-let _anthropic = null;
-function getAnthropicClient() {
-  if (_anthropic) return _anthropic;
-  const opts = { apiKey: process.env.ANTHROPIC_API_KEY };
-  if (process.env.ANTHROPIC_BASE_URL) opts.baseURL = process.env.ANTHROPIC_BASE_URL;
-  _anthropic = new Anthropic(opts);
-  return _anthropic;
-}
 
 // ─── System prompt para Layer3 — guardrails científicos ─────────────────────
 const LAYER3_SYSTEM_PROMPT = `Eres un analista de riesgo climático operacional para la plataforma DataRisk Peru.
@@ -343,17 +334,12 @@ Responde ÚNICAMENTE con este JSON (sin markdown):
 
 Máximo 4 impactos. Cada impacto: frase operativa específica y accionable.`;
 
-  const client = getAnthropicClient();
-  const model  = process.env.AI_MODEL || 'openrouter/free';
-
-  const result = await client.messages.create({
-    model,
-    system:   LAYER3_SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: prompt }],
-    max_tokens: 1024,
-  });
-
-  const rawText = result.content.find(b => b.type === 'text')?.text ?? '{}';
+  const { content: rawContent } = await callWithFallback(
+    [{ role: 'user', content: prompt }],
+    LAYER3_SYSTEM_PROMPT,
+    1024,
+  );
+  const rawText = rawContent || '{}';
 
   // Strip potential markdown fencing (```json ... ```)
   const text = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
