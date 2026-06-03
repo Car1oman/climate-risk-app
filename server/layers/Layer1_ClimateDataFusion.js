@@ -16,7 +16,7 @@ import { getTerrainIntelligence }  from '../services/terrainService.js';  // Spr
 // r20mm/r50mm (días con lluvia intensa), tasmax (temp máx media), tx84rr (días cálidos)
 const CLIMATE_VARS = [
   'txx', 'tas', 'tasmax',            // temperatura
-  'hd30', 'hd35',                    // días calurosos (hd40 no está en DB)
+  'hd30', 'hd35',                    // días calurosos
   'tr',                              // noches tropicales (Tmin > 20°C) — señal clave Perú
   'rx1day', 'rx5day',               // extremos de precipitación
   'r20mm', 'r50mm',                 // días con lluvia intensa
@@ -34,6 +34,7 @@ function buildHorizonMap(scenario) {
     historical:                              'historical',
     [`ensemble-all-${sc}_2020-2039`]:        'short_term',
     [`ensemble-all-${sc}_2040-2059`]:        'mid_term',
+    [`ensemble-all-${sc}_2060-2079`]:        'long_term',
   };
 }
 

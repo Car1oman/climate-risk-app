@@ -45,6 +45,7 @@ export const SIGNAL_TO_CONSOLIDATED: Record<string, RiskTypeSlug> = {
   drought:                  'sequia',
   water_stress:             'sequia',
   landslide_susceptibility: 'deslizamiento',
+  landslide_risk:           'deslizamiento',
   huayco_risk:              'deslizamiento',
   enso_phase:               'fenomeno_enso',
   enso:                     'fenomeno_enso',

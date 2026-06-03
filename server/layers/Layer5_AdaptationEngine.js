@@ -178,6 +178,76 @@ const ADAPTATION_CATALOG = {
     },
   ],
 
+  landslide_risk: [
+    {
+      nombre:                    'Plan de evacuación y rutas alternativas de acceso',
+      descripcion:               'Protocolo documentado con rutas de evacuación alternativas, roles y responsabilidades para activación ante alerta de deslizamiento o bloqueo de vías',
+      donde_impacta:             'Operaciones, logística, recursos humanos',
+      horizonte_implementacion:  'inmediato',
+      costo_estimado_rango:      { min_usd: 2_000, max_usd: 8_000 },
+      efectividad:               'alta',
+    },
+    {
+      nombre:                    'Monitoreo geotécnico de taludes críticos',
+      descripcion:               'Instalación de inclinómetros y piezómetros en taludes adyacentes a la instalación para detección temprana de movimiento de terreno',
+      donde_impacta:             'Infraestructura, seguridad operativa',
+      horizonte_implementacion:  'corto',
+      costo_estimado_rango:      { min_usd: 15_000, max_usd: 60_000 },
+      efectividad:               'alta',
+    },
+    {
+      nombre:                    'Gestión de drenaje superficial en ladera',
+      descripcion:               'Construcción de cunetas de coronación y zanjas interceptoras para desviar escorrentía que satura laderas y reduce la cohesión del suelo',
+      donde_impacta:             'Infraestructura, accesos, taludes adyacentes',
+      horizonte_implementacion:  'mediano',
+      costo_estimado_rango:      { min_usd: 20_000, max_usd: 80_000 },
+      efectividad:               'alta',
+    },
+    {
+      nombre:                    'Revegetación y bioestabilización de taludes',
+      descripcion:               'Plantación de especies nativas de raíz profunda y mantas vegetales para incrementar cohesión del suelo y reducir erosión superficial en laderas',
+      donde_impacta:             'Perímetro del predio, taludes de acceso',
+      horizonte_implementacion:  'mediano',
+      costo_estimado_rango:      { min_usd: 10_000, max_usd: 40_000 },
+      efectividad:               'media',
+    },
+  ],
+
+  huayco_risk: [
+    {
+      nombre:                    'Sistema de alerta temprana por flujo de detritos',
+      descripcion:               'Instalación de pluviómetros y sensores de nivel en quebradas aguas arriba para detectar umbrales críticos de lluvia y activar alertas de evacuación antes de que el flujo alcance la instalación',
+      donde_impacta:             'Operaciones, seguridad del personal, logística',
+      horizonte_implementacion:  'corto',
+      costo_estimado_rango:      { min_usd: 8_000, max_usd: 30_000 },
+      efectividad:               'alta',
+    },
+    {
+      nombre:                    'Barreras de retención de material de arrastre',
+      descripcion:               'Construcción de diques de gaviones o muros de concreto ciclópeo en la salida de quebradas para retener rocas, lodo y debris antes de que impacten la infraestructura del activo',
+      donde_impacta:             'Infraestructura perimetral, accesos, estacionamientos',
+      horizonte_implementacion:  'mediano',
+      costo_estimado_rango:      { min_usd: 40_000, max_usd: 150_000 },
+      efectividad:               'alta',
+    },
+    {
+      nombre:                    'Encauzamiento y canalización de flujos de detritos',
+      descripcion:               'Diseño y construcción de canales de derivación que redirijan flujos de detritos y lodo hacia zonas de disposición segura, evitando que el material arrastrado alcance la instalación',
+      donde_impacta:             'Infraestructura, accesos, perímetro del predio',
+      horizonte_implementacion:  'mediano',
+      costo_estimado_rango:      { min_usd: 60_000, max_usd: 200_000 },
+      efectividad:               'alta',
+    },
+    {
+      nombre:                    'Limpieza preventiva de quebradas y control de material arrastrado',
+      descripcion:               'Programa anual de remoción de sedimentos, rocas y vegetación acumulada en quebradas adyacentes durante temporada seca, reduciendo el volumen de material disponible para movilización en eventos de lluvia intensa',
+      donde_impacta:             'Perímetro del predio, rutas de acceso',
+      horizonte_implementacion:  'inmediato',
+      costo_estimado_rango:      { min_usd: 5_000, max_usd: 20_000 },
+      efectividad:               'media',
+    },
+  ],
+
   tropical_nights: [
     {
       nombre:                    'Climatización nocturna eficiente',

@@ -11,9 +11,6 @@ const THRESHOLDS = {
   EXTREME_HEAT_SHORT: 10,
   EXTREME_HEAT_MID:   20,
 
-  // Días con Tmax > 40°C: aumento > 5 días
-  SEVERE_HEAT: 5,
-
   // Noches tropicales (Tmin > 20°C): aumento > 10 días en corto, > 20 en mediano
   // Fuente: IPCC AR6 WG1 Chapter 11.3 — Warm nights / TN90p
   // Señal clave para salud, confort y cadena frío en regiones costeras de Perú
@@ -385,27 +382,6 @@ export function detectSignals(fusedData) {
     }
   }
 
-  // ── SEVERE_HEAT (hd40) ───────────────────────────────────────────────────
-  for (const [horizon, period] of [['short_term', short], ['mid_term', mid]]) {
-    if (hist?.hd40 != null && period?.hd40 != null) {
-      const d = deltaAbs(hist.hd40, period.hd40);
-      if (d != null && d > THRESHOLDS.SEVERE_HEAT) {
-        signals.push(buildSignal({
-          signalType:          'severe_heat',
-          indicator:           'hd40',
-          historical:          hist.hd40,
-          projected:           period.hd40,
-          delta:               d,
-          delta_pct:           deltaPct(hist.hd40, period.hd40),
-          conf:                confidence(hasCC, !!meteoData),
-          horizon,
-          threshold_reference: 'IPCC AR6 WG1 SPM — umbral calor severo: +5 días hd40',
-          exceeds_threshold:   true,
-        }));
-      }
-    }
-  }
-
   // ── TROPICAL_NIGHTS (tr) ────────────────────────────────────────────────
   // Noches con Tmin > 20°C — señal de bienestar, salud y cadena frío en Perú costero
   // La DB tiene este índice y muestra incrementos de +20-50 días en la región
@@ -456,13 +432,14 @@ export function detectSignals(fusedData) {
     // prpercnt = 100 significa igual al histórico; < 85 significa reducción > 15%
     if (period?.prpercnt != null) {
       const pctChange = period.prpercnt - 100; // convierte a delta vs histórico
+      const histPr = hist?.pr ?? null;
       if (pctChange < THRESHOLDS.DROUGHT_PR_PCT) {
         signals.push(buildSignal({
           signalType:          'drought',
           indicator:           'prpercnt',
-          historical:          100,
+          historical:          histPr,
           projected:           period.prpercnt,
-          delta:               null,
+          delta:               histPr != null ? deltaAbs(histPr, period.prpercnt / 100 * histPr) : null,
           delta_pct:           pctChange,
           conf:                confidence(hasCC, !!meteoData),
           horizon,
@@ -625,7 +602,7 @@ export function detectSignals(fusedData) {
   }
 
   // Calor extremo desde GRI
-  if (!signals.some(s => ['extreme_heat', 'severe_heat'].includes(s.signalType))) {
+  if (!signals.some(s => s.signalType === 'extreme_heat')) {
     const griHeat   = extractGriHazard(['heat', 'extreme_heat', 'wildfire']);
     const baseScore = griHeat?.baseline?.score;
     if (baseScore && baseScore !== 'sin data') {

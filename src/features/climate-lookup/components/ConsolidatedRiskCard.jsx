@@ -58,6 +58,13 @@ export default function ConsolidatedRiskCard({ risk, activeScenario }) {
         {/* Explicación simple — narrativa operativa, sin jerga técnica */}
         <p className="text-xs text-foreground/75 leading-relaxed">{displayNarrative}</p>
 
+        {/* Métrica clave — valor ya formateado por normalizeRisks */}
+        {risk.keyMetric && (
+          <p className="text-[11px] font-mono font-medium text-foreground/80 bg-muted/40 rounded px-2 py-0.5 w-fit">
+            {risk.keyMetric}
+          </p>
+        )}
+
         {/* Evidencia resumida */}
         {evidenceCount > 0 && (
           <p className="text-[10px] text-muted-foreground/70">

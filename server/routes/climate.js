@@ -24,6 +24,7 @@ import {
 // ── Fase 2: Backend Layers ────────────────────────────────────────────────────
 import { fusionClimateData }    from '../layers/Layer1_ClimateDataFusion.js';
 import { detectSignals }        from '../layers/Layer2_SignalEngine.js';
+import { detectSignalsV2 }      from '../layers/Layer2_SignalEngineV2.js';
 import { assessBusinessRisk }   from '../layers/Layer3_BusinessRiskEngine.js';
 import { getAdaptations, enrichAdaptationsWithAI } from '../layers/Layer5_AdaptationEngine.js';
 import { generateNarrative, enhanceNarrativeWithAI } from '../layers/Layer6_NarrativeEngine.js';
@@ -145,6 +146,9 @@ router.get('/climate', async (req, res) => {
  * Retorna: datos completos con todos los horizontes temporales
  */
 router.get('/climate-cells/query', async (req, res) => {
+  console.warn('[DEPRECATED] GET /api/climate-cells/query — use GET /api/climate-risks/lookup instead');
+  res.setHeader('X-Deprecated', 'true');
+  res.setHeader('X-Deprecation-Message', 'Use GET /api/climate-risks/lookup instead');
   try {
     const { lat, lng, lon } = req.query;
     const latitude = parseFloat(lat);
@@ -677,7 +681,7 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
     // ── Capa 2: Detección de señales ────────────────────────────────────────
     let signalOutput;
     try {
-      signalOutput = detectSignals(fusedData);
+      signalOutput = detectSignalsV2(fusedData);
       partialResult.layer2 = 'ok';
     } catch (err) {
       console.error('[v2] Layer2 falló:', err.message);

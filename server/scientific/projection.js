@@ -74,9 +74,10 @@ export const TIME_WINDOWS = {
   far_term: {
     id:          'far_term',
     label:       '2060–2079',
-    description: 'Término lejano (IPCC AR6 — long-term extrapolado a 2060–2079)',
+    description: 'Término lejano (IPCC AR6 — long-term extrapolado a 2060–2079). NOTA: datos IPCC de referencia regional, NO específicos del pipeline site-level de climate_cells. Usar con cautela para decisiones locales.',
     years:       [2060, 2079],
     horizon_key: 'long_term',
+    source_note: 'IPCC reference (not site-specific) — usar solo como contexto, no como input directo a Layer2',
   },
 };
 

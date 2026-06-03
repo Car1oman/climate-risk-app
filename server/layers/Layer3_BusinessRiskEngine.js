@@ -63,6 +63,22 @@ const OPERATIONAL_IMPACTS = {
     entretenimiento:['Daño a instalaciones recreativas', 'Cancelación prolongada de operaciones'],
     otros:          ['Interrupción operativa', 'Daño a infraestructura', 'Riesgo logístico'],
   },
+  // Deslizamiento: movimiento de masa en ladera — daño estructural, bloqueo de accesos, riesgo geotécnico
+  landslide_risk: {
+    retail:         ['Riesgo estructural en instalaciones por inestabilidad de ladera', 'Bloqueo de accesos y rutas logísticas', 'Daño a infraestructura por movimiento de masa', 'Riesgo de cierre temporal por inestabilidad del terreno'],
+    educacion:      ['Riesgo estructural en instalaciones educativas en zonas de ladera', 'Interrupción prolongada del servicio educativo por daño a infraestructura'],
+    salud:          ['Acceso a centros de salud comprometido por bloqueo de vías', 'Daño a infraestructura crítica de salud', 'Riesgo de interrupción de servicios esenciales'],
+    entretenimiento:['Cierre preventivo por riesgo geotécnico en instalaciones', 'Daño a infraestructura en zonas de ladera'],
+    otros:          ['Riesgo geotécnico para infraestructura en zonas de pendiente', 'Bloqueo de acceso operativo por movimiento de masa'],
+  },
+  // Huayco (flujo de detritos): lodo y rocas en movimiento — bloqueo de accesos, daño por impacto y arrastre
+  huayco_risk: {
+    retail:         ['Bloqueo de accesos por depósito de lodo y rocas — interrupción logística severa', 'Daño estructural a instalaciones por impacto y arrastre de flujo de detritos', 'Pérdida de inventario por ingreso de material lodoso', 'Interrupción prolongada de servicios por limpieza y rehabilitación de vías'],
+    educacion:      ['Daño a infraestructura educativa por impacto y arrastre de detritos', 'Interrupción prolongada del servicio educativo por bloqueo de accesos y rehabilitación'],
+    salud:          ['Acceso a centros de salud bloqueado por depósito de lodo y material sólido', 'Daño a infraestructura crítica por fuerza de impacto del flujo de detritos', 'Interrupción de servicios esenciales por inhabilitación de vías de acceso'],
+    entretenimiento:['Cierre preventivo y correctivo por daño de flujo de detritos a instalaciones', 'Bloqueo de accesos al público por depósito de lodo y escombros'],
+    otros:          ['Interrupción operativa por bloqueo de acceso ante flujo de detritos', 'Daño a infraestructura por arrastre de material sólido y lodoso'],
+  },
   // Noches tropicales: afectan confort nocturno, cadena frío y productividad laboral
   tropical_nights: {
     retail:         ['↑ carga HVAC nocturna y costos energéticos', 'Riesgo cadena frío en horario nocturno', 'Disminución confort del personal'],
@@ -118,6 +134,22 @@ const FINANCIAL_RANGES = {
     salud:          { min_usd: 150_000, max_usd: 600_000 },
     entretenimiento:{ min_usd: 80_000,  max_usd: 300_000 },
     otros:          { min_usd: 40_000,  max_usd: 150_000 },
+  },
+  // Reparación geotécnica + estructural supera costos de inundación; rangos ~20% sobre flood_risk
+  landslide_risk: {
+    retail:         { min_usd: 120_000, max_usd: 550_000 },
+    educacion:      { min_usd: 60_000,  max_usd: 220_000 },
+    salud:          { min_usd: 180_000, max_usd: 650_000 },
+    entretenimiento:{ min_usd: 90_000,  max_usd: 330_000 },
+    otros:          { min_usd: 50_000,  max_usd: 180_000 },
+  },
+  // Huayco supera costos de landslide (~10-15%) por limpieza de lodo+rocas y rehabilitación de vías bloqueadas
+  huayco_risk: {
+    retail:         { min_usd: 130_000, max_usd: 600_000 },
+    educacion:      { min_usd: 65_000,  max_usd: 240_000 },
+    salud:          { min_usd: 200_000, max_usd: 700_000 },
+    entretenimiento:{ min_usd: 100_000, max_usd: 360_000 },
+    otros:          { min_usd: 55_000,  max_usd: 200_000 },
   },
   tropical_nights: {
     retail:         { min_usd: 25_000,  max_usd: 80_000  },

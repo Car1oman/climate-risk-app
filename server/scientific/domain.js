@@ -17,15 +17,14 @@
 
 // ─── FASE C — Signal Taxonomy ─────────────────────────────────────────────────
 
-/**
- * Canonical registry of all signal types emitted by Layer2.
- * Each entry defines the scientific semantics, unit, threshold, and evidence link.
- * No duplicates: each real-world phenomenon has exactly one canonical key.
- *
- * Mapping to Layer2 signalType values:
- *   'extreme_heat'          → signalType: 'extreme_heat'
- *   'severe_heat'           → signalType: 'severe_heat'
- *   'tropical_nights'       → signalType: 'tropical_nights'
+  /**
+   * Canonical registry of all signal types emitted by Layer2.
+   * Each entry defines the scientific semantics, unit, threshold, and evidence link.
+   * No duplicates: each real-world phenomenon has exactly one canonical key.
+   *
+   * Mapping to Layer2 signalType values:
+   *   'extreme_heat'          → signalType: 'extreme_heat'
+   *   'tropical_nights'       → signalType: 'tropical_nights'
  *   'temp_increase'         → signalType: 'temp_increase'
  *   'drought'               → signalType: 'drought'
  *   'extreme_rain'          → signalType: 'extreme_rain'
@@ -394,6 +393,57 @@ export const EVIDENCE_REGISTRY = {
     ],
   },
 };
+
+// ─── SYSTEM LIMITATIONS (detectadas en auditoría Jun 2026) ─────────────────────
+// Limitaciones conocidas del pipeline completo que no son atribuibles a
+// una fuente de datos individual sino al diseño del sistema.
+export const SYSTEM_LIMITATIONS = [
+  {
+    id: 'SYS-001',
+    title: 'hd40 no disponible en climate_cells (DB)',
+    description: 'La variable hd40 (días con Tmax > 40°C) no existe en la tabla climate_cells. ' +
+                 'La señal severe_heat se eliminó del pipeline. Open-Meteo puede computar hd40 como fallback.',
+    severity: 'info',
+    mitigation: 'Commit 1 — eliminado de Layer2. Usar GRI extreme_heat como proxy de calor severo.',
+  },
+  {
+    id: 'SYS-002',
+    title: 'Sin horizonte long_term (2060-2100) real en climate_cells',
+    description: 'La DB solo cubre hasta 2059. El horizonte long_term se añadió al buildHorizonMap ' +
+                 'para detectar datos si estuvieran disponibles. projection.js contiene datos IPCC de referencia regional.',
+    severity: 'medium',
+    mitigation: 'Commit 7 — extrapolación de mid_term y datos IPCC de referencia. Migrar a CMIP6 2060-2099 cuando estén disponibles.',
+  },
+  {
+    id: 'SYS-003',
+    title: 'Thresholds regionalizados V2 (Commit 3)',
+    description: 'Layer2_SignalEngineV2.js usa thresholds diferenciados por macro-región ' +
+                 '(costa/sierra/selva/puna) basados en SENAMHI, no thresholds globales IPCC.',
+    severity: 'info',
+    mitigation: 'Validar en staging contra al menos 10 ubicaciones por región antes de desactivar v1.',
+  },
+  {
+    id: 'SYS-004',
+    title: 'Variables huérfanas integradas (Commit 4)',
+    description: 'r50mm, tx84rr, tasmax ahora generan señales en V2. Antes estaban en DB pero no se usaban.',
+    severity: 'info',
+    mitigation: 'Monitorear nuevas señales en staging — pueden aumentar tasa de detección en ~30%.',
+  },
+  {
+    id: 'SYS-005',
+    title: 'GRI como fuente primaria de inundación (Commit 5)',
+    description: 'GRI (~1km) evaluado antes que CMIP6 (~25km) en V2. Mejora resolución espacial para Perú.',
+    severity: 'info',
+    mitigation: 'Verificar que GRI tenga cobertura para ubicaciones de interés en Perú costero.',
+  },
+  {
+    id: 'SYS-006',
+    title: 'prpercnt historical fijo corregido (Commit 6)',
+    description: 'historical: 100 reemplazado por valor real de pr histórico como baseline.',
+    severity: 'info',
+    mitigation: 'N/A — corrección cosmética para reportes.',
+  },
+];
 
 // ─── FASE B — Standard signal structure builder ───────────────────────────────
 

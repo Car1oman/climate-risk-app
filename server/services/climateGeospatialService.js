@@ -1,10 +1,13 @@
-// LEGACY — This service uses an incorrect chained .from().rpc() pattern
+// ═══════════════════════════════════════════════════════════════════════════════
+// DEPRECATED — This service uses an incorrect chained .from().rpc() pattern
 // that does not execute correctly against Supabase.
-// The active lookup path is GET /api/climate-risks/lookup in server.js,
-// which calls supabase.rpc('get_climate_by_location') directly.
-// This file is only kept because server.js still imports getClimateByLocation
-// and interpretClimateRisks for the /api/climate-cells/query endpoint.
-// Do NOT add new features here. Migrate consumers to /api/climate-risks/lookup.
+// Scheduled for removal in Sprint 6.
+//
+// Replacement: GET /api/climate-risks/lookup in server.js, which calls
+// supabase.rpc('get_climate_by_location') directly.
+//
+// Do NOT add new features here. Migrate all consumers to /api/climate-risks/lookup.
+// ═══════════════════════════════════════════════════════════════════════════════
 
 /**
  * Servicio de datos climáticos geoespaciales
@@ -19,6 +22,7 @@ import { supabase } from "../supabaseClient.js";
  * @returns {Promise<Object>} Datos climáticos completos
  */
 const getClimateByLocation = async (lat, lon) => {
+  console.warn('[DEPRECATED] climateGeospatialService.getClimateByLocation — use GET /api/climate-risks/lookup instead');
   const latNum = Number(lat);
   const lonNum = Number(lon);
 
