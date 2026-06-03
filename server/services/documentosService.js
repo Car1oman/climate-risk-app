@@ -16,6 +16,9 @@
 import { supabase } from '../supabaseClient.js';
 import { extractTextFull } from './documentTextExtractor.js';
 import { indexDocument } from './documentEmbeddingService.js';
+import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { s3Client, R2_BUCKET, buildPublicUrl } from './s3Client.js';
+import { config } from '../config/env.js';
 
 // ── Constantes ──────────────────────────────────────────────────────────────
 
@@ -160,30 +163,51 @@ const uploadDocumento = async (file, descripcion, categoria) => {
     );
   }
 
-  // ── Asegurar bucket ───────────────────────────────────────────────────────
-  await ensureBucket();
-
   // ── Subir a Storage ───────────────────────────────────────────────────────
   // Prefijo con timestamp para evitar colisiones en el bucket aunque haya rollback
   const storagePath = `${Date.now()}_${nombreNorm}`;
 
-  const { error: storageErr } = await supabase.storage
-    .from(BUCKET)
-    .upload(storagePath, file.buffer, {
-      contentType: file.mimetype,
-      upsert: false,
-    });
+  let publicUrl;
 
-  if (storageErr) {
-    throw new Error(`Error al subir al storage: ${storageErr.message}`);
+  if (config.r2Configured) {
+    // ── R2 como proveedor principal ─────────────────────────────────────────
+    console.log('[UPLOAD_PRIMARY_R2]', { file: nombreNorm, path: storagePath });
+
+    await s3Client.send(new PutObjectCommand({
+      Bucket:      R2_BUCKET,
+      Key:         storagePath,
+      Body:        file.buffer,
+      ContentType: file.mimetype,
+    }));
+
+    console.log('[UPLOAD_R2_OK]', { file: nombreNorm, path: storagePath });
+
+    publicUrl = buildPublicUrl(storagePath);
+  } else {
+    // ── Supabase como proveedor principal (legacy) ──────────────────────────
+    console.log('[UPLOAD_PRIMARY_SUPABASE]', { file: nombreNorm, path: storagePath });
+
+    await ensureBucket();
+
+    const { error: storageErr } = await supabase.storage
+      .from(BUCKET)
+      .upload(storagePath, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false,
+      });
+
+    if (storageErr) {
+      throw new Error(`Error al subir al storage: ${storageErr.message}`);
+    }
+
+    console.log('[UPLOAD_SUPABASE_OK]', { file: nombreNorm, path: storagePath });
+
+    const { data: urlData } = supabase.storage
+      .from(BUCKET)
+      .getPublicUrl(storagePath);
+
+    publicUrl = urlData.publicUrl;
   }
-
-  // ── Obtener URL pública ───────────────────────────────────────────────────
-  const { data: urlData } = supabase.storage
-    .from(BUCKET)
-    .getPublicUrl(storagePath);
-
-  const publicUrl = urlData.publicUrl;
 
   // ── Insertar en BD (con rollback si falla) ─────────────────────────────────
   // Detectar si la columna 'categoria' existe para evitar error en schema cache.
@@ -211,9 +235,17 @@ const uploadDocumento = async (file, descripcion, categoria) => {
     .single();
 
   if (dbErr) {
-    // Rollback: eliminar el archivo ya subido al storage
+    // Rollback: eliminar el archivo ya subido al proveedor principal
     console.warn('⚠️  Rollback storage — eliminando:', storagePath);
-    await supabase.storage.from(BUCKET).remove([storagePath]);
+    if (config.r2Configured) {
+      try {
+        await s3Client.send(new DeleteObjectCommand({ Bucket: R2_BUCKET, Key: storagePath }));
+      } catch (r2DelErr) {
+        console.warn('[ROLLBACK_R2_FAILED]', { path: storagePath, error: r2DelErr.message });
+      }
+    } else {
+      await supabase.storage.from(BUCKET).remove([storagePath]);
+    }
     throw new Error(`Error al guardar en base de datos: ${dbErr.message}`);
   }
 
