@@ -5,6 +5,7 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Upload, FileText, CheckCircle, XCircle, Cloud } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { apiFetch } from '@/lib/api';
 
 const BulkClimateUpload = () => {
   const [file, setFile] = useState(null);
@@ -149,11 +150,9 @@ const BulkClimateUpload = () => {
       for (let i = 0; i < validatedData.length; i += batchSize) {
         const batch = validatedData.slice(i, i + batchSize);
 
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/climate/bulk`, {
+        const response = await apiFetch('/api/climate/bulk', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ climateData: batch }),
         });
 

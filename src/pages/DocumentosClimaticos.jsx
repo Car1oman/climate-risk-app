@@ -13,7 +13,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
-import { API_URL } from "@/lib/api";
+import { API_URL, apiFetch } from "@/lib/api";
 import {
   Upload, FileText, FileSpreadsheet, Trash2, Download, AlertTriangle,
   FolderOpen, CheckCircle, XCircle, RefreshCw, Filter,
@@ -97,7 +97,7 @@ export default function DocumentosClimaticos() {
 
   const handleDelete = async (id, nombre) => {
     try {
-      const res = await fetch(`${API_URL}/api/documentos/${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/documentos/${id}`, { method: "DELETE" });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || "Error al eliminar");
@@ -223,10 +223,9 @@ function UploadForm({ onSuccess }) {
         setProgress((p) => Math.min(p + 10, 85));
       }, 300);
 
-      const res = await fetch(`${API_URL}/api/documentos/upload`, {
+      const res = await apiFetch("/api/documentos/upload", {
         method: "POST",
         body: formData,
-        // NO establecer Content-Type — el browser lo pone con el boundary correcto
       });
 
       clearInterval(ticker);

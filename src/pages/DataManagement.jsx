@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAssets } from "@/hooks/useAssets";
-import { API_URL } from "@/lib/api";
+import { API_URL, apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -136,7 +136,7 @@ function AssetsTab({ assets, refetch }) {
 function AssetsTable({ assets, refetch, onEdit }) {
   const handleDelete = async (assetId) => {
     try {
-      const response = await fetch(`${API_URL}/api/assets/${assetId}`, {
+      const response = await apiFetch(`/api/assets/${assetId}`, {
         method: 'DELETE',
       });
 
@@ -341,7 +341,7 @@ function ManualAssetForm({ isOpen, onClose, editingAsset, onSuccess }) {
 
   const checkDuplicate = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/assets/check-duplicate`, {
+      const response = await apiFetch('/api/assets/check-duplicate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -384,10 +384,10 @@ function ManualAssetForm({ isOpen, onClose, editingAsset, onSuccess }) {
         condition: formData.condition,
       };
 
-      const url = editingAsset ? `${API_URL}/api/assets/${editingAsset.id}` : `${API_URL}/api/assets`;
+      const path = editingAsset ? `/api/assets/${editingAsset.id}` : '/api/assets';
       const method = editingAsset ? 'PUT' : 'POST';
 
-      const response = await fetch(url, {
+      const response = await apiFetch(path, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

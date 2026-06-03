@@ -5,6 +5,7 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Upload, FileText, CheckCircle, XCircle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { apiFetch } from '@/lib/api';
 
 const BulkAssetUpload = () => {
   const [file, setFile] = useState(null);
@@ -109,11 +110,9 @@ const BulkAssetUpload = () => {
       for (let i = 0; i < assets.length; i += batchSize) {
         const batch = assets.slice(i, i + batchSize);
 
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/assets/bulk`, {
+        const response = await apiFetch('/api/assets/bulk', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ assets: batch }),
         });
 
