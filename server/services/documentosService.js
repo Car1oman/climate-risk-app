@@ -56,7 +56,7 @@ const normalizeName = (raw) =>
     .replace(/^_+|_+$/g, '');                // trim _
 
 /**
- * Extraer la ruta relativa dentro del bucket a partir de la URL pública.
+ * Extraer la ruta relativa dentro del bucket a partir de la URL pública de Supabase.
  * URL: https://{ref}.supabase.co/storage/v1/object/public/{bucket}/{path}
  */
 const storagePathFromUrl = (publicUrl) => {
@@ -65,6 +65,22 @@ const storagePathFromUrl = (publicUrl) => {
     const marker = `/public/${BUCKET}/`;
     const idx = url.pathname.indexOf(marker);
     return idx >= 0 ? url.pathname.slice(idx + marker.length) : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Extraer la key de R2 a partir de la URL pública de R2.
+ * URL: ${R2_PUBLIC_URL}/${key}
+ * Retorna null si la URL no corresponde a R2 o si R2_PUBLIC_URL no está configurado.
+ */
+const r2KeyFromUrl = (publicUrl) => {
+  try {
+    const base = config.r2PublicUrl;
+    if (!base || !publicUrl) return null;
+    const prefix = base + '/';
+    return publicUrl.startsWith(prefix) ? publicUrl.slice(prefix.length) : null;
   } catch {
     return null;
   }
@@ -288,11 +304,16 @@ const getDocumentos = async (_categoria = null) => {
 };
 
 /**
- * Eliminar un documento de la BD y del storage.
- * Si falla el storage el registro en BD ya fue eliminado (no bloquea la operación).
+ * Eliminar un documento de la BD y del storage (R2 o Supabase según la URL).
+ *
+ * Caso A — URL R2: elimina el objeto de R2 PRIMERO; si R2 falla, lanza error
+ *   y el registro en BD permanece intacto (la operación es reintentable).
+ *   Si R2 OK → elimina el registro de BD.
+ *
+ * Caso B — URL Supabase (legacy): elimina BD primero; luego intenta Supabase
+ *   Storage en modo best-effort (un fallo de storage no bloquea la respuesta).
  */
 const deleteDocumento = async (id) => {
-  // Obtener registro
   const { data: doc, error: fetchErr } = await supabase
     .from('archivos')
     .select('*')
@@ -302,23 +323,37 @@ const deleteDocumento = async (id) => {
   if (fetchErr) throw fetchErr;
   if (!doc) throw Object.assign(new Error('Documento no encontrado'), { status: 404 });
 
-  // Eliminar de BD
-  const { error: delErr } = await supabase
-    .from('archivos')
-    .delete()
-    .eq('id', id);
+  const r2Key = r2KeyFromUrl(doc.url);
 
-  if (delErr) throw delErr;
+  if (r2Key) {
+    // ── Caso A: documento almacenado en R2 ────────────────────────────────────
+    try {
+      await s3Client.send(new DeleteObjectCommand({ Bucket: R2_BUCKET, Key: r2Key }));
+      console.log('[DELETE_R2_OK]', { id, key: r2Key });
+    } catch (r2Err) {
+      console.error('[DELETE_R2_FAILED]', { id, key: r2Key, error: r2Err.message });
+      throw Object.assign(
+        new Error(`No se pudo eliminar el objeto de R2 (key: ${r2Key}): ${r2Err.message}`),
+        { status: 500 }
+      );
+    }
 
-  // Eliminar del storage (best-effort)
-  const storagePath = storagePathFromUrl(doc.url);
-  if (storagePath) {
-    const { error: stErr } = await supabase.storage
-      .from(BUCKET)
-      .remove([storagePath]);
+    const { error: delErr } = await supabase.from('archivos').delete().eq('id', id);
+    if (delErr) throw delErr;
+  } else {
+    // ── Caso B: documento almacenado en Supabase Storage (legacy) ─────────────
+    const { error: delErr } = await supabase.from('archivos').delete().eq('id', id);
+    if (delErr) throw delErr;
 
-    if (stErr) {
-      console.warn(`⚠️  No se pudo eliminar del storage "${storagePath}":`, stErr.message);
+    const storagePath = storagePathFromUrl(doc.url);
+    if (storagePath) {
+      const { error: stErr } = await supabase.storage.from(BUCKET).remove([storagePath]);
+
+      if (stErr) {
+        console.warn('[DELETE_SUPABASE_FAILED]', { id, path: storagePath, error: stErr.message });
+      } else {
+        console.log('[DELETE_SUPABASE_OK]', { id, path: storagePath });
+      }
     }
   }
 
