@@ -92,9 +92,8 @@ function RiskTimelineRow({ timeline, activeScenario }) {
     return null;
   }
 
-  // Only render rows that span at least 2 temporal periods
   const presentPeriods = PERIOD_ORDER.filter(p => timeline[p] != null);
-  if (presentPeriods.length < 2) return null;
+  if (timeline.riskType !== 'fenomeno_enso' && presentPeriods.length < 2) return null;
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
@@ -141,8 +140,8 @@ export default function RiskTimeline({ timelineRisks, activeScenario }) {
     return null;
   }
 
-  // Only include risk types that span at least 2 temporal periods
   const multiPeriodTimelines = timelineRisks.filter(t => {
+    if (t.riskType === 'fenomeno_enso') return true;
     const count = PERIOD_ORDER.filter(p => t[p] != null).length;
     return count >= 2;
   });
