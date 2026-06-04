@@ -364,8 +364,11 @@ export function buildEnsoShortTermNarrative(
   affectedRegions?: string[],
 ): string {
   if (phase === 'neutral') {
-    const oniStr = oni != null ? ` (ONI: ${oni > 0 ? '+' : ''}${oni.toFixed(2)}°C)` : '';
-    return `Fase ENSO neutral${oniStr}. Sin amplificación climática por El Niño/La Niña. Los riesgos de inundación y sequía dependen de las proyecciones climáticas de largo plazo.`;
+    const oniVal  = oni != null ? `${oni > 0 ? '+' : ''}${oni.toFixed(2)}°C` : null;
+    const oniLine = oniVal
+      ? ` Índice ONI actual: ${oniVal} (umbral NOAA: ±0.5°C).`
+      : '';
+    return `Sin El Niño ni La Niña activo según NOAA CPC.${oniLine} No hay amplificación ENSO sobre los riesgos climáticos del activo.`;
   }
 
   const isFeminine     = phase === 'la_nina';

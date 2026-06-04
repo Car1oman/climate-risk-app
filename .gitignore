@@ -38,3 +38,4 @@ codegraph/*
 server/_audit_schema.mjs
 build_phase*.txt
 .codegraph/
+.claude/settings.local.json
