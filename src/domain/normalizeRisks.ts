@@ -26,7 +26,7 @@ import type {
 
 import { RISK_TYPE_DISPLAY, formatKeyMetric } from '../constants/riskTypes';
 import { toScenarioLabel, toTemporalPeriod } from '../constants/scenarios';
-import { buildScenarioVariants, buildTemporalEvolutionSentence } from './buildOperationalNarrative';
+import { buildScenarioVariants, buildTemporalEvolutionSentence, buildEnsoShortTermNarrative } from './buildOperationalNarrative';
 
 // ─── Semantic mapping tables ──────────────────────────────────────────────────
 
@@ -380,7 +380,57 @@ export function normalizeRisks(apiResponse: Record<string, unknown>): Consolidat
     }
   }
 
-  // ── 5b. Return sorted: higher-confidence first, then by period ─────────────
+  // ── 5b. Override ENSO narrative with real phase-specific context ───────────
+  // I3: ENSO only exists in corto_plazo — never overrides future horizons.
+  // Requires enso_context in the API response (added in server/routes/climate.js).
+  const ensoCtx = apiResponse['enso_context'] as Record<string, unknown> | null | undefined;
+  const ensoEntry = map.get('fenomeno_enso_corto_plazo');
+  if (ensoEntry && ensoCtx) {
+    const phase      = ensoCtx['phase']             as string | undefined;
+    const intensity  = ensoCtx['intensity']         as string | undefined;
+    const oni        = ensoCtx['oni_latest']        as number | undefined;
+    const trend      = ensoCtx['trend']             as string | undefined;
+    const summary    = ensoCtx['summary']           as string | undefined;
+    const opRisks    = ensoCtx['operational_risks'] as string[] | undefined;
+    const supplyRisk = ensoCtx['supply_chain_risk'] as string | undefined;
+
+    if (phase) {
+      const richNarrative = buildEnsoShortTermNarrative(phase, intensity, oni, trend, summary);
+      ensoEntry.narrativeText = richNarrative;
+
+      const modVariant  = ensoEntry.scenarioVariants['emisiones_moderadas'];
+      const highVariant = ensoEntry.scenarioVariants['altas_emisiones'];
+      if (modVariant)  modVariant.narrativeText = richNarrative;
+      if (highVariant) {
+        const highSuffix = phase === 'el_nino'
+          ? ' Bajo altas emisiones, la intensidad de los eventos asociados podría ser mayor.'
+          : ' Bajo altas emisiones, el déficit hídrico asociado podría ser más severo.';
+        highVariant.narrativeText = richNarrative + highSuffix;
+      }
+
+      if (oni != null) {
+        ensoEntry.keyMetric = formatKeyMetric(oni, '°C', 'ONI');
+      }
+
+      if (Array.isArray(opRisks) && opRisks.length > 0) {
+        ensoEntry.impacts = dedupeStrings([...opRisks, ...ensoEntry.impacts]);
+        // Rebuild scenarioVariants with the enriched impacts (I3: corto_plazo only)
+        const refreshed = buildScenarioVariants('fenomeno_enso', 'corto_plazo', ensoEntry.impacts);
+        if (refreshed['emisiones_moderadas']) refreshed['emisiones_moderadas'].narrativeText = richNarrative;
+        if (refreshed['altas_emisiones']) {
+          const highSuffix = phase === 'el_nino'
+            ? ' Bajo altas emisiones, la intensidad de los eventos asociados podría ser mayor.'
+            : ' Bajo altas emisiones, el déficit hídrico asociado podría ser más severo.';
+          refreshed['altas_emisiones'].narrativeText = richNarrative + highSuffix;
+        }
+        ensoEntry.scenarioVariants = refreshed;
+      } else if (supplyRisk) {
+        ensoEntry.impacts = dedupeStrings([`Riesgo en cadena de suministro: nivel ${supplyRisk}`, ...ensoEntry.impacts]);
+      }
+    }
+  }
+
+  // ── 5c. Return sorted: higher-confidence first, then by period ─────────────
   const periodOrder: Record<TemporalPeriod, number> = {
     historico:      0,
     corto_plazo:    1,

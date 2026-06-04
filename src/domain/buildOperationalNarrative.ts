@@ -336,3 +336,34 @@ export function buildScenarioVariants(
 export function buildTemporalEvolutionSentence(riskType: RiskTypeSlug): string {
   return TEMPORAL_EVOLUTION[riskType] ?? `Este fenómeno presenta variaciones proyectadas a lo largo de los horizontes temporales analizados.`;
 }
+
+/**
+ * Builds a phase-specific ENSO narrative for the ConsolidatedRisk card.
+ * Only for corto_plazo — ENSO is never projected in future horizons (I3).
+ *
+ * Mirrors ensoService.buildEnsoNarrative() but adapted for the card context.
+ */
+export function buildEnsoShortTermNarrative(
+  phase: string,
+  intensity: string | undefined,
+  oni: number | undefined,
+  trend: string | undefined,
+  summary: string | undefined
+): string {
+  if (phase === 'neutral') {
+    const oniStr = oni != null ? ` (ONI: ${oni > 0 ? '+' : ''}${oni.toFixed(2)}°C)` : '';
+    return `Fase ENSO neutral${oniStr}. Sin amplificación climática por El Niño/La Niña. Los riesgos de inundación y sequía dependen de las proyecciones climáticas de largo plazo.`;
+  }
+
+  const phaseLabel   = phase === 'el_nino' ? 'El Niño' : 'La Niña';
+  const intensityStr = intensity && intensity !== 'neutro' ? ` ${intensity}` : '';
+  const oniStr       = oni != null
+    ? ` (ONI: ${oni > 0 ? '+' : ''}${oni.toFixed(2)}°C)`
+    : '';
+  const trendStr     = trend === 'increasing'  ? ' en aumento'
+                     : trend === 'decreasing'   ? ' en disminución'
+                     : '';
+
+  const base = `Se detecta ${phaseLabel}${intensityStr} activo${oniStr}${trendStr}.`;
+  return summary ? `${base} ${summary}` : base;
+}

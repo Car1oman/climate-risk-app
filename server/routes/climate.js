@@ -865,6 +865,20 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
       uncertainty:       narrativeOutput.uncertainty,
       gri_hazards:       fusedData.griData?.hazards ?? [],
       territorial:       fusedData.territorialData ?? null,
+      enso_context:      fusedData.ensoData
+        ? {
+            phase:             fusedData.ensoData.phase,
+            intensity:         fusedData.ensoData.intensity,
+            oni_latest:        fusedData.ensoData.oni_latest,
+            trend:             fusedData.ensoData.trend,
+            flood_amplifier:   fusedData.ensoData.flood_amplifier,
+            drought_amplifier: fusedData.ensoData.drought_amplifier,
+            supply_chain_risk: fusedData.ensoData.supply_chain_risk,
+            affected_regions:  fusedData.ensoData.affected_regions,
+            operational_risks: fusedData.ensoData.operational_risks,
+            summary:           fusedData.ensoData.summary,
+          }
+        : null,
       metadata: {
         sector,
         ...(business_unit_id && { business_unit_id }),
