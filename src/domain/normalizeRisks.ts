@@ -401,6 +401,11 @@ export function normalizeRisks(apiResponse: Record<string, unknown>): Consolidat
       const richNarrative = buildEnsoShortTermNarrative(phase, intensity, oni, trend, summary, affectedRegions);
       ensoEntry.narrativeText = richNarrative;
 
+      // Fix 2: neutral phase never has an active El Niño/La Niña event — use a non-misleading label.
+      if (phase === 'neutral') {
+        ensoEntry.displayName = 'Estado ENSO (fase neutral)';
+      }
+
       // High-emissions suffix is phase-specific — neutral gets no amplification text.
       const highSuffix = phase === 'el_nino'
         ? ' Bajo altas emisiones, la intensidad de los eventos asociados podría ser mayor.'
@@ -413,12 +418,25 @@ export function normalizeRisks(apiResponse: Record<string, unknown>): Consolidat
       if (modVariant) modVariant.narrativeText = richNarrative;
       if (highVariant) highVariant.narrativeText = highSuffix ? richNarrative + highSuffix : richNarrative;
 
+      // Fix 3: ENSO neutral is observational (NOAA ONI), not a model projection —
+      // override the variant confidence that buildScenarioVariants hardcodes to 'media'.
+      if (phase === 'neutral') {
+        if (modVariant)  modVariant.confidence  = 'alta';
+        if (highVariant) highVariant.confidence = 'alta';
+        ensoEntry.confidence = 'alta';
+      }
+
       if (oni != null) {
-        const oniPhaseLabel = phase === 'el_nino' ? 'El Niño'
-                            : phase === 'la_nina' ? 'La Niña'
-                            : 'ENSO';
-        const rounded = Number.isInteger(oni) ? oni : Number(oni.toFixed(1));
-        ensoEntry.keyMetric = `${rounded} °C de variabilidad climática ${oniPhaseLabel}`;
+        // Fix 1: avoid toFixed(1) rounding 0.48 → "0.5" (looks like the El Niño threshold).
+        // Neutral phase gets a precise ONI label; active phases keep the rounded °C metric.
+        if (phase === 'neutral') {
+          const sign = oni > 0 ? '+' : '';
+          ensoEntry.keyMetric = `ONI: ${sign}${oni.toFixed(2)}°C — fase neutral`;
+        } else {
+          const oniPhaseLabel = phase === 'el_nino' ? 'El Niño' : 'La Niña';
+          const rounded = Number.isInteger(oni) ? oni : Number(oni.toFixed(1));
+          ensoEntry.keyMetric = `${rounded} °C de variabilidad climática ${oniPhaseLabel}`;
+        }
       }
 
       if (Array.isArray(opRisks) && opRisks.length > 0) {
