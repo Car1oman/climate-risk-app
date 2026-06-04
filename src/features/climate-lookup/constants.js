@@ -24,6 +24,38 @@ export const SECTORS = [
   { value: "otros",           label: "Otro sector" },
 ];
 
+/**
+ * Unidades de negocio — mapeadas al catálogo businessProfiles.js del backend.
+ * Cada entrada tiene sector sugerido y taxonomía operativa.
+ * Al seleccionar una unidad, el sector se ajusta automáticamente.
+ */
+export const BUSINESS_UNITS = [
+  // ── Financiero ──────────────────────────────────────────────────────────
+  { id: "interbank",          label: "Interbank",          plataforma: "Financiera",   taxonomia: "banco",             sectorSugerido: "otros" },
+  { id: "inteligo",           label: "Inteligo",           plataforma: "Financiera",   taxonomia: "banco_inversiones", sectorSugerido: "otros" },
+  { id: "izipay",             label: "Izipay",              plataforma: "Financiera",   taxonomia: "procesadora_pagos", sectorSugerido: "otros" },
+  { id: "interseguro",        label: "Interseguro",         plataforma: "Financiera",   taxonomia: "seguros",           sectorSugerido: "otros" },
+  { id: "infinance_xp",       label: "InFinance XP",        plataforma: "Retail",       taxonomia: "financiera",        sectorSugerido: "otros" },
+  // ── Retail ──────────────────────────────────────────────────────────────
+  { id: "spsa",               label: "Supermercados Peruanos", plataforma: "Retail",    taxonomia: "supermercado",     sectorSugerido: "retail" },
+  { id: "farmacias_peruanas", label: "Farmacias Peruanas",   plataforma: "Retail",      taxonomia: "farmacia",          sectorSugerido: "retail" },
+  { id: "oechsle",            label: "Oechsle",             plataforma: "Retail",       taxonomia: "tienda_departamentos", sectorSugerido: "retail" },
+  { id: "real_plaza",         label: "Real Plaza",          plataforma: "Retail",       taxonomia: "centro_comercial",  sectorSugerido: "retail" },
+  { id: "promart",            label: "Promart",             plataforma: "Retail",       taxonomia: "homecenter",        sectorSugerido: "retail" },
+  // ── Educación ───────────────────────────────────────────────────────────
+  { id: "innova_schools",     label: "Innova Schools",      plataforma: "Educación",    taxonomia: "colegio",           sectorSugerido: "educacion" },
+  { id: "utp",                label: "UTP",                 plataforma: "Educación",    taxonomia: "universidad",       sectorSugerido: "educacion" },
+  { id: "inlearning",         label: "InLearning",          plataforma: "Educación",    taxonomia: "instituto",         sectorSugerido: "educacion" },
+  // ── Entretenimiento ─────────────────────────────────────────────────────
+  { id: "la_tinka",           label: "La Tinka",            plataforma: "Entretenimiento", taxonomia: "juegos_azar",     sectorSugerido: "entretenimiento" },
+  { id: "ngr",                label: "NGR",                 plataforma: "Entretenimiento", taxonomia: "restaurante",      sectorSugerido: "entretenimiento" },
+  { id: "casa_andina",        label: "Casa Andina",         plataforma: "Entretenimiento", taxonomia: "hotel",            sectorSugerido: "entretenimiento" },
+  { id: "cineplanet",         label: "Cineplanet",          plataforma: "Entretenimiento", taxonomia: "cine",             sectorSugerido: "entretenimiento" },
+  // ── Salud ───────────────────────────────────────────────────────────────
+  { id: "clinica_aviva",      label: "Clínica Aviva",       plataforma: "Salud",        taxonomia: "hospital",          sectorSugerido: "salud" },
+  { id: "smi",                label: "SMI",                 plataforma: "Industrial",   taxonomia: "planta_industrial", sectorSugerido: "otros" },
+];
+
 export const SIGNAL_META = {
   extreme_heat:    { icon: "🌡️", label: "Calor extremo (>35°C)",    unit: "días/año"    },
   severe_heat:     { icon: "🔥", label: "Calor severo (>40°C)",      unit: "días/año"    },

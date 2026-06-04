@@ -19,10 +19,11 @@ import { buildNarrativeReport } from '@/domain/buildNarrativeReport';
 import { SECTORS } from '@/features/climate-lookup/constants';
 
 /**
- * @param {string} sector  - Current sector slug (e.g. 'retail')
- * @returns {object}       - Hook payload (see return statement for full shape)
+ * @param {string} sector         - Current sector slug (e.g. 'retail')
+ * @param {string} businessUnitId - Business unit ID (e.g. 'spsa', 'interbank')
+ * @returns {object}              - Hook payload (see return statement for full shape)
  */
-export function useClimateAnalysis(sector) {
+export function useClimateAnalysis(sector, businessUnitId = '') {
   const [rawResponse,   setRawResponse]   = useState(null);
   const [loading,       setLoading]       = useState(false);
   const [error,         setError]         = useState(null);
@@ -103,7 +104,7 @@ export function useClimateAnalysis(sector) {
       setError(null);
 
       try {
-        const result = await analyzeClimateRisk({ lat, lon, sector });
+        const result = await analyzeClimateRisk({ lat, lon, sector, business_unit_id: businessUnitId || undefined });
         if (result) {
           setRawResponse(result);
         } else {

@@ -29,6 +29,7 @@ import { assessBusinessRisk }   from '../layers/Layer3_BusinessRiskEngine.js';
 import { getAdaptations, enrichAdaptationsWithAI } from '../layers/Layer5_AdaptationEngine.js';
 import { generateNarrative, enhanceNarrativeWithAI } from '../layers/Layer6_NarrativeEngine.js';
 import { buildProjectionContext } from '../scientific/projection.js';
+import { listBusinessUnits, getBusinessProfile } from '../layers/businessProfiles.js';
 
 const router = express.Router();
 
@@ -640,8 +641,26 @@ router.get('/territorial-context', async (req, res) => {
 // Ejecuta las 6 capas en secuencia y retorna
 // análisis completo de riesgo climático.
 // ============================================
+/**
+ * GET /api/business-units
+ * Lista todas las unidades de negocio disponibles para el frontend.
+ */
+router.get('/business-units', (_req, res) => {
+  res.json(listBusinessUnits());
+});
+
+/**
+ * GET /api/business-units/:id
+ * Retorna el perfil completo de una unidad de negocio.
+ */
+router.get('/business-units/:id', (req, res) => {
+  const profile = getBusinessProfile(req.params.id);
+  if (!profile) return res.status(404).json({ error: 'Unidad de negocio no encontrada' });
+  res.json(profile);
+});
+
 router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
-  const { lat, lon, sector: sectorRaw, asset_type, scenario } = req.body;
+  const { lat, lon, sector: sectorRaw, asset_type, scenario, business_unit_id } = req.body;
   const sector = sectorRaw || 'retail';
 
   if (!lat || !lon) {
@@ -656,7 +675,7 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
   }
 
   // ── Cache de respuestas (10 min) ────────────────────────────────────────────
-  const v2CacheKey = `v2-${latNum.toFixed(4)}-${lonNum.toFixed(4)}-${sector}-${scenario || 'pesimista'}`;
+  const v2CacheKey = `v2-${latNum.toFixed(4)}-${lonNum.toFixed(4)}-${sector}-${scenario || 'pesimista'}-${business_unit_id || 'none'}`;
   const now = Date.now();
   if (climateCache[v2CacheKey] && now - climateCache[v2CacheKey].timestamp < CACHE_TTL) {
     console.log('[v2] Cache hit:', v2CacheKey);
@@ -719,7 +738,7 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
     // ── Capa 3: Evaluación de riesgo de negocio ─────────────────────────────
     let businessRiskOutput;
     try {
-      businessRiskOutput = await assessBusinessRisk(signalOutput, { sector, asset_type, docContext });
+      businessRiskOutput = await assessBusinessRisk(signalOutput, { sector, asset_type, docContext, business_unit_id });
       partialResult.layer3 = 'ok';
     } catch (err) {
       console.error('[v2] Layer3 falló:', err.message);
@@ -838,6 +857,7 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
         executive_summary: narrativeOutput.executive_summary,
         key_metrics:       narrativeOutput.key_metrics,
       },
+      ...(business_unit_id && { business_unit: business_unit_id }),
       confidence:        narrativeOutput.confidence,
       evidence:          narrativeOutput.evidence,
       scenario:          fusedData.scenario,
@@ -847,6 +867,7 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
       territorial:       fusedData.territorialData ?? null,
       metadata: {
         sector,
+        ...(business_unit_id && { business_unit_id }),
         scenario:     fusedData.scenario,
         confidence:   narrativeOutput.confidence,
         uncertainty:  narrativeOutput.uncertainty,

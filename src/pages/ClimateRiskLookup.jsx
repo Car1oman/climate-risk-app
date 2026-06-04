@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertTriangle, Loader2, MapPin, Search, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
-import { SECTORS }              from "@/features/climate-lookup/constants";
+import { SECTORS, BUSINESS_UNITS } from "@/features/climate-lookup/constants";
 import { useClimateAnalysis }   from "@/features/climate-lookup/hooks/useClimateAnalysis";
 import SearchPanel              from "@/features/climate-lookup/components/SearchPanel";
 import AnalysisLoading          from "@/features/climate-lookup/components/AnalysisLoading";
@@ -55,6 +55,7 @@ export default function ClimateRiskLookup() {
   const [lat,            setLat]            = useState("");
   const [lng,            setLng]            = useState("");
   const [sector,         setSector]         = useState("retail");
+  const [businessUnit,   setBusinessUnit]   = useState("");
   const [tileLayer,      setTileLayer]      = useState("osm");
   const [markerPos,      setMarkerPos]      = useState(null);
   const [flyTarget,      setFlyTarget]      = useState(null);
@@ -78,7 +79,18 @@ export default function ClimateRiskLookup() {
     docContext,
     analyze,
     reset,
-  } = useClimateAnalysis(sector);
+  } = useClimateAnalysis(sector, businessUnit);
+
+  // Auto-ajustar sector cuando se selecciona una unidad de negocio
+  const handleBusinessUnitChange = useCallback((value) => {
+    setBusinessUnit(value);
+    // Si es "ninguna", mantener el sector actual
+    if (!value) return;
+    const found = BUSINESS_UNITS.find(bu => bu.id === value);
+    if (found && found.sectorSugerido) {
+      setSector(found.sectorSugerido);
+    }
+  }, []);
 
   // ── Map event handlers ────────────────────────────────────────────────────
   const handleMapClick = useCallback((clickLat, clickLng) => {
@@ -105,8 +117,8 @@ export default function ClimateRiskLookup() {
     setMarkerPos([latNum, lngNum]);
     setFlyTarget({ pos: [latNum, lngNum], zoom: 14 });
     setActiveScenario("emisiones_moderadas");
-    await analyze({ lat: latNum, lon: lngNum });
-  }, [lat, lng, analyze]);
+    await analyze({ lat: latNum, lon: lngNum, business_unit_id: businessUnit || undefined });
+  }, [lat, lng, businessUnit, analyze]);
 
   // ── Period-grouped risks (memoized) ───────────────────────────────────────
   const historicalRisks = useMemo(
@@ -185,6 +197,28 @@ export default function ClimateRiskLookup() {
                   <SelectContent>
                     {SECTORS.map(s => (
                       <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">
+                  Unidad de negocio <span className="text-[10px] text-muted-foreground/60">(opcional — impactos más precisos)</span>
+                </Label>
+                <Select value={businessUnit} onValueChange={handleBusinessUnitChange}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Ninguna (sector genérico)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Ninguna (sector genérico)</SelectItem>
+                    {BUSINESS_UNITS.map(bu => (
+                      <SelectItem key={bu.id} value={bu.id}>
+                        <span className="flex items-center gap-2">
+                          <span className="text-[10px] text-muted-foreground">{bu.plataforma}</span>
+                          <span>{bu.label}</span>
+                        </span>
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

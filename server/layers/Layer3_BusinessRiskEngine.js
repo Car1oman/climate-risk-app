@@ -1,10 +1,15 @@
 /**
  * Layer 3 — Business Risk Engine
- * Mapea señales climáticas a impactos operacionales por sector,
+ * Mapea señales climáticas a impactos operacionales por sector o taxonomía de negocio,
  * calcula exposure_level, sensitivity_level y financial_impact_range.
+ *
+ * V2: Soporta perfil de unidad de negocio (business_unit_id) para impactos
+ *      coherentes con el giro específico de cada negocio.
  */
 import { callWithFallback } from '../lib/ai/client.js';
 import { validateAIOutput } from '../ai/scientificValidator.js';
+import { getBusinessProfile, resolveBusinessTaxonomy } from './businessProfiles.js';
+import { getTaxonomyImpacts, getModifierImpacts, scaleFinancialRange } from './taxonomyImpacts.js';
 
 // ─── System prompt para Layer3 — guardrails científicos ─────────────────────
 const LAYER3_SYSTEM_PROMPT = `Eres un analista de riesgo climático operacional para la plataforma DataRisk Peru.
@@ -242,6 +247,47 @@ function normalizeSector(sector) {
 }
 
 /**
+ * Obtiene impactos operacionales para un negocio, usando taxonomía detallada
+ * si está disponible, con fallback al sector genérico.
+ *
+ * @param {string} signalType     - Tipo de señal climática
+ * @param {string} sectorKey      - Clave de sector genérica (fallback)
+ * @param {object|null} businessProfile - Perfil de unidad de negocio (opcional)
+ * @returns {{ impacts: string[], provenance: string, modifiers: string[] }}
+ */
+function getImpactsForBusiness(signalType, sectorKey, businessProfile) {
+  if (!businessProfile) {
+    // Sin perfil de negocio — usar catálogo por sector (comportamiento original)
+    return {
+      impacts:   OPERATIONAL_IMPACTS[signalType]?.[sectorKey]
+              ?? OPERATIONAL_IMPACTS[signalType]?.otros
+              ?? ['Impacto operacional no especificado'],
+      provenance: 'Catálogo interno de referencia por sector',
+      modifiers:  [],
+    };
+  }
+
+  const taxonomia = businessProfile.taxonomia_operativa;
+  const taxonomyImpacts = taxonomia ? getTaxonomyImpacts(taxonomia, signalType) : null;
+
+  const baseImpacts = taxonomyImpacts
+    ?? OPERATIONAL_IMPACTS[signalType]?.[sectorKey]
+    ?? OPERATIONAL_IMPACTS[signalType]?.otros
+    ?? ['Impacto operacional no especificado'];
+
+  // Impactos adicionales por modificadores del perfil (cadena_frio, data_center, etc.)
+  const modifierImpacts = getModifierImpacts(businessProfile, signalType);
+
+  const provenance = taxonomyImpacts
+    ? `Catálogo de impacto por taxonomía: ${taxonomia}`
+    : 'Catálogo interno de referencia por sector';
+
+  const impacts = [...baseImpacts, ...modifierImpacts].slice(0, 6);
+
+  return { impacts, provenance, modifiers: modifierImpacts };
+}
+
+/**
  * Calcula exposure_level basado en cantidad y tipo de señales detectadas.
  */
 function calcExposureLevel(signals) {
@@ -253,26 +299,39 @@ function calcExposureLevel(signals) {
 }
 
 /**
- * Calcula sensitivity_level combinando sector y asset_type.
+ * Calcula sensitivity_level combinando sector, asset_type y perfil de negocio.
  */
-function calcSensitivityLevel(sectorKey, asset_type) {
+function calcSensitivityLevel(sectorKey, asset_type, businessProfile) {
   const sectorSens = SECTOR_SENSITIVITY[sectorKey] ?? 'bajo';
   const assetSens  = ASSET_TYPE_SENSITIVITY_BOOST[(asset_type || '').toLowerCase()] ?? null;
 
   // Si el activo tiene sensibilidad 'alto', prevalece
   if (assetSens === 'alto') return 'alto';
+
+  // Boost por perfil de negocio: cadena de frío o data center elevan sensibilidad
+  if (businessProfile) {
+    if (businessProfile.tiene_cadena_frio || businessProfile.tiene_data_center) {
+      if (sectorSens === 'bajo') return 'medio';
+      return 'alto';
+    }
+  }
+
   return sectorSens;
 }
 
 /**
  * Función principal exportada.
  * @param {Object} signalOutput - Output de Layer 2
- * @param {Object} params - { sector, asset_type?, docContext? }
+ * @param {Object} params - { sector, asset_type?, docContext?, business_unit_id? }
  * @returns {Promise<{ risks: Array, overall_exposure: string }>}
  */
-export async function assessBusinessRisk(signalOutput, { sector, asset_type = null, docContext = null }) {
+export async function assessBusinessRisk(signalOutput, { sector, asset_type = null, docContext = null, business_unit_id = null }) {
   const { signals } = signalOutput;
   const sectorKey = normalizeSector(sector);
+
+  // Resolver perfil de negocio si se proporcionó business_unit_id
+  const businessProfile = business_unit_id ? resolveBusinessTaxonomy(business_unit_id) : null;
+  const profile = businessProfile?.profile ?? null;
 
   const hasDocs = docContext?.by_category?.impacto?.length > 0
                || docContext?.by_category?.riesgo?.length > 0;
@@ -286,36 +345,43 @@ export async function assessBusinessRisk(signalOutput, { sector, asset_type = nu
 
     if (hasDocs) {
       try {
-        const aiResult = await generateImpactsViaAI(signal, sectorKey, docContext);
+        const aiResult = await generateImpactsViaAI(signal, sectorKey, docContext, profile);
         impacts = aiResult.impacts;
         provenanceLabel = aiResult.provenance;
         ai_used = true;
       } catch (err) {
-        impacts = OPERATIONAL_IMPACTS[signal.signalType]?.[sectorKey]
-               ?? OPERATIONAL_IMPACTS[signal.signalType]?.otros
-               ?? ['Impacto operacional no especificado'];
+        const fallback = getImpactsForBusiness(signal.signalType, sectorKey, profile);
+        impacts = fallback.impacts;
+        provenanceLabel = fallback.provenance;
         ai_fallback_reason = err?.message ?? 'AI generation failed';
       }
     } else {
-      impacts = OPERATIONAL_IMPACTS[signal.signalType]?.[sectorKey]
-             ?? OPERATIONAL_IMPACTS[signal.signalType]?.otros
-             ?? ['Impacto operacional no especificado'];
+      const result = getImpactsForBusiness(signal.signalType, sectorKey, profile);
+      impacts = result.impacts;
+      provenanceLabel = result.provenance;
     }
 
-    const financialRange = FINANCIAL_RANGES[signal.signalType]?.[sectorKey]
+    let financialRange = FINANCIAL_RANGES[signal.signalType]?.[sectorKey]
       ?? FINANCIAL_RANGES[signal.signalType]?.otros
       ?? { min_usd: 0, max_usd: 0 };
+
+    // Escalar rango financiero según cantidad de locales del negocio
+    if (profile?.locales_count) {
+      financialRange = scaleFinancialRange(financialRange, profile.locales_count);
+    }
 
     risks.push({
       signal,
       source_traceability:    signal.source_traceability ?? null,
       operational_impacts:    impacts,
       exposure_level:         calcExposureLevel([signal]),
-      sensitivity_level:      calcSensitivityLevel(sectorKey, asset_type),
+      sensitivity_level:      calcSensitivityLevel(sectorKey, asset_type, profile),
       financial_impact_range: financialRange,
       provenance:             provenanceLabel,
       ai_used,
       ...(ai_fallback_reason && { ai_fallback_reason }),
+      ...(profile && { business_unit: profile.id }),
+      ...(profile && { business_taxonomia: profile.taxonomia_operativa }),
     });
   }
 
@@ -328,7 +394,7 @@ export async function assessBusinessRisk(signalOutput, { sector, asset_type = nu
         source_traceability:    null,
         operational_impacts:    compound.impacts,
         exposure_level:         'alto',
-        sensitivity_level:      calcSensitivityLevel(sectorKey, asset_type),
+        sensitivity_level:      calcSensitivityLevel(sectorKey, asset_type, profile),
         financial_impact_range: { min_usd: 0, max_usd: 0 },
         provenance:             `Síntesis de riesgo compuesto: combinación ${compound.key.replace('|', ' + ')}`,
         ai_used:                false,
@@ -341,10 +407,12 @@ export async function assessBusinessRisk(signalOutput, { sector, asset_type = nu
     risks,
     overall_exposure: calcExposureLevel(signals),
     sector_key:       sectorKey,
+    ...(profile && { business_unit: profile.id }),
+    ...(profile && { business_taxonomia: profile.taxonomia_operativa }),
   };
 }
 
-async function generateImpactsViaAI(signal, sectorKey, docContext) {
+async function generateImpactsViaAI(signal, sectorKey, docContext, businessProfile = null) {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
 
   const signalType  = signal.signalType  ?? 'unknown';
@@ -353,7 +421,21 @@ async function generateImpactsViaAI(signal, sectorKey, docContext) {
   const deltaDesc   = signal.delta != null ? ` (delta: +${signal.delta.toFixed(1)})` : '';
   const docSection  = docContext?.ai_context ?? '';
 
-  const prompt = `Basándote exclusivamente en los documentos de referencia disponibles, genera impactos operativos concretos para el sector "${sectorKey}" ante la señal climática "${signalLabel}"${deltaDesc} (horizonte: ${horizon}).
+  // Contexto de negocio enriquecido (si hay perfil)
+  const businessCtx = businessProfile
+    ? `Negocio: ${businessProfile.rubro_especifico}
+Tipo de negocio: ${businessProfile.taxonomia_operativa}
+Productos clave: ${(businessProfile.productos_clave || []).join(', ')}
+Proveedores críticos: ${(businessProfile.proveedores_criticos || []).join(', ')}
+${businessProfile.tiene_cadena_frio ? 'Dependencia crítica de cadena de frío' : ''}
+${businessProfile.tiene_data_center ? 'Data center propio' : ''}
+`
+    : `Sector: ${sectorKey}`;
+
+  const prompt = `Basándote exclusivamente en los documentos de referencia disponibles, genera impactos operativos concretos para el siguiente negocio ante la señal climática "${signalLabel}"${deltaDesc} (horizonte: ${horizon}).
+
+Contexto del negocio:
+${businessCtx}
 
 Documentos de referencia:
 ${docSection}
