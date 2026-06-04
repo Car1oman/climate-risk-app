@@ -222,7 +222,7 @@ function buildContextSentence(contextualRisk, adaptations) {
  * @param {string} sector
  * @returns {Promise<Object>}
  */
-export async function enhanceNarrativeWithAI(narrativeOutput, signalOutput, businessRiskOutput, sector) {
+export async function enhanceNarrativeWithAI(narrativeOutput, signalOutput, businessRiskOutput, sector, docContext = null) {
   if (!process.env.ANTHROPIC_API_KEY) return narrativeOutput;
   const signals = signalOutput?.signals ?? [];
   if (signals.length === 0) return narrativeOutput;
@@ -235,6 +235,10 @@ export async function enhanceNarrativeWithAI(narrativeOutput, signalOutput, busi
     })
     .join('\n');
 
+  const docSection = docContext?.ai_context
+    ? `\nDocumentos de referencia disponibles:\n${docContext.ai_context}\n`
+    : '';
+
   const prompt = `Pipeline de riesgo climático — datos reales:
 
 Sector: ${sector}
@@ -242,11 +246,11 @@ Exposición general: ${businessRiskOutput?.overall_exposure ?? 'no determinada'}
 
 Señales detectadas:
 ${signalDesc}
-
+${docSection}
 Narrativa algorítmica actual (base):
 ${narrativeOutput.executive_summary}
 
-Genera un resumen ejecutivo mejorado que sintetice TODAS las señales (incluyendo riesgos compuestos si aplica).
+Genera un resumen ejecutivo mejorado que sintetice TODAS las señales (incluyendo riesgos compuestos si aplica).${docContext?.ai_context ? ' Incorpora evidencia específica de los documentos de referencia cuando sea relevante.' : ''}
 Responde SOLO con el texto del resumen. Sin JSON, sin markdown, sin encabezados. Máximo 4 oraciones.`;
 
   try {

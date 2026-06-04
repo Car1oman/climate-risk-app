@@ -333,8 +333,11 @@ export async function assessBusinessRisk(signalOutput, { sector, asset_type = nu
   const businessProfile = business_unit_id ? resolveBusinessTaxonomy(business_unit_id) : null;
   const profile = businessProfile?.profile ?? null;
 
+  // Ruta semántica (OPENAI_API_KEY activo): retorna { mode:'semantic', chunks, ai_context } sin by_category
+  // Ruta legacy (sin OPENAI_API_KEY): retorna { by_category, ai_context }
   const hasDocs = docContext?.by_category?.impacto?.length > 0
-               || docContext?.by_category?.riesgo?.length > 0;
+               || docContext?.by_category?.riesgo?.length > 0
+               || (docContext?.mode === 'semantic' && docContext?.chunks?.length > 0);
 
   const risks = [];
   for (const signal of signals) {

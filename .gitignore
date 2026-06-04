@@ -35,4 +35,6 @@ dist-ssr
 !README.md
 docs/*.md
 codegraph/*
+server/_audit_schema.mjs
+build_phase*.txt
 .codegraph/

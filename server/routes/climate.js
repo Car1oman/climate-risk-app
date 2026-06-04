@@ -825,7 +825,7 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
     // ── Capa 6 enriquecimiento IA (opcional, no bloqueante) ─────────────────
     if (process.env.ANTHROPIC_API_KEY && signalOutput.signals?.length > 0) {
       try {
-        narrativeOutput = await enhanceNarrativeWithAI(narrativeOutput, signalOutput, businessRiskOutput, sector);
+        narrativeOutput = await enhanceNarrativeWithAI(narrativeOutput, signalOutput, businessRiskOutput, sector, docContext);
         partialResult.layer6_ai = 'ok';
       } catch (err) {
         console.warn('[v2] Layer6 AI enhancement failed, usando narrativa algorítmica:', err.message);
