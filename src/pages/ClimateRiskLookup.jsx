@@ -55,7 +55,7 @@ export default function ClimateRiskLookup() {
   const [lat,            setLat]            = useState("");
   const [lng,            setLng]            = useState("");
   const [sector,         setSector]         = useState("retail");
-  const [businessUnit,   setBusinessUnit]   = useState("");
+  const [businessUnit,   setBusinessUnit]   = useState("none");
   const [tileLayer,      setTileLayer]      = useState("osm");
   const [markerPos,      setMarkerPos]      = useState(null);
   const [flyTarget,      setFlyTarget]      = useState(null);
@@ -85,7 +85,7 @@ export default function ClimateRiskLookup() {
   const handleBusinessUnitChange = useCallback((value) => {
     setBusinessUnit(value);
     // Si es "ninguna", mantener el sector actual
-    if (!value) return;
+    if (value === "none") return;
     const found = BUSINESS_UNITS.find(bu => bu.id === value);
     if (found && found.sectorSugerido) {
       setSector(found.sectorSugerido);
@@ -117,7 +117,7 @@ export default function ClimateRiskLookup() {
     setMarkerPos([latNum, lngNum]);
     setFlyTarget({ pos: [latNum, lngNum], zoom: 14 });
     setActiveScenario("emisiones_moderadas");
-    await analyze({ lat: latNum, lon: lngNum, business_unit_id: businessUnit || undefined });
+    await analyze({ lat: latNum, lon: lngNum, business_unit_id: (businessUnit && businessUnit !== "none") ? businessUnit : undefined });
   }, [lat, lng, businessUnit, analyze]);
 
   // ── Period-grouped risks (memoized) ───────────────────────────────────────
@@ -211,7 +211,7 @@ export default function ClimateRiskLookup() {
                     <SelectValue placeholder="Ninguna (sector genérico)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Ninguna (sector genérico)</SelectItem>
+                    <SelectItem value="none">Ninguna (sector genérico)</SelectItem>
                     {BUSINESS_UNITS.map(bu => (
                       <SelectItem key={bu.id} value={bu.id}>
                         <span className="flex items-center gap-2">
