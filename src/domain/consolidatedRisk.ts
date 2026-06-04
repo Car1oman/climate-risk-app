@@ -99,7 +99,7 @@ export interface ConsolidatedRisk {
   evidence: EvidenceRef[];
   adaptationMeasures: AdaptationSummary[];
   /** Internal: which API sources contributed to this entry. */
-  rawSources: ('signals' | 'risks' | 'gri')[];
+  rawSources: ('signals' | 'risks' | 'gri' | 'enso_fallback')[];
   /** Provenance label from Layer3 (e.g. "Catálogo interno de referencia" or IA-generated). */
   provenance?: string;
   /**

@@ -386,42 +386,52 @@ export function normalizeRisks(apiResponse: Record<string, unknown>): Consolidat
   const ensoCtx = apiResponse['enso_context'] as Record<string, unknown> | null | undefined;
   const ensoEntry = map.get('fenomeno_enso_corto_plazo');
   if (ensoEntry && ensoCtx) {
-    const phase      = ensoCtx['phase']             as string | undefined;
-    const intensity  = ensoCtx['intensity']         as string | undefined;
-    const oni        = ensoCtx['oni_latest']        as number | undefined;
-    const trend      = ensoCtx['trend']             as string | undefined;
-    const summary    = ensoCtx['summary']           as string | undefined;
-    const opRisks    = ensoCtx['operational_risks'] as string[] | undefined;
-    const supplyRisk = ensoCtx['supply_chain_risk'] as string | undefined;
+    const phase           = ensoCtx['phase']             as string | undefined;
+    const intensity       = ensoCtx['intensity']         as string | undefined;
+    const oni             = ensoCtx['oni_latest']        as number | undefined;
+    const trend           = ensoCtx['trend']             as string | undefined;
+    const summary         = ensoCtx['summary']           as string | undefined;
+    const opRisks         = ensoCtx['operational_risks'] as string[] | undefined;
+    const supplyRisk      = ensoCtx['supply_chain_risk'] as string | undefined;
+    const floodAmp        = ensoCtx['flood_amplifier']   as boolean | undefined;
+    const droughtAmp      = ensoCtx['drought_amplifier'] as boolean | undefined;
+    const affectedRegions = ensoCtx['affected_regions']  as string[] | undefined;
 
     if (phase) {
-      const richNarrative = buildEnsoShortTermNarrative(phase, intensity, oni, trend, summary);
+      const richNarrative = buildEnsoShortTermNarrative(phase, intensity, oni, trend, summary, affectedRegions);
       ensoEntry.narrativeText = richNarrative;
+
+      // High-emissions suffix is phase-specific — neutral gets no amplification text.
+      const highSuffix = phase === 'el_nino'
+        ? ' Bajo altas emisiones, la intensidad de los eventos asociados podría ser mayor.'
+        : phase === 'la_nina'
+        ? ' Bajo altas emisiones, el déficit hídrico asociado podría ser más severo.'
+        : '';
 
       const modVariant  = ensoEntry.scenarioVariants['emisiones_moderadas'];
       const highVariant = ensoEntry.scenarioVariants['altas_emisiones'];
-      if (modVariant)  modVariant.narrativeText = richNarrative;
-      if (highVariant) {
-        const highSuffix = phase === 'el_nino'
-          ? ' Bajo altas emisiones, la intensidad de los eventos asociados podría ser mayor.'
-          : ' Bajo altas emisiones, el déficit hídrico asociado podría ser más severo.';
-        highVariant.narrativeText = richNarrative + highSuffix;
-      }
+      if (modVariant) modVariant.narrativeText = richNarrative;
+      if (highVariant) highVariant.narrativeText = highSuffix ? richNarrative + highSuffix : richNarrative;
 
       if (oni != null) {
-        ensoEntry.keyMetric = formatKeyMetric(oni, '°C', 'ONI');
+        const oniPhaseLabel = phase === 'el_nino' ? 'El Niño'
+                            : phase === 'la_nina' ? 'La Niña'
+                            : 'ENSO';
+        const rounded = Number.isInteger(oni) ? oni : Number(oni.toFixed(1));
+        ensoEntry.keyMetric = `${rounded} °C de variabilidad climática ${oniPhaseLabel}`;
       }
 
       if (Array.isArray(opRisks) && opRisks.length > 0) {
-        ensoEntry.impacts = dedupeStrings([...opRisks, ...ensoEntry.impacts]);
+        const amplifierImpacts: string[] = [];
+        if (floodAmp)   amplifierImpacts.push('Amplificación de riesgo de inundación por ENSO');
+        if (droughtAmp) amplifierImpacts.push('Amplificación de riesgo de sequía por ENSO');
+        if (supplyRisk) amplifierImpacts.push(`Riesgo de cadena de suministro: nivel ${supplyRisk}`);
+        ensoEntry.impacts = dedupeStrings([...opRisks, ...amplifierImpacts, ...ensoEntry.impacts]);
         // Rebuild scenarioVariants with the enriched impacts (I3: corto_plazo only)
         const refreshed = buildScenarioVariants('fenomeno_enso', 'corto_plazo', ensoEntry.impacts);
         if (refreshed['emisiones_moderadas']) refreshed['emisiones_moderadas'].narrativeText = richNarrative;
         if (refreshed['altas_emisiones']) {
-          const highSuffix = phase === 'el_nino'
-            ? ' Bajo altas emisiones, la intensidad de los eventos asociados podría ser mayor.'
-            : ' Bajo altas emisiones, el déficit hídrico asociado podría ser más severo.';
-          refreshed['altas_emisiones'].narrativeText = richNarrative + highSuffix;
+          refreshed['altas_emisiones'].narrativeText = highSuffix ? richNarrative + highSuffix : richNarrative;
         }
         ensoEntry.scenarioVariants = refreshed;
       } else if (supplyRisk) {
