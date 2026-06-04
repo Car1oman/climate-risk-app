@@ -244,6 +244,25 @@ export function normalizeRisks(apiResponse: Record<string, unknown>): Consolidat
     if (!entry.rawSources.includes('signals')) entry.rawSources.push('signals');
   }
 
+  // ── 1b. ENSO fallback from top-level signalOutput.enso_phase (ensure `fenomeno_enso` always appears) −
+  if (!map.has('fenomeno_enso_corto_plazo')) {
+    const ensoPhase = (rawSignals as Record<string, unknown> | undefined)?.['enso_phase'];
+    if (ensoPhase) {
+      const riskType: RiskTypeSlug = 'fenomeno_enso';
+      const period: TemporalPeriod = 'corto_plazo';
+      const entry = buildEmpty(riskType, period, null, 'alta');
+      entry.narrativeText = RISK_TYPE_DISPLAY[riskType]?.briefNarrative ?? 'Variabilidad climática interanual';
+      entry.keyMetric = formatKeyMetric(null, null, `oni (fase: ${ensoPhase})`);
+      entry.evidence = [{
+        sourceLabel: 'NOAA CPC ONI',
+        period: 'presente',
+        validationStatus: 'validado',
+      }];
+      entry.rawSources.push('signals', 'enso_fallback');
+      map.set(`${riskType}_${period}`, entry);
+    }
+  }
+
   // ── 2. Enrich with risks[] (Layer3) ──────────────────────────────────────
   // Contextual risks add operational_impacts to existing entries.
   // They do NOT create new entries (prevents triplication).
