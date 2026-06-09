@@ -9,8 +9,9 @@
 
 import { callWithFallback }      from '../lib/ai/client.js';
 import { validateAIOutput }      from '../ai/scientificValidator.js';
-import { buildEnsoNarrative }    from '../services/ensoService.js';
-import { buildTerrainNarrative } from '../services/terrainService.js'; // Sprint 6
+import { buildEnsoNarrative }      from '../services/ensoService.js';
+import { buildTerrainNarrative }   from '../services/terrainService.js'; // Sprint 6
+import { buildPowerNarrative }     from '../services/nasaPowerService.js'; // Sprint 7: NASA POWER
 
 
 const LAYER6_SYSTEM_PROMPT = `Eres un redactor de análisis de riesgo climático científico para la plataforma DataRisk Peru.
@@ -295,6 +296,7 @@ export function generateNarrative({
   // Resolve data sources once — used in key_metrics, generated_from, and narrative
   const enso        = fusedData?.ensoData    ?? null;  // declared here to avoid TDZ (was after key_metrics)
   const terrainData = fusedData?.terrainData ?? null;  // Sprint 6
+  const powerData   = fusedData?.nasaPowerData?.recent ?? null; // Sprint 7: NASA POWER
 
   // Construir executive_summary con datos numéricos reales
   const sentence1 = buildMainSentence(contextualRisk, latNum, lonNum);
@@ -305,8 +307,10 @@ export function generateNarrative({
   const ensoSentence    = buildEnsoNarrative(enso);
   // Sprint 6: Terrain narrative enrichment (appended only when risk exceeds threshold)
   const terrainSentence = buildTerrainNarrative(terrainData);
+  // Sprint 7: NASA POWER narrative enrichment (appended when POWER data is available)
+  const powerSentence    = buildPowerNarrative(powerData);
 
-  const executive_summary = [sentence1, compoundSentence, sentence2, ensoSentence, terrainSentence]
+  const executive_summary = [sentence1, compoundSentence, sentence2, ensoSentence, terrainSentence, powerSentence]
     .filter(Boolean)
     .join(' ') || buildFallbackSummary(fusedData);
 
@@ -334,6 +338,11 @@ export function generateNarrative({
     terrain_susceptibility: terrainData?.susceptibility    ?? null,
     terrain_huayco_risk:    terrainData?.huayco_risk       ?? null,
     terrain_landslide_score: terrainData?.landslide_score  ?? null,
+    // Sprint 7: NASA POWER — informacional, may be null
+    power_temp_c:           powerData?.T2M?.value          ?? null,
+    power_precip_mm:        powerData?.PRECTOT?.value      ?? null,
+    power_wind_ms:          powerData?.WS2M?.value         ?? null,
+    power_radiation:        powerData?.ALLSKY_SFC_SW_DWN?.value ?? null,
   };
 
   // Trazabilidad: qué fuentes de datos alimentaron el análisis
@@ -349,6 +358,8 @@ export function generateNarrative({
     // Sprint 6: Terrain provenance
     terrain:         terrainData != null,
     terrain_source:  terrainData?.source        ?? null,
+    // Sprint 7: NASA POWER provenance
+    nasa_power:      powerData != null,
     distance_km:     fusedData?.distanceKm      ?? null,
     scenario:        fusedData?.scenario        ?? null,
   };

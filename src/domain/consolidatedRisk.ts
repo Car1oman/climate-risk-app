@@ -99,9 +99,16 @@ export interface ConsolidatedRisk {
   evidence: EvidenceRef[];
   adaptationMeasures: AdaptationSummary[];
   /** Internal: which API sources contributed to this entry. */
-  rawSources: ('signals' | 'risks' | 'gri' | 'enso_fallback')[];
+  rawSources: ('signals' | 'risks' | 'gri' | 'enso_fallback' | 'nasa_power' | 'modis_ndvi' | 'grace_fo')[];
   /** Provenance label from Layer3 (e.g. "Catálogo interno de referencia" or IA-generated). */
   provenance?: string;
+  /**
+   * Compound severity level when multiple data sources converge on the same
+   * phenomenon (e.g. drought confirmed by NDVI + GRACE-FO + POWER).
+   * 'severe' means 3/3 sources agree, 'moderate' means 2/3.
+   * Absent or null when no compounding detected.
+   */
+  compoundSeverity?: 'severe' | 'moderate';
   /**
    * Per-scenario variants for projection periods (mediano_plazo, largo_plazo).
    * Empty object for 'historico'.  Populated by normalizeRisks() via

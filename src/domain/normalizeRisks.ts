@@ -43,6 +43,7 @@ export const SIGNAL_TO_CONSOLIDATED: Record<string, RiskTypeSlug> = {
   tropical_nights:          'calor_extremo',
   temp_increase:            'calor_extremo',
   drought:                  'sequia',
+  drought_compounding:      'sequia',
   water_stress:             'sequia',
   landslide_susceptibility: 'deslizamiento',
   landslide_risk:           'deslizamiento',
@@ -242,6 +243,12 @@ export function normalizeRisks(apiResponse: Record<string, unknown>): Consolidat
     }]);
 
     if (!entry.rawSources.includes('signals')) entry.rawSources.push('signals');
+
+    // Compound severity from multi-source signals (e.g. drought_compounding)
+    const compoundRaw = signal['compound_severity'] as string | undefined;
+    if (compoundRaw && !entry.compoundSeverity) {
+      entry.compoundSeverity = compoundRaw as 'severe' | 'moderate';
+    }
   }
 
   // ── 1b. ENSO fallback from top-level signalOutput.enso_phase (ensure `fenomeno_enso` always appears) −
@@ -370,6 +377,56 @@ export function normalizeRisks(apiResponse: Record<string, unknown>): Consolidat
       timeframe:   (adapt['horizonte_implementacion'] ?? adapt['timeframe'] ?? 'mediano') as AdaptationSummary['timeframe'],
       effectiveness: (adapt['efectividad'] ?? adapt['effectiveness'] ?? 'media') as AdaptationSummary['effectiveness'],
     });
+  }
+
+  // ── 4a. Enrich with GRACE-FO evidence ────────────────────────────────────
+  const graceRaw = apiResponse['graceFoData'] as Record<string, unknown> | null | undefined;
+  if (graceRaw) {
+    const graceEvidence: EvidenceRef = {
+      sourceLabel: 'GRACE-FO (JPL Mascon, ~300km)',
+      period: 'presente',
+      validationStatus: 'provisional',
+    };
+    for (const entry of map.values()) {
+      if (entry.riskType === 'sequia') {
+        entry.evidence = mergeEvidence(entry.evidence, [graceEvidence]);
+        if (!entry.rawSources.includes('grace_fo')) entry.rawSources.push('grace_fo');
+      }
+    }
+  }
+
+  // ── 4b. Enrich with MODIS NDVI evidence ──────────────────────────────────
+  const ndviRaw = apiResponse['ndviData'] as Record<string, unknown> | null | undefined;
+  if (ndviRaw) {
+    const ndviEvidence: EvidenceRef = {
+      sourceLabel: 'MODIS NDVI (Terra MOD13Q1, 250m)',
+      period: 'presente',
+      validationStatus: 'provisional',
+    };
+    for (const entry of map.values()) {
+      if (entry.riskType === 'sequia') {
+        entry.evidence = mergeEvidence(entry.evidence, [ndviEvidence]);
+        if (!entry.rawSources.includes('modis_ndvi')) entry.rawSources.push('modis_ndvi');
+      }
+    }
+  }
+
+  // ── 4c. Enrich with NASA POWER evidence ───────────────────────────────────
+  // When nasaPowerData exists in the response, add POWER as a contributing source
+  // to all entries that already have climate-related evidence.
+  const nasaPowerRaw = apiResponse['nasaPowerData'] as Record<string, unknown> | null | undefined;
+  if (nasaPowerRaw) {
+    const powerEvidence: EvidenceRef = {
+      sourceLabel: 'NASA POWER (MERRA-2)',
+      period: 'presente',
+      validationStatus: 'provisional',
+    };
+    for (const entry of map.values()) {
+      if (entry.riskType === 'calor_extremo' || entry.riskType === 'sequia' || entry.riskType === 'lluvias_extremas') {
+        entry.evidence = mergeEvidence(entry.evidence, [powerEvidence]);
+        if (!entry.rawSources.includes('nasa_power')) entry.rawSources.push('nasa_power');
+      }
+    }
   }
 
   // ── 5a. Populate scenario variants for projection periods ─────────────────

@@ -19,117 +19,7 @@
  */
 
 import { getTerrainIntelligence } from '../services/terrainService.js';
-
-// ─── UMBRALES REGIONALIZADOS PERÚ ────────────────────────────────────────────
-// Basados en climatología observada 1980-2014 por macro-región
-// Fuente: SENAMHI Perú normales climatológicas 1981-2010
-const REGION_THRESHOLDS = {
-  costa: {
-    // Costa desértica: hd35 es común en verano (Lima: ~20-40 días/año)
-    extreme_heat_delta_short: 15,    // +15 días hd35 en corto plazo
-    extreme_heat_delta_mid:   25,    // +25 días hd35 en mediano plazo
-    extreme_heat_delta_long:  35,    // +35 días hd35 en largo plazo
-    tropical_nights_delta_short: 15,
-    tropical_nights_delta_mid:   25,
-    tropical_nights_delta_long:  35,
-    temp_increase_short: 1.5,
-    temp_increase_mid:   2.5,
-    temp_increase_long:  3.5,
-    drought_pr_pct: -30,
-    drought_pr_pct_long: -40,
-    extreme_rain_rx5day_pct: 25,
-    extreme_rain_rx1day_mm: 50,
-    extreme_rain_rx1day_mm_long: 60,
-    drought_cdd_delta: 10,
-    r50mm_delta: 5,            // días >50mm: +5 días señal
-    tx84rr_delta_pct: 10,      // días cálidos: +10% cambio
-    tasmax_threshold_c: 35,    // Tmax media > 35°C
-  },
-  sierra: {
-    // Sierra andina: hd35 casi nunca ocurre, noches tropicales no aplican
-    extreme_heat_delta_short: 5,     // pocos días adicionales ya son señal
-    extreme_heat_delta_mid:   10,
-    extreme_heat_delta_long:  15,
-    tropical_nights_delta_short: null,
-    tropical_nights_delta_mid:   null,
-    tropical_nights_delta_long:  null,
-    temp_increase_short: 1.0,
-    temp_increase_mid:   2.0,
-    temp_increase_long:  3.0,
-    drought_pr_pct: -15,
-    drought_pr_pct_long: -25,
-    extreme_rain_rx5day_pct: 15,
-    extreme_rain_rx1day_mm: 40,
-    extreme_rain_rx1day_mm_long: 50,
-    drought_cdd_delta: 5,
-    r50mm_delta: 3,            // sierra sensible a lluvia intensa
-    tx84rr_delta_pct: 8,
-    tasmax_threshold_c: 30,    // sierra: Tmax > 30°C ya es señal
-  },
-  selva: {
-    // Amazonía: lluvias abundantes, calor constante
-    extreme_heat_delta_short: 10,
-    extreme_heat_delta_mid:   20,
-    extreme_heat_delta_long:  30,
-    tropical_nights_delta_short: 10,
-    tropical_nights_delta_mid:   20,
-    tropical_nights_delta_long:  30,
-    temp_increase_short: 1.5,
-    temp_increase_mid:   2.5,
-    temp_increase_long:  4.0,
-    drought_pr_pct: -20,
-    drought_pr_pct_long: -35,
-    extreme_rain_rx5day_pct: 20,
-    extreme_rain_rx1day_mm: 80,
-    extreme_rain_rx1day_mm_long: 100,
-    drought_cdd_delta: 15,
-    r50mm_delta: 8,            // Amazonía: lluvias fuertes son normales
-    tx84rr_delta_pct: 10,
-    tasmax_threshold_c: 35,
-  },
-  puna: {
-    // Altiplano: frío extremo, estación seca marcada
-    extreme_heat_delta_short: null,  // no aplica (nunca >35°C)
-    extreme_heat_delta_mid:   null,
-    extreme_heat_delta_long:  null,
-    tropical_nights_delta_short: null,
-    tropical_nights_delta_mid:   null,
-    tropical_nights_delta_long:  null,
-    temp_increase_short: 0.8,
-    temp_increase_mid:   1.5,
-    temp_increase_long:  2.5,
-    drought_pr_pct: -20,
-    drought_pr_pct_long: -30,
-    extreme_rain_rx5day_pct: 15,
-    extreme_rain_rx1day_mm: 30,
-    extreme_rain_rx1day_mm_long: 40,
-    drought_cdd_delta: 5,
-    r50mm_delta: 3,
-    tx84rr_delta_pct: 8,
-    tasmax_threshold_c: 30,
-  },
-  default: {
-    extreme_heat_delta_short: 10,
-    extreme_heat_delta_mid:   20,
-    extreme_heat_delta_long:  30,
-    tropical_nights_delta_short: 10,
-    tropical_nights_delta_mid:   20,
-    tropical_nights_delta_long:  30,
-    temp_increase_short: 1.5,
-    temp_increase_mid:   2.5,
-    temp_increase_long:  3.5,
-    drought_pr_pct: -15,
-    drought_pr_pct_long: -30,
-    extreme_rain_rx5day_pct: 20,
-    extreme_rain_rx1day_mm: 50,
-    extreme_rain_rx1day_mm_long: 60,
-    drought_cdd_delta: 15,
-    drought_cdd_delta_long: 20,
-    r50mm_delta: 5,
-    tx84rr_delta_pct: 10,
-    tasmax_threshold_c: 35,
-  },
-};
+import { REGION_THRESHOLDS, GRI_SCORE_PROB } from '../config/signalThresholds.js';
 
 // ─── FACTOR DE AMPLIFICACIÓN ENSO ─────────────────────────────────────────────
 // El Niño: amplifica lluvia/inundación en costa norte, reduce en sierra sur
@@ -233,11 +123,13 @@ function buildSignal(opts) {
     exceeds_threshold: opts.exceeds_threshold,
     enso_amplified: opts.ensoAmplified ?? false,
     region: opts.region ?? null,
+    source_traceability: opts.sourceTraceability ?? null,
+    compound_severity: opts.compoundSeverity ?? null,
   };
 }
 
 export function detectSignalsV2(fusedData) {
-  const { climateData, griData, meteoData, ensoData, terrainData } = fusedData;
+  const { climateData, griData, meteoData, ensoData, terrainData, ndviData, graceFoData } = fusedData;
   const signals = [];
 
   const hist = climateData?.historical ?? null;
@@ -766,6 +658,56 @@ export function detectSignalsV2(fusedData) {
     }));
   }
 
+  // ── NDVI SIGNALS (MODIS) ─────────────────────────────────────────────────
+  if (ndviData?.anomaly) {
+    const { vegetation_health, current_ndvi, anomaly_zscore } = ndviData.anomaly;
+    if (vegetation_health === 'severe_stress' || vegetation_health === 'stress') {
+      signals.push(buildSignal({
+        signalType: vegetation_health === 'severe_stress' ? 'severe_vegetation_stress' : 'vegetation_stress',
+        indicator: 'ndvi_anomaly',
+        projected: current_ndvi,
+        delta: anomaly_zscore,
+        conf: 'medium',
+        horizon: 'short_term',
+        threshold_reference: `MODIS NDVI anomalía: ${vegetation_health === 'severe_stress' ? '< -0.4' : '< -0.2'}`,
+        exceeds_threshold: true,
+        region: terrainData?.terrain_region ?? null,
+        sourceTraceability: {
+          source: 'MODIS NDVI (Terra MOD13Q1, 250m)',
+          dataset: 'MOD13Q1 v6.1',
+          temporal_window: '16-day composite',
+          validation_status: 'provisional',
+        },
+      }));
+    }
+  }
+
+  // ── GRACE-FO SIGNALS ────────────────────────────────────────────────────
+  if (graceFoData?.anomaly) {
+    const { tws_anomaly_cm, drought_severity } = graceFoData.anomaly;
+
+    // groundwater_depletion: TWS anomaly < -5cm
+    if (tws_anomaly_cm < -5) {
+      signals.push(buildSignal({
+        signalType: 'groundwater_depletion',
+        indicator: 'tws_anomaly',
+        projected: tws_anomaly_cm,
+        delta: tws_anomaly_cm,
+        conf: 'medium',
+        horizon: 'short_term',
+        threshold_reference: `GRACE-FO TWS anomalía: < -5cm (severidad: ${drought_severity})`,
+        exceeds_threshold: tws_anomaly_cm < -10,
+        region: terrainData?.terrain_region ?? null,
+        sourceTraceability: {
+          source: 'GRACE-FO (JPL Mascon, ~300km)',
+          dataset: 'TELLUS Mascon v3',
+          temporal_window: 'mensual',
+          validation_status: 'provisional',
+        },
+      }));
+    }
+  }
+
   // ── TERRAIN SIGNALS (sin cambios respecto a v1) ──────────────────────────
   if (terrainData?.exceeds_landslide_threshold) {
     signals.push(buildSignal({
@@ -798,6 +740,35 @@ export function detectSignalsV2(fusedData) {
       exceeds_threshold: true,
       ensoAmplified: false,
       region,
+    }));
+  }
+
+  // ── COMPOUND SIGNAL: drought_compounding (NDVI + GRACE-FO + POWER) ─────
+  const ndviStress = ndviData?.anomaly?.vegetation_health === 'stress' || ndviData?.anomaly?.vegetation_health === 'severe_stress';
+  const graceDry = graceFoData?.anomaly?.tws_anomaly_cm < -5;
+  const powerDry = fusedData?.nasaPowerData?.recent?.PRECTOT?.value != null
+    && fusedData.nasaPowerData.recent.PRECTOT.value < 0.5;
+  const droughtSources = [ndviStress, graceDry, powerDry].filter(Boolean).length;
+
+  if (droughtSources >= 2) {
+    const compoundSeverity = droughtSources === 3 ? 'severe' : 'moderate';
+    signals.push(buildSignal({
+      signalType: 'drought_compounding',
+      indicator: 'compound_drought_index',
+      projected: droughtSources,
+      delta: droughtSources,
+      conf: compoundSeverity === 'severe' ? 'high' : 'medium',
+      horizon: 'short_term',
+      compoundSeverity,
+      threshold_reference: `Sequía compuesta: ${droughtSources}/3 fuentes (NDVI + GRACE-FO + POWER) — severidad ${compoundSeverity}`,
+      exceeds_threshold: true,
+      region: terrainData?.terrain_region ?? null,
+      sourceTraceability: {
+        source: `Compuesto (${['NDVI', 'GRACE-FO', 'POWER'].filter((_, i) => [ndviStress, graceDry, powerDry][i]).join(' + ')})`,
+        dataset: 'MODIS MOD13Q1 + GRACE-FO Mascon + NASA POWER',
+        temporal_window: 'multiple escalas',
+        validation_status: 'provisional',
+      },
     }));
   }
 

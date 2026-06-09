@@ -10,6 +10,9 @@ import { getClimateTrends }        from '../services/openMeteoService.js';
 import { getTerritorialContext }   from '../services/worldBankService.js';
 import { getEnsoContext }          from '../services/ensoService.js';
 import { getTerrainIntelligence }  from '../services/terrainService.js';  // Sprint 6
+import { getNasaPowerData }        from '../services/nasaPowerService.js'; // Sprint 7: NASA POWER
+import { getModisNdviData }        from '../services/modisNdviService.js'; // Sprint 7: MODIS NDVI
+import { getGraceFoData }          from '../services/graceFoService.js'; // Sprint 7: GRACE-FO
 
 // Variables climáticas extraídas del JSONB de climate_cells
 // Refleja las columnas reales de la DB: tr (noches tropicales), prpercnt (% cambio precip),
@@ -149,13 +152,16 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
   const lonNum = Number(lon);
 
   // Ejecutar todas las fuentes en paralelo; cada una falla silenciosamente
-  const [cellResult, griResult, meteoResult, territorialResult, ensoResult, terrainResult] = await Promise.allSettled([
+  const [cellResult, griResult, meteoResult, territorialResult, ensoResult, terrainResult, powerResult, ndviResult, graceResult] = await Promise.allSettled([
     fetchClimateCell(latNum, lonNum, scenario),
     getGriRiskByLocation(latNum, lonNum),
     getClimateTrends(latNum, lonNum),
     getTerritorialContext(),
     getEnsoContext(),                           // Sprint 5: ENSO — informacional, non-blocking
     getTerrainIntelligence(latNum, lonNum),    // Sprint 6: terrain — informacional, non-blocking
+    getNasaPowerData(latNum, lonNum),           // Sprint 7: NASA POWER — informacional, non-blocking
+    getModisNdviData(latNum, lonNum),           // Sprint 7: MODIS NDVI — informacional, non-blocking
+    getGraceFoData(latNum, lonNum),             // Sprint 7: GRACE-FO — informacional, non-blocking
   ]);
 
   const cellData      = cellResult.status      === 'fulfilled' ? cellResult.value      : null;
@@ -164,6 +170,9 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
   const territorial   = territorialResult.status === 'fulfilled' ? territorialResult.value : null;
   const ensoData      = ensoResult.status        === 'fulfilled' ? ensoResult.value        : null;
   const terrainData   = terrainResult.status     === 'fulfilled' ? terrainResult.value     : null;
+  const powerData     = powerResult.status       === 'fulfilled' ? powerResult.value       : null;
+  const ndviData      = ndviResult.status        === 'fulfilled' ? ndviResult.value        : null;
+  const graceFoData   = graceResult.status       === 'fulfilled' ? graceResult.value        : null;
 
   if (cellResult.status === 'rejected')
     console.warn('[Layer1] climate_cells falló:', cellResult.reason?.message);
@@ -177,6 +186,12 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
     console.warn('[Layer1] ENSO falló (non-blocking):', ensoResult.reason?.message);
   if (terrainResult.status === 'rejected')
     console.warn('[Layer1] Terrain falló (non-blocking):', terrainResult.reason?.message);
+  if (powerResult.status === 'rejected')
+    console.warn('[Layer1] NASA POWER falló (non-blocking):', powerResult.reason?.message);
+  if (ndviResult.status === 'rejected')
+    console.warn('[Layer1] MODIS NDVI falló (non-blocking):', ndviResult.reason?.message);
+  if (graceResult.status === 'rejected')
+    console.warn('[Layer1] GRACE-FO falló (non-blocking):', graceResult.reason?.message);
 
   // Cuando climate_cells no tiene datos, usar los índices extremos computados
   // por Open-Meteo (hd35, hd40, cdd, rx5day, rx1day, pr, tas) como fallback.
@@ -199,6 +214,12 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
     ensoData:        ensoData                 ?? null,
     // Sprint 6: Terrain — informacional, null cuando elevation APIs no responden
     terrainData:     terrainData              ?? null,
+    // Sprint 7: NASA POWER — informacional, null cuando NASA API no responde
+    nasaPowerData:   powerData                ?? null,
+    // Sprint 7: MODIS NDVI — informacional, null cuando Earthdata no responde
+    ndviData:        ndviData                 ?? null,
+    // Sprint 7: GRACE-FO — informacional, null cuando PO.DAAC no responde
+    graceFoData:     graceFoData              ?? null,
     // Metadatos de ubicación
     distanceKm:      cellData?.distanceKm     ?? null,
     scenario,

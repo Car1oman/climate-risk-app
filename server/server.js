@@ -27,6 +27,8 @@ import searchRouter    from './routes/search.js';
 import alertsRouter    from './routes/alerts.js';
 import ensoRouter      from './routes/enso.js';
 import terrainRouter   from './routes/terrain.js';
+import nasaRouter      from './routes/nasa.js';
+import nasaMetricsRouter from './routes/nasaMetrics.js';
 
 // Fail fast if required env vars are absent.
 validateEnv();
@@ -79,7 +81,9 @@ app.use('/api/documentos', documentosRouter);
 app.use('/api',            searchRouter);   // /api/test, /api/search, /api/places/assets
 app.use('/api',            climateRouter);  // /api/climate, /api/climate-cells/*, /api/climate-risks/*, etc.
 app.use('/api',            ensoRouter);     // /api/enso/status, /api/enso/refresh, /api/enso/cache-stats
-app.use('/api',            terrainRouter);  // /api/terrain/slope, /api/terrain/cache-stats, /api/terrain/cache
+  app.use('/api',            terrainRouter);  // /api/terrain/slope, /api/terrain/cache-stats, /api/terrain/cache
+  app.use('/api',            nasaRouter);     // /api/nasa-power/health
+app.use('/api',            nasaMetricsRouter); // /api/nasa-metrics
 
 // ── SPA fallback ──────────────────────────────────────────────────────────────
 app.use((req, res, next) => {
