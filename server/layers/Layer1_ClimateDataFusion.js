@@ -13,13 +13,14 @@ import { getTerrainIntelligence }  from '../services/terrainService.js';  // Spr
 import { getNasaPowerData }        from '../services/nasaPowerService.js'; // Sprint 7: NASA POWER
 import { getModisNdviData }        from '../services/modisNdviService.js'; // Sprint 7: MODIS NDVI
 import { getGraceFoData }          from '../services/graceFoService.js'; // Sprint 7: GRACE-FO
+import { downscaleClimateData, getEffectiveResolution } from '../services/downscaleService.js'; // 002-downscaling-aal
 
 // Variables climáticas extraídas del JSONB de climate_cells
 // Refleja las columnas reales de la DB: tr (noches tropicales), prpercnt (% cambio precip),
 // r20mm/r50mm (días con lluvia intensa), tasmax (temp máx media), tx84rr (días cálidos)
 const CLIMATE_VARS = [
   'txx', 'tas', 'tasmax',            // temperatura
-  'hd30', 'hd35',                    // días calurosos
+  'hd30', 'hd35', 'hd40',            // días calurosos (hd40 = Tmax > 40°C)
   'tr',                              // noches tropicales (Tmin > 20°C) — señal clave Perú
   'rx1day', 'rx5day',               // extremos de precipitación
   'r20mm', 'r50mm',                 // días con lluvia intensa
@@ -111,6 +112,21 @@ function normalizePeriodStats(periodData) {
  * @param {string} scenario - 'ssp245' | 'ssp585'
  * @returns {{ climateData, distanceKm }} o null si no hay datos
  */
+const cellElevationCache = new Map();
+
+async function getCellElevation(lat, lon) {
+  const key = `${lat.toFixed(2)},${lon.toFixed(2)}`;
+  if (cellElevationCache.has(key)) return cellElevationCache.get(key);
+  try {
+    const terrain = await getTerrainIntelligence(lat, lon);
+    const elev = terrain?.elevation_m ?? null;
+    cellElevationCache.set(key, elev);
+    return elev;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchClimateCell(lat, lon, scenario) {
   try {
     const { data, error } = await supabase
@@ -131,11 +147,14 @@ async function fetchClimateCell(lat, lon, scenario) {
       }
     }
 
-    // Validar que al menos tenemos el período histórico
     if (!climateData.historical) return null;
 
     const distanceKm = haversineKm(lat, lon, cell.lat, cell.lon);
-    return { climateData, climateDataStats, distanceKm, cellLat: cell.lat, cellLon: cell.lon };
+
+    // Look up CMIP6 grid cell elevation for downscaling (cached, non-blocking)
+    const cellElevationM = await getCellElevation(cell.lat, cell.lon);
+
+    return { climateData, climateDataStats, distanceKm, cellLat: cell.lat, cellLon: cell.lon, cellElevationM };
   } catch (err) {
     console.warn('[Layer1] climate_cells falló (fallo silencioso):', err.message);
     return null;
@@ -199,11 +218,26 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
   const climateData      = cellData?.climateData ?? meteoResult_?.climateIndices ?? null;
   const climateDataStats = cellData?.climateDataStats ?? null; // only available for climate_cells (CMIP6)
 
+  // ── 002-downscaling-aal: Apply elevation correction to CMIP6 data ──────────
+  let downscaleResult = null;
+  let spatialResolution = '25km_raw';
+  if (climateData && cellData?.cellLat != null && cellData?.cellLon != null) {
+    const siteElevM = terrainData?.elevation_m ?? null;
+    const cellElevM = cellData?.cellElevationM ?? null;
+    if (siteElevM != null) {
+      downscaleResult = downscaleClimateData(climateData, siteElevM, cellElevM ?? siteElevM);
+      spatialResolution = getEffectiveResolution(downscaleResult);
+    }
+  }
+
   return {
     // Datos climáticos normalizados: climate_cells (preferido) u Open-Meteo computed
     climateData,
-    climateDataStats,  // {historical,short_term,mid_term} × {varName:{median,p10,p90}} — CMIP6 only
+    climateDataStats,
     climateSource:   cellData?.climateData ? 'climate_cells' : (meteoResult_?.climateIndices ? 'open_meteo_derived' : null),
+    // Downscaling metadata (002-downscaling-aal)
+    downscale:       downscaleResult,
+    spatial_resolution: spatialResolution,
     // Datos GRI (probabilidades de amenaza por peligro)
     griData:         griData                  ?? null,
     // Datos Open-Meteo (deltas de temperatura y precipitación para narrativa)

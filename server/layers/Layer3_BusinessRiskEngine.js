@@ -10,6 +10,7 @@ import { callWithFallback } from '../lib/ai/client.js';
 import { validateAIOutput } from '../ai/scientificValidator.js';
 import { getBusinessProfile, resolveBusinessTaxonomy } from './businessProfiles.js';
 import { getTaxonomyImpacts, getModifierImpacts, scaleFinancialRange } from './taxonomyImpacts.js';
+import { computeAAL } from '../scientific/extremeValueAnalysis.js'; // 002-downscaling-aal
 
 // ─── System prompt para Layer3 — guardrails científicos ─────────────────────
 const LAYER3_SYSTEM_PROMPT = `Eres un analista de riesgo climático operacional para la plataforma DataRisk Peru.
@@ -162,6 +163,21 @@ const FINANCIAL_RANGES = {
     salud:          { min_usd: 20_000,  max_usd: 70_000  },
     entretenimiento:{ min_usd: 15_000,  max_usd: 50_000  },
     otros:          { min_usd: 5_000,   max_usd: 20_000  },
+  },
+  vegetation_stress: {
+    retail:         { min_usd: 15_000,  max_usd: 60_000  },
+    agro:           { min_usd: 40_000,  max_usd: 150_000 },
+    otros:          { min_usd: 10_000,  max_usd: 40_000  },
+  },
+  severe_vegetation_stress: {
+    retail:         { min_usd: 40_000,  max_usd: 150_000 },
+    agro:           { min_usd: 100_000, max_usd: 400_000 },
+    otros:          { min_usd: 25_000,  max_usd: 100_000 },
+  },
+  groundwater_depletion: {
+    retail:         { min_usd: 30_000,  max_usd: 100_000 },
+    agro:           { min_usd: 80_000,  max_usd: 300_000 },
+    otros:          { min_usd: 20_000,  max_usd: 80_000  },
   },
 };
 
@@ -325,9 +341,62 @@ function calcSensitivityLevel(sectorKey, asset_type, businessProfile) {
  * @param {Object} params - { sector, asset_type?, docContext?, business_unit_id? }
  * @returns {Promise<{ risks: Array, overall_exposure: string }>}
  */
-export async function assessBusinessRisk(signalOutput, { sector, asset_type = null, docContext = null, business_unit_id = null }) {
+export async function assessBusinessRisk(signalOutput, { sector, asset_type = null, docContext = null, business_unit_id = null, fusedData = null }) {
   const { signals } = signalOutput;
   const sectorKey = normalizeSector(sector);
+
+  // ── 002-downscaling-aal: Extract ensemble data for AAL computation ─────────
+  const ensembleCache = {};
+  function extractEnsemble(signalType) {
+    if (ensembleCache[signalType] !== undefined) return ensembleCache[signalType];
+    const stats = fusedData?.climateDataStats;
+    if (!stats?.short_term) {
+      ensembleCache[signalType] = null;
+      return null;
+    }
+    // Map signal type to CMIP6 variable
+    const varMap = {
+      extreme_heat: 'hd35',
+      severe_heat: 'hd40',
+      moderate_heat: 'hd30',
+      drought: 'prpercnt',
+      flood_risk: 'rx5day',
+      extreme_rain: 'rx5day',
+      tropical_nights: 'tr',
+      temp_increase: 'tas',
+      extreme_rain_frequency: 'r20mm',
+    };
+    const varName = varMap[signalType];
+    if (!varName) {
+      ensembleCache[signalType] = null;
+      return null;
+    }
+    const period = stats.short_term[varName];
+    if (!period || period.median == null) {
+      ensembleCache[signalType] = null;
+      return null;
+    }
+    // Build synthetic ensemble from p10/median/p90
+    const { median, p10, p90 } = period;
+    if (p10 == null || p90 == null) {
+      ensembleCache[signalType] = null;
+      return null;
+    }
+    // Generate n=100 synthetic values approximating the p10-p90 range
+    const n = 100;
+    const values = [];
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1);
+      // Logit-weighted between p10 and p90, centered on median
+      if (t < 0.5) {
+        values.push(p10 + (median - p10) * Math.pow(t * 2, 1.5));
+      } else {
+        values.push(median + (p90 - median) * Math.pow((t - 0.5) * 2, 1.5));
+      }
+    }
+    ensembleCache[signalType] = values;
+    return values;
+  }
 
   // Resolver perfil de negocio si se proporcionó business_unit_id
   const businessProfile = business_unit_id ? resolveBusinessTaxonomy(business_unit_id) : null;
@@ -373,6 +442,23 @@ export async function assessBusinessRisk(signalOutput, { sector, asset_type = nu
       financialRange = scaleFinancialRange(financialRange, profile.locales_count);
     }
 
+    // ── 002-downscaling-aal: Compute AAL from ensemble data ──────────────────
+    let aalResult = null;
+    try {
+      const ensemble = extractEnsemble(signal.signalType);
+      if (ensemble) {
+        const avgImpact = (financialRange.min_usd + financialRange.max_usd) / 2;
+        aalResult = computeAAL(ensemble, v => (v / 50) * avgImpact);
+      if (aalResult) {
+        aalResult.warning = 'Inputs are synthetic (100 values from p10/p50/p90). AAL is approximate.';
+      }
+      }
+    } catch (err) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`[Layer3] AAL skipped for ${signal.signalType}: ${err.message}`);
+      }
+    }
+
     risks.push({
       signal,
       source_traceability:    signal.source_traceability ?? null,
@@ -380,6 +466,7 @@ export async function assessBusinessRisk(signalOutput, { sector, asset_type = nu
       exposure_level:         calcExposureLevel([signal]),
       sensitivity_level:      calcSensitivityLevel(sectorKey, asset_type, profile),
       financial_impact_range: financialRange,
+      probabilistic_risk:     aalResult, // 002-downscaling-aal
       provenance:             provenanceLabel,
       ai_used,
       ...(ai_fallback_reason && { ai_fallback_reason }),

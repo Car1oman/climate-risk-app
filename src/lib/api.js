@@ -84,6 +84,23 @@ export const analyzeClimateRisk = async ({ lat, lon, sector, asset_type, scenari
   }
 };
 
+// POST /api/v2/climate-risk-analysis/batch — batch risk levels for list pages
+// assets: [{ id, lat, lng, type }]
+// Returns: { [asset_id]: { overall_exposure, overall_risk_score, signal_count } }
+export const batchAnalyzeClimateRisk = async (assets) => {
+  try {
+    const res = await apiFetch('/api/v2/climate-risk-analysis/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assets }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+};
+
 /** @returns {Promise<any[]>} */
 export const fetchAlerts = async ({ active = true } = {}) => {
   try {

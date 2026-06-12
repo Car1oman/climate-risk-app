@@ -4,9 +4,10 @@ import { getRiskColor } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
-import { Building2, MapPin, ChevronRight, Search } from "lucide-react";
+import { Building2, MapPin, ChevronRight, Search, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useBatchAssetRisks } from "@/hooks/useAssetRisk";
 
 
 const TYPE_LABELS = {
@@ -31,6 +32,8 @@ export default function Assets() {
   const [riskFilter, setRiskFilter] = useState("all");
   const [error, setError] = useState(null);
 
+  const { computedRisks, isLoading: risksLoading, getRisk, error: risksError, unavailable: risksUnavailable } = useBatchAssetRisks(assetsList);
+
   useEffect(() => {
     const loadAssets = async () => {
       setIsLoading(true);
@@ -52,7 +55,8 @@ export default function Assets() {
   const filtered = assetsList.filter((a) => {
     const matchSearch = !search || a.name?.toLowerCase().includes(search.toLowerCase()) || a.district?.toLowerCase().includes(search.toLowerCase());
     const matchType = typeFilter === "all" || a.type === typeFilter;
-    const matchRisk = riskFilter === "all" || a.risk_level === riskFilter;
+    const risk = getRisk(a);
+    const matchRisk = riskFilter === "all" || risk.risk_level === riskFilter;
     return matchSearch && matchType && matchRisk;
   });
 
@@ -70,9 +74,13 @@ export default function Assets() {
         <h1 className="text-2xl font-bold tracking-tight">Activos</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
           {assetsList.length} activos registrados en el portafolio
+          {risksLoading && <span className="ml-2 text-xs">· evaluando riesgos...</span>}
         </p>
         {error && (
           <p className="text-xs text-orange-500 mt-2">{error}</p>
+        )}
+        {risksUnavailable && !risksLoading && (
+          <p className="text-xs text-muted-foreground mt-1">Riesgo no disponible para algunos activos (el pipeline V2 no pudo completar el analisis).</p>
         )}
       </div>
 
@@ -109,12 +117,19 @@ export default function Assets() {
             ))}
           </SelectContent>
         </Select>
+        {risksLoading && (
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            Calculando riesgos...
+          </div>
+        )}
       </div>
 
       {/* Asset list */}
       <div className="space-y-2">
         {filtered.map((asset) => {
-          const rc = getRiskColor(asset.risk_level);
+          const risk = getRisk(asset);
+          const rc = getRiskColor(risk.risk_level);
           return (
             <Link
               key={asset.id}
@@ -144,9 +159,15 @@ export default function Assets() {
                   <p className="text-xs text-muted-foreground">Senal observada</p>
                   <p className="text-sm font-semibold truncate">{asset.top_risk || "Contexto climatico"}</p>
                 </div>
-                <Badge variant="outline" className={cn("text-xs px-2.5 py-1", rc.bg, rc.text, rc.border)}>
-                  {RISK_LABELS[asset.risk_level] || "Sin clasificar"}
-                </Badge>
+                {risk.unavailable ? (
+                  <Badge variant="outline" className="text-xs px-2.5 py-1 bg-muted text-muted-foreground border-border">
+                    Riesgo no disponible
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className={cn("text-xs px-2.5 py-1", rc.bg, rc.text, rc.border)}>
+                    {RISK_LABELS[risk.risk_level] || "Sin clasificar"}
+                  </Badge>
+                )}
                 <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
               </div>
             </Link>

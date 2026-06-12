@@ -10,6 +10,14 @@ import {
   checkDuplicateSchema,
 } from '../validators/assets.js';
 
+// ── Deprecation flag ─────────────────────────────────────────────────────────
+// risk_scores table is DEPRECATED. All risk computation now flows through the
+// v2 pipeline (POST /api/v2/climate-risk-analysis). This flag controls whether
+// the backend still attempts to read from the risk_scores table for enrichment.
+// When false, the field is returned as null — the frontend hook useAssetRisk()
+// fills it from the v2 API.
+const USE_RISK_SCORES = false;
+
 const router = express.Router();
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -35,21 +43,84 @@ async function findOrCreatePlace(lat, lng, district) {
   return newPlace.id;
 }
 
+// Builds a full asset row by joining assets + places + asset_metrics directly.
+// Does NOT use the deprecated asset_risk_summary view or risk_scores table.
 async function getAssetWithDetails(id) {
-  const { data } = await supabase
-    .from('asset_risk_summary')
-    .select('*')
+  const { data, error } = await supabase
+    .from('assets')
+    .select(`
+      id, name, type, created_at,
+      place_id,
+      places!inner(id, direccion, district, lat, lng),
+      asset_metrics(id, monthly_sales, area_m2, num_employees, condition, updated_at)
+    `)
     .eq('id', id)
     .single();
-  return data;
+
+  if (error || !data) return null;
+
+  // Flatten the joined structure
+  const place = data.places;
+  const metrics = data.asset_metrics;
+
+  return {
+    id: data.id,
+    name: data.name,
+    type: data.type,
+    created_at: data.created_at,
+    direccion: place?.direccion ?? null,
+    district: place?.district ?? null,
+    lat: place?.lat ?? null,
+    lng: place?.lng ?? null,
+    monthly_sales: metrics?.monthly_sales ?? null,
+    area_m2: metrics?.area_m2 ?? null,
+    num_employees: metrics?.num_employees ?? null,
+    condition: metrics?.condition ?? null,
+    risk_score: USE_RISK_SCORES ? (data.risk_score ?? 0) : null,
+    risk_level: USE_RISK_SCORES ? (data.risk_level ?? 'unknown') : null,
+    financial_impact: USE_RISK_SCORES ? (data.financial_impact ?? 0) : null,
+    metrics_updated_at: metrics?.updated_at ?? null,
+  };
 }
 
 // ── GET / ────────────────────────────────────────────────────────────────────
 
 router.get('/', async (_req, res) => {
-  const { data, error } = await supabase.from('asset_risk_summary').select('*');
+  const { data, error } = await supabase
+    .from('assets')
+    .select(`
+      id, name, type, created_at,
+      place_id,
+      places!inner(id, direccion, district, lat, lng),
+      asset_metrics(id, monthly_sales, area_m2, num_employees, condition, updated_at)
+    `);
+
   if (error) return res.status(500).json(error);
-  res.json(data);
+
+  const flat = (data ?? []).map(item => {
+    const place = item.places;
+    const metrics = item.asset_metrics;
+    return {
+      id: item.id,
+      name: item.name,
+      type: item.type,
+      created_at: item.created_at,
+      direccion: place?.direccion ?? null,
+      district: place?.district ?? null,
+      lat: place?.lat ?? null,
+      lng: place?.lng ?? null,
+      monthly_sales: metrics?.monthly_sales ?? null,
+      area_m2: metrics?.area_m2 ?? null,
+      num_employees: metrics?.num_employees ?? null,
+      condition: metrics?.condition ?? null,
+      risk_score: null,
+      risk_level: null,
+      financial_impact: null,
+      metrics_updated_at: metrics?.updated_at ?? null,
+    };
+  });
+
+  res.json(flat);
 });
 
 // ── GET /:id ─────────────────────────────────────────────────────────────────
@@ -67,11 +138,11 @@ router.post('/check-duplicate', requireAuth, validate(checkDuplicateSchema), asy
     const { name, lat, lng, excludeId } = req.body;
 
     let query = supabase
-      .from('asset_risk_summary')
-      .select('id')
+      .from('assets')
+      .select('id, places!inner(id)')
       .eq('name', name.trim())
-      .eq('lat', lat)
-      .eq('lng', lng);
+      .eq('places.lat', lat)
+      .eq('places.lng', lng);
 
     if (excludeId) query = query.neq('id', excludeId);
 
@@ -100,13 +171,13 @@ router.post('/', requireAuth, strictLimiter, validate(createAssetSchema), async 
       return res.status(400).json({ error: 'Ventas mensuales deben ser >= 0' });
     }
 
-    // Verificar duplicado
+    // Verificar duplicado via direct assets + places join
     const { data: existing } = await supabase
-      .from('asset_risk_summary')
-      .select('id')
+      .from('assets')
+      .select('id, places!inner(id)')
       .eq('name', name.trim())
-      .eq('lat', lat)
-      .eq('lng', lng);
+      .eq('places.lat', lat)
+      .eq('places.lng', lng);
 
     if (existing && existing.length > 0) {
       return res.status(409).json({ error: 'Activo duplicado' });
@@ -157,11 +228,11 @@ router.put('/:id', requireAuth, strictLimiter, validate(updateAssetSchema), asyn
 
     // Verificar duplicado (excluyendo el actual)
     const { data: dup } = await supabase
-      .from('asset_risk_summary')
-      .select('id')
+      .from('assets')
+      .select('id, places!inner(id)')
       .eq('name', name.trim())
-      .eq('lat', lat)
-      .eq('lng', lng)
+      .eq('places.lat', lat)
+      .eq('places.lng', lng)
       .neq('id', id);
 
     if (dup && dup.length > 0) return res.status(409).json({ error: 'Activo duplicado' });
@@ -267,11 +338,11 @@ router.post('/bulk', requireAuth, strictLimiter, validate(bulkAssetsSchema), asy
           }
 
           const { data: existing } = await supabase
-            .from('asset_risk_summary')
-            .select('id')
+            .from('assets')
+            .select('id, places!inner(id)')
             .eq('name', name.trim())
-            .eq('lat', lat)
-            .eq('lng', lng);
+            .eq('places.lat', lat)
+            .eq('places.lng', lng);
 
           if (existing && existing.length > 0) {
             results.duplicates++;

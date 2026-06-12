@@ -139,6 +139,7 @@ export const DISCLAIMER_CATALOG = {
       'Las proyecciones CMIP6 reflejan tendencias estadísticas de largo plazo y no constituyen predicciones de eventos climáticos específicos.',
       'La resolución espacial de los modelos (~25 km) limita la representación de fenómenos climáticos locales y efectos orográficos complejos.',
       'Los umbrales de señal empleados son referencias orientativas basados en literatura científica revisada por pares; no constituyen dictamen técnico-legal.',
+      'La corrección por elevación aplicada mejora la estimación puntual pero no constituye downscaling espacial — la resolución efectiva sigue siendo ~25 km.',
       'Este análisis no reemplaza la evaluación de riesgo in-situ por profesionales certificados en ingeniería, geología o climatología.',
     ],
     uncertainty:

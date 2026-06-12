@@ -3,12 +3,15 @@ import { cn, getRiskColor } from "@/lib/utils";
 import { Link } from "react-router-dom";
 import { ExternalLink, BookOpen, MapPin, ShieldCheck } from "lucide-react";
 
-const LEVEL_ORDER = { critico: 0, alto: 1, medio: 2, bajo: 3 };
-const LEVEL_LABELS = { critico: "observacion alta", alto: "observacion alta", medio: "monitoreo", bajo: "seguimiento" };
+const LEVEL_ORDER = { critico: 0, alto: 1, medio: 2, bajo: 3, unknown: 9 };
+const LEVEL_LABELS = { critico: "observacion alta", alto: "observacion alta", medio: "monitoreo", bajo: "seguimiento", unknown: "no disponible" };
 
-export default function TopRisksTable({ assets }) {
+export default function TopRisksTable({ assets, computedRisks = {} }) {
+  const getRiskLevel = (asset) => computedRisks[asset.id]?.risk_level ?? asset.risk_level ?? 'unknown';
+  const isUnavailable = (asset) => computedRisks[asset.id]?.unavailable === true;
+
   const sorted = [...assets]
-    .sort((a, b) => (LEVEL_ORDER[a.risk_level] ?? 9) - (LEVEL_ORDER[b.risk_level] ?? 9))
+    .sort((a, b) => (LEVEL_ORDER[getRiskLevel(a)] ?? 9) - (LEVEL_ORDER[getRiskLevel(b)] ?? 9))
     .slice(0, 8);
 
   return (
@@ -23,8 +26,10 @@ export default function TopRisksTable({ assets }) {
       </div>
       <div className="space-y-3">
         {sorted.map((asset) => {
-          const rc = getRiskColor(asset.risk_level);
-          const signal = asset.top_risk || "Senales climaticas por contextualizar";
+          const riskLevel = getRiskLevel(asset);
+          const unavailable = isUnavailable(asset);
+          const rc = getRiskColor(riskLevel);
+          const signal = asset.top_risk || (unavailable ? "Riesgo no disponible" : "Senales climaticas por contextualizar");
 
           return (
             <Link
@@ -35,13 +40,19 @@ export default function TopRisksTable({ assets }) {
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className={cn("w-2 h-2 rounded-full flex-shrink-0", rc.dot)} />
+                    <span className={cn("w-2 h-2 rounded-full flex-shrink-0", unavailable ? "bg-muted-foreground" : rc.dot)} />
                     <h4 className="font-semibold text-sm group-hover:text-primary transition-colors truncate">
                       {asset.name}
                     </h4>
-                    <Badge variant="outline" className={cn("text-[10px] px-2 py-0.5", rc.bg, rc.text, rc.border)}>
-                      {LEVEL_LABELS[asset.risk_level] || "sin clasificar"}
-                    </Badge>
+                    {unavailable ? (
+                      <Badge variant="outline" className="text-[10px] px-2 py-0.5 bg-muted text-muted-foreground border-border">
+                        Riesgo no disponible
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className={cn("text-[10px] px-2 py-0.5", rc.bg, rc.text, rc.border)}>
+                        {LEVEL_LABELS[riskLevel] || "sin clasificar"}
+                      </Badge>
+                    )}
                   </div>
                   <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground mb-2">
                     <div className="flex items-center gap-1">
@@ -50,15 +61,17 @@ export default function TopRisksTable({ assets }) {
                     </div>
                     <div className="flex items-center gap-1">
                       <ShieldCheck className="w-3 h-3" />
-                      Confianza media
+                      {unavailable ? "Datos no disponibles" : "Confianza basada en V2"}
                     </div>
                   </div>
                   <p className="text-xs text-foreground/75 leading-relaxed">
-                    Senal observada: {signal}. Fuente: GRI / CMIP6 / Open-Meteo. Periodo: historico 1980-2014 y
-                    proyeccion 2020-2059. Escenarios: SSP245 y SSP585.
+                    {unavailable
+                      ? "Analisis de riesgo V2 no disponible para este activo."
+                      : `Senal observada: ${signal}. Fuente: pipeline V2 — CMIP6 / GRI / Open-Meteo / ENSO. Periodo: historico 1980-2014 y proyeccion 2020-2059. Escenarios: SSP245 y SSP585.`
+                    }
                   </p>
                 </div>
-                <BookOpen className={cn("w-5 h-5 flex-shrink-0", rc.color)} />
+                <BookOpen className={cn("w-5 h-5 flex-shrink-0", unavailable ? "text-muted-foreground" : rc.color)} />
               </div>
             </Link>
           );

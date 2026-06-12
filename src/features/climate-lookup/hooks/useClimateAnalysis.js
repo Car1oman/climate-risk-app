@@ -104,7 +104,7 @@ export function useClimateAnalysis(sector, businessUnitId = '') {
       setError(null);
 
       try {
-        const result = await analyzeClimateRisk({ lat, lon, sector, business_unit_id: businessUnitId || undefined });
+        const result = await analyzeClimateRisk({ lat, lon, sector, asset_type: undefined, scenario: undefined, business_unit_id: businessUnitId || undefined });
         if (result) {
           setRawResponse(result);
         } else {

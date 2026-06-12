@@ -12,8 +12,9 @@
  *   4. GRI como fuente primaria de inundación (~1km en vez de ~25km CMIP6).
  *   5. Señales long_term (2060-2100) cuando climate_cells tienen datos; si no,
  *      se usa extrapolación IPCC de referencia regional (ver projection.js).
- *   6. Eliminado: severe_heat/hd40 (no existe en DB) — usar GRI extreme_heat como proxy.
- *   7. prpercnt historical usa valor real de pr (no 100 fijo) — Commit 6.
+ *   6. Re-activado: severe_heat/hd40 (004-hd40-extreme-heat) — Open-Meteo computa hd40.
+ *   7. Nuevo: moderate_heat/hd30 + extreme_rain_frequency/r20mm (CP-001).
+ *   8. prpercnt historical usa valor real de pr (no 100 fijo) — Commit 6.
  *
  * Fuentes: SENAMHI Perú, IPCC AR6, GRI Oxford, NOAA CPC, INGEMMET.
  */
@@ -228,6 +229,57 @@ export function detectSignalsV2(fusedData) {
     }
   }
 
+  // ── SEVERE HEAT (hd40) — Tmax > 40°C ──────────────────────────────────
+  for (const [horizon, period] of [['short_term', short], ['mid_term', mid]]) {
+    if (thr.severe_heat_delta != null && hist?.hd40 != null && period?.hd40 != null) {
+      const d = deltaAbs(hist.hd40, period.hd40);
+      if (d != null && d > thr.severe_heat_delta) {
+        signals.push(buildSignal({
+          signalType: 'severe_heat',
+          indicator: 'hd40',
+          historical: hist.hd40,
+          projected: period.hd40,
+          delta: d,
+          delta_pct: deltaPct(hist.hd40, period.hd40),
+          conf: confidence(hasCC, !!meteoData),
+          horizon,
+          threshold_reference: `Umbral regionalizado ${region}: +${thr.severe_heat_delta} días hd40 (Tmax > 40°C)`,
+          exceeds_threshold: true,
+          ensoAmplified: false,
+          region,
+        }));
+      }
+    }
+  }
+
+  // ── MODERATE HEAT (hd30) — Tmax > 30°C (solo si no hay severe_heat ni extreme_heat para mismo horizonte) ─
+  for (const [horizon, period] of [['short_term', short], ['mid_term', mid]]) {
+    if (thr.moderate_heat_delta != null && hist?.hd30 != null && period?.hd30 != null) {
+      const hasHigherPriorityHeat = signals.some(s =>
+        (s.signalType === 'severe_heat' || s.signalType === 'extreme_heat')
+        && s.horizon === horizon
+      );
+      if (hasHigherPriorityHeat) continue;
+      const d = deltaAbs(hist.hd30, period.hd30);
+      if (d != null && d > thr.moderate_heat_delta) {
+        signals.push(buildSignal({
+          signalType: 'moderate_heat',
+          indicator: 'hd30',
+          historical: hist.hd30,
+          projected: period.hd30,
+          delta: d,
+          delta_pct: deltaPct(hist.hd30, period.hd30),
+          conf: confidence(hasCC, !!meteoData),
+          horizon,
+          threshold_reference: `Umbral regionalizado ${region}: +${thr.moderate_heat_delta} días hd30 (Tmax > 30°C)`,
+          exceeds_threshold: true,
+          ensoAmplified: false,
+          region,
+        }));
+      }
+    }
+  }
+
   // ── TROPICAL NIGHTS (tr) — solo donde aplica ────────────────────────────
   for (const [horizon, period, thresholdKey] of [
     ['short_term', short, 'tropical_nights_delta_short'],
@@ -427,6 +479,27 @@ export function detectSignalsV2(fusedData) {
         }));
       }
     }
+
+    // r20mm (días con lluvia > 20mm) — frecuencia de lluvia intensa
+    if (hist?.r20mm != null && period?.r20mm != null) {
+      const d = deltaAbs(hist.r20mm, period.r20mm);
+      if (d != null && d > thr.r20mm_delta) {
+        signals.push(buildSignal({
+          signalType: 'extreme_rain_frequency',
+          indicator: 'r20mm',
+          historical: hist.r20mm,
+          projected: period.r20mm,
+          delta: d,
+          delta_pct: deltaPct(hist.r20mm, period.r20mm),
+          conf: confidence(hasCC, !!meteoData),
+          horizon,
+          threshold_reference: `r20mm delta > ${thr.r20mm_delta} días (regionalizado ${region})`,
+          exceeds_threshold: true,
+          ensoAmplified: false,
+          region,
+        }));
+      }
+    }
   }
 
   // ── LONG_TERM (2060-2100) — señales extendidas cuando hay datos ─────────
@@ -590,7 +663,7 @@ export function detectSignalsV2(fusedData) {
   }
 
   // Heat desde GRI
-  if (!hasSignalType('extreme_heat') && !hasSignalType('severe_heat')) {
+  if (!hasSignalType('extreme_heat') && !hasSignalType('severe_heat') && !hasSignalType('moderate_heat')) {
     const griH = extractGri(['heat', 'extreme_heat']);
     const baseScore = griH?.baseline?.score;
     if (baseScore && baseScore !== 'sin data') {
@@ -767,6 +840,28 @@ export function detectSignalsV2(fusedData) {
         source: `Compuesto (${['NDVI', 'GRACE-FO', 'POWER'].filter((_, i) => [ndviStress, graceDry, powerDry][i]).join(' + ')})`,
         dataset: 'MODIS MOD13Q1 + GRACE-FO Mascon + NASA POWER',
         temporal_window: 'multiple escalas',
+        validation_status: 'provisional',
+      },
+    }));
+  }
+
+  // ── PRECTOT SIGNAL (NASA POWER — standalone drought_observacional) ──────
+  const prectotVal = fusedData?.nasaPowerData?.recent?.PRECTOT?.value;
+  if (prectotVal != null && prectotVal < thr.prectot_drought_mm) {
+    signals.push(buildSignal({
+      signalType: 'drought_observacional',
+      indicator: 'prectot',
+      projected: prectotVal,
+      delta: prectotVal,
+      conf: 'medium',
+      horizon: 'short_term',
+      threshold_reference: `NASA POWER PRECTOT < ${thr.prectot_drought_mm} mm/día (${prectotVal.toFixed(2)} mm/día observado)`,
+      exceeds_threshold: true,
+      region: terrainData?.terrain_region ?? null,
+      sourceTraceability: {
+        source: 'NASA POWER (PRECTOT)',
+        dataset: 'NASA POWER v2.8.0 (MERRA-2)',
+        temporal_window: 'diario reciente',
         validation_status: 'provisional',
       },
     }));

@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useAssets } from "@/hooks/useAssets";
 import { useAlerts } from "@/hooks/useAlerts";
-import { Building2, Database, CloudSun, BookOpen } from "lucide-react";
+import { useBatchAssetRisks } from "@/hooks/useAssetRisk";
+import { Building2, Database, CloudSun, BookOpen, Loader2 } from "lucide-react";
 import StatCard from "@/components/dashboard/StatCard";
 import TopRisksTable from "@/components/dashboard/TopRisksTable";
 import AlertsFeed from "@/components/dashboard/AlertsFeed";
@@ -13,6 +14,7 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const { data: assets = [], isLoading: assetsLoading, error: assetsError } = useAssets();
   const { data: alerts = [] } = useAlerts({ active: true });
+  const { computedRisks, getRisk, isLoading: risksLoading, error: risksError, unavailable: risksUnavailable } = useBatchAssetRisks(assets);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 500);
@@ -22,7 +24,20 @@ export default function Dashboard() {
   const totalAssets = assets.length;
   const locatedAssets = assets.filter((a) => a.lat && a.lng).length;
   const districts = new Set(assets.map((a) => a.district).filter(Boolean)).size;
-  const observedSignals = assets.filter((a) => a.top_risk || a.risk_level).length;
+  const observedSignals = assets.filter((a) => {
+    const risk = getRisk(a);
+    return !risk.unavailable && (a.top_risk || (risk.risk_level && risk.risk_level !== 'bajo' && risk.risk_level !== 'unknown'));
+  }).length;
+
+  const hasNonBajo = assets.some(a => {
+    const risk = getRisk(a);
+    return !risk.unavailable && (risk.risk_level === 'alto' || risk.risk_level === 'critico');
+  });
+
+  const unavailableCount = assets.filter(a => {
+    const risk = getRisk(a);
+    return risk.unavailable;
+  }).length;
 
   if (isLoading || assetsLoading) {
     return (
@@ -38,12 +53,18 @@ export default function Dashboard() {
         <h1 className="text-2xl font-bold tracking-tight">Panel de Control</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
           Plataforma de inteligencia climatica basada en evidencia y trazabilidad
+          {risksLoading && <span className="ml-2 text-xs">· evaluando riesgos...</span>}
         </p>
       </div>
 
       {assetsError && (
         <div className="bg-destructive/10 border border-destructive rounded-xl p-4 text-sm text-destructive">
           Error cargando activos desde backend. Verifica la conexion.
+        </div>
+      )}
+      {risksUnavailable && !risksLoading && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-sm text-amber-400">
+          El analisis de riesgo V2 no esta disponible para {unavailableCount} activo{unavailableCount !== 1 ? 's' : ''}. Revisa el estado del pipeline.
         </div>
       )}
 
@@ -76,15 +97,28 @@ export default function Dashboard() {
           className=""
         />
         <StatCard
-          title="Senales Observadas"
+          title="Senales Identificadas"
           value={observedSignals}
-          subtitle="Contexto descriptivo disponible"
+          subtitle="Riesgos calculados por pipeline V2"
           icon={BookOpen}
           trend={0}
           trendUp={false}
           className=""
         />
       </div>
+
+      {risksLoading && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 rounded-xl px-4 py-2">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Calculando niveles de riesgo mediante pipeline V2...
+        </div>
+      )}
+
+      {hasNonBajo && !risksLoading && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3 text-sm text-amber-400">
+          Se detectaron activos con nivel de riesgo alto o crítico. Revisa la tabla de priorización.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <ClimateStoryCard
@@ -112,7 +146,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
-          <TopRisksTable assets={assets} />
+          <TopRisksTable assets={assets} computedRisks={computedRisks} />
         </div>
         <div className="space-y-4">
           <ScientificEvidenceCard />

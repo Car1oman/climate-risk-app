@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { MapContainer, TileLayer, CircleMarker } from "react-leaflet";
+import { useAssetRisk } from "@/hooks/useAssetRisk";
 import ClimateStoryCard from "@/components/climate/ClimateStoryCard";
 import HistoricalEventsCard from "@/components/climate/HistoricalEventsCard";
 import ProjectionScenarioCard from "@/components/climate/ProjectionScenarioCard";
@@ -43,6 +44,8 @@ export default function AssetDetail() {
   const [climateLoading, setClimateLoading] = useState(false);
   const { toast } = useToast();
 
+  const { computedRisk, isLoading: riskLoading, error: riskError, unavailable: riskUnavailable } = useAssetRisk(asset);
+
   useEffect(() => {
     const loadAsset = async () => {
       setDetailLoading(true);
@@ -59,7 +62,7 @@ export default function AssetDetail() {
 
     setClimateLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/climate?lat=${asset.lat}&lng=${asset.lng}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://climate-risk-app-91ev.onrender.com'}/api/climate?lat=${asset.lat}&lng=${asset.lng}`);
       if (!res.ok) throw new Error("Error en la API");
       setClimate(await res.json());
     } catch (error) {
@@ -115,7 +118,9 @@ Genera exactamente 3 recomendaciones de adaptacion climatica especificas para es
     );
   }
 
-  const rc = getRiskColor(asset.risk_level);
+  const isRiskUnavailable = riskUnavailable || computedRisk?.unavailable === true;
+  const riskLevel = isRiskUnavailable ? 'unknown' : (computedRisk?.risk_level ?? asset.risk_level ?? 'unknown');
+  const rc = getRiskColor(riskLevel);
   const traceability = {
     source: "CMIP6, IPCC AR6, GRI, Open-Meteo",
     period: "1980-2014 / 2020-2059",
@@ -126,12 +131,20 @@ Genera exactamente 3 recomendaciones de adaptacion climatica especificas para es
 
   return (
     <div className="p-6 max-w-[1400px] mx-auto space-y-6">
+      {isRiskUnavailable && !riskLoading && (
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-400">
+          El analisis de riesgo V2 no esta disponible para este activo. Los datos mostrados son informativos.
+        </div>
+      )}
       <div className="flex items-start justify-between">
         <div>
           <Link to="/assets" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-3 transition-colors">
             <ArrowLeft className="w-3 h-3" /> Volver a activos
           </Link>
-          <h1 className="text-2xl font-bold tracking-tight">{asset.name}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {asset.name}
+            {riskLoading && <Loader2 className="inline w-4 h-4 ml-2 animate-spin text-muted-foreground" />}
+          </h1>
           <div className="flex flex-wrap items-center gap-3 mt-1">
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <MapPin className="w-3 h-3" /> {asset.district}
@@ -147,9 +160,15 @@ Genera exactamente 3 recomendaciones de adaptacion climatica especificas para es
               </div>
             ) : null}
             <Badge variant="outline" className="text-xs">{TYPE_LABELS[asset.type] || asset.type}</Badge>
-            <Badge variant="outline" className={cn("text-xs", rc.bg, rc.text, rc.border)}>
-              {STATUS_LABELS[asset.risk_level] || "Sin clasificar"}
-            </Badge>
+            {isRiskUnavailable ? (
+              <Badge variant="outline" className="text-xs bg-muted text-muted-foreground border-border">
+                Riesgo no disponible
+              </Badge>
+            ) : (
+              <Badge variant="outline" className={cn("text-xs", rc.bg, rc.text, rc.border)}>
+                {STATUS_LABELS[riskLevel] || "Sin clasificar"}
+              </Badge>
+            )}
           </div>
         </div>
       </div>
@@ -159,7 +178,7 @@ Genera exactamente 3 recomendaciones de adaptacion climatica especificas para es
           <ClimateStoryCard
             asset={asset}
             climateData={climate}
-            evidence={{ summary: asset.top_risk || "Senales climaticas del entorno requieren lectura contextual", confidence: "medium" }}
+            evidence={{ summary: computedRisk?.signals?.[0]?.signalType ?? asset.top_risk ?? "Senales climaticas del entorno requieren lectura contextual", confidence: "medium" }}
             traceability={traceability}
           />
         </div>
@@ -172,8 +191,9 @@ Genera exactamente 3 recomendaciones de adaptacion climatica especificas para es
               { label: "Area", value: `${(asset.area_m2 || 0).toLocaleString()} m2` },
               { label: "Colaboradores", value: asset.num_employees || "-" },
               { label: "Condicion", value: asset.condition === "alquilado" ? "Alquilado" : "Propio" },
-              { label: "Senal observada", value: asset.top_risk || "-" },
-              { label: "Fuente", value: "GRI / CMIP6" },
+              { label: "Score de riesgo", value: isRiskUnavailable ? "-" : computedRisk?.risk_score != null ? `${Math.round(computedRisk.risk_score * 100)}%` : asset?.risk_score ? `${Math.round(asset.risk_score * 100)}%` : "-" },
+              { label: "Senal observada", value: asset.top_risk || (computedRisk?.signals?.[0]?.signalType ?? "-") },
+              { label: "Fuente", value: "V2 Pipeline: CMIP6 / GRI / ENSO" },
             ].map((item) => (
               <div key={item.label} className="flex items-center justify-between gap-4">
                 <span className="text-sm text-muted-foreground">{item.label}</span>
@@ -193,9 +213,9 @@ Genera exactamente 3 recomendaciones de adaptacion climatica especificas para es
                 center={[asset.lat, asset.lng]}
                 radius={12}
                 pathOptions={{
-                  color: STATUS_FILL[asset.risk_level] || "#22c55e",
-                  fillColor: STATUS_FILL[asset.risk_level] || "#22c55e",
-                  fillOpacity: 0.4,
+                  color: isRiskUnavailable ? "#71717a" : (STATUS_FILL[riskLevel] || "#22c55e"),
+                  fillColor: isRiskUnavailable ? "#71717a" : (STATUS_FILL[riskLevel] || "#22c55e"),
+                  fillOpacity: isRiskUnavailable ? 0.2 : 0.4,
                   weight: 2,
                 }}
               />

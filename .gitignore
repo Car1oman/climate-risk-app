@@ -30,10 +30,16 @@ dist-ssr
 .env
 .vite
 
-# Markdown docs (except README)
+# Markdown — track explicitly, ignore root-level transient audits
 *.md
 !README.md
-docs/*.md
+!AGENTS.md
+!docs/*.md
+!memory/**/*.md
+!project-memory/*.md
+!specs/**/*.md
+!server/**/*.md
+!scripts/README.md
 codegraph/*
 server/_audit_schema.mjs
 build_phase*.txt

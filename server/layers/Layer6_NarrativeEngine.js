@@ -12,7 +12,8 @@ import { validateAIOutput }      from '../ai/scientificValidator.js';
 import { buildEnsoNarrative }      from '../services/ensoService.js';
 import { buildTerrainNarrative }   from '../services/terrainService.js'; // Sprint 6
 import { buildPowerNarrative }     from '../services/nasaPowerService.js'; // Sprint 7: NASA POWER
-
+import { buildNdviNarrative }      from '../services/modisNdviService.js'; // Sprint 8: NDVI narrative
+import { buildGraceFoNarrative }   from '../services/graceFoService.js'; // Sprint 8: GRACE-FO narrative
 
 const LAYER6_SYSTEM_PROMPT = `Eres un redactor de análisis de riesgo climático científico para la plataforma DataRisk Peru.
 Tu tarea es generar resúmenes ejecutivos que sinteticen MÚLTIPLES señales climáticas co-ocurrentes en un solo párrafo coherente.
@@ -45,7 +46,9 @@ const SIGNAL_LABELS = {
   severe_heat:     'calor severo (días con Tmax > 40°C)',
   tropical_nights: 'noches tropicales (Tmin > 20°C)',
   drought:         'sequía / estrés hídrico',
+  moderate_heat:   'calor moderado (días con Tmax > 30°C)',
   extreme_rain:    'lluvia extrema',
+  extreme_rain_frequency: 'frecuencia de lluvia intensa (días con lluvia > 20mm)',
   temp_increase:   'aumento de temperatura media',
   flood_risk:      'riesgo de inundación',
   enso_phase:      'fase ENSO activa (ONI)',      // Sprint 5
@@ -126,7 +129,7 @@ function buildMainSentence(contextualRisk, lat, lon) {
     deltaDesc  = hist
       ? `${proj}${d} con Tmin > 20°C (histórico: ${hist})`
       : `${proj} con Tmin > 20°C`;
-  } else if (['extreme_heat', 'severe_heat'].includes(signal.signalType)) {
+  } else if (['extreme_heat', 'severe_heat', 'moderate_heat'].includes(signal.signalType)) {
     if (signal.indicator === 'gri_heat_probability') {
       const prob = signal.historical != null ? `${(signal.historical * 100).toFixed(0)}%` : null;
       const futP = signal.projected  != null ? `${(signal.projected  * 100).toFixed(0)}%` : null;
@@ -136,7 +139,10 @@ function buildMainSentence(contextualRisk, lat, lon) {
     } else {
       const proj = signal.projected != null ? `${Math.round(signal.projected)} días/año` : 'incremento significativo';
       const d    = signal.delta     != null ? ` (+${Math.round(signal.delta)} días vs histórico)` : '';
-      deltaDesc = `${proj}${d} con ${signal.indicator === 'hd40' ? 'Tmax > 40°C' : 'Tmax > 35°C'}`;
+      const tempRef = signal.indicator === 'hd40' ? 'Tmax > 40°C'
+        : signal.indicator === 'hd30' ? 'Tmax > 30°C'
+        : 'Tmax > 35°C';
+      deltaDesc = `${proj}${d} con ${tempRef}`;
     }
   } else if (signal.signalType === 'drought') {
     if (signal.indicator === 'gri_drought_probability') {
@@ -164,6 +170,10 @@ function buildMainSentence(contextualRisk, lat, lon) {
       const val = signal.projected != null ? `${signal.projected.toFixed(0)} mm` : 'valor extremo';
       deltaDesc = `precipitación máxima diaria de ${val}`;
     }
+  } else if (signal.signalType === 'extreme_rain_frequency') {
+    const d = signal.delta != null ? `+${Math.round(signal.delta)} días` : 'aumento significativo';
+    const proj = signal.projected != null ? `${Math.round(signal.projected)} días/año` : '';
+    deltaDesc = `${d} de lluvia intensa (>20mm/día) ${proj}`.trim();
   }
 
   return `Para esta ubicación (${lat.toFixed(4)}, ${lon.toFixed(4)}), el análisis identifica ${signalLabel} con ${deltaDesc} hacia ${horizonLabel}.`;
@@ -309,8 +319,11 @@ export function generateNarrative({
   const terrainSentence = buildTerrainNarrative(terrainData);
   // Sprint 7: NASA POWER narrative enrichment (appended when POWER data is available)
   const powerSentence    = buildPowerNarrative(powerData);
+  // Sprint 8: Observational narrative enrichment (NDVI + GRACE-FO)
+  const ndviSentence     = buildNdviNarrative(fusedData?.ndviData?.anomaly);
+  const graceSentence    = buildGraceFoNarrative(fusedData?.graceFoData?.anomaly);
 
-  const executive_summary = [sentence1, compoundSentence, sentence2, ensoSentence, terrainSentence, powerSentence]
+  const executive_summary = [sentence1, compoundSentence, sentence2, ensoSentence, terrainSentence, powerSentence, ndviSentence, graceSentence]
     .filter(Boolean)
     .join(' ') || buildFallbackSummary(fusedData);
 
@@ -360,6 +373,9 @@ export function generateNarrative({
     terrain_source:  terrainData?.source        ?? null,
     // Sprint 7: NASA POWER provenance
     nasa_power:      powerData != null,
+    // Sprint 8: Observational provenance
+    ndvi:            fusedData?.ndviData?.anomaly != null,
+    grace_fo:        fusedData?.graceFoData?.anomaly != null,
     distance_km:     fusedData?.distanceKm      ?? null,
     scenario:        fusedData?.scenario        ?? null,
   };

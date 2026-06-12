@@ -267,12 +267,13 @@ export const CUSCO_LOGISTICS_SSP585 = {
   },
 
   expected: {
-    // Layer2: 12 total signals
+    // Layer2: 13 total signals
     // (4 drought: short cdd, short prpercnt, mid cdd, mid prpercnt)
-    // (3 extreme_rain: short rx5day, mid rx5day, mid rx1day)
-    // (2 temp_increase: short, mid)
+    // (4 extreme_rain: short rx5day, short rx1day*, mid rx5day, mid rx1day)
+    //   * rx1day short triggers due to ENSO 1.3× amplification (40.2 → 52.26mm)
+    // (2 temp_increase: short, mid — both ENSO-boosted)
     // + enso_phase + landslide_risk + huayco_risk
-    signals_count:   12,
+    signals_count:   13,
     dominant_signal: 'drought',   // cdd mid delta=70 is largest among scorable signals
     enso_phase:      'El Niño',
     terrain_region:  'Andes Sur',

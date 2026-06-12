@@ -17,7 +17,7 @@ const SCIENTIFIC_REFERENCES = [
 ];
 
 const INSTITUTION_BADGES = ["IPCC", "CMIP6", "World Bank", "GRI", "NOAA", "Open-Meteo"];
-const RISK_LABELS = { critico: "Critico", alto: "Alto", medio: "Medio", bajo: "Bajo" };
+const RISK_LABELS = { critico: "Critico", alto: "Alto", medio: "Medio", bajo: "Bajo", unknown: "No disponible" };
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -40,20 +40,32 @@ function riskBadgeClass(level) {
   if (level === "critico") return "critical";
   if (level === "alto") return "high";
   if (level === "medio") return "medium";
-  return "low";
+  if (level === "bajo") return "low";
+  return "unavailable";
 }
 
-function computePortfolio(assets) {
+function computePortfolio(assets, computedRisks = {}) {
   const list = Array.isArray(assets) ? assets : [];
+  const getLevel = (a) => computedRisks[a.id]?.risk_level ?? a.risk_level;
   const totalAssets = list.length;
   const georeferenced = list.filter((asset) => asset.lat && asset.lng).length;
   const districts = new Set(list.map((asset) => asset.district).filter(Boolean)).size;
-  const signalCount = list.filter((asset) => asset.top_risk || asset.risk_level).length;
+  const signalCount = list.filter((asset) => {
+    const risk = computedRisks[asset.id];
+    if (risk?.unavailable) return false;
+    const level = getLevel(asset);
+    return asset.top_risk || (level && level !== 'bajo' && level !== 'unknown');
+  }).length;
+
+  const unavailableCount = list.filter((asset) => {
+    const risk = computedRisks[asset.id];
+    return risk?.unavailable === true;
+  }).length;
   const topRisks = [...list]
     .sort((a, b) => String(a.district || "").localeCompare(String(b.district || "")))
     .slice(0, 8);
 
-  return { totalAssets, georeferenced, districts, signalCount, topRisks };
+  return { totalAssets, georeferenced, districts, signalCount, topRisks, unavailableCount };
 }
 
 function markdownToHtml(markdown) {
@@ -68,21 +80,27 @@ function markdownToHtml(markdown) {
   }).join("");
 }
 
-function renderTopRiskRows(topRisks) {
+function renderTopRiskRows(topRisks, computedRisks = {}) {
   if (!topRisks.length) {
     return `<tr><td colspan="6">No hay activos disponibles para priorizacion.</td></tr>`;
   }
 
-  return topRisks.map((asset, index) => `
+  const getLevel = (asset) => computedRisks[asset.id]?.risk_level ?? asset.risk_level;
+
+  return topRisks.map((asset, index) => {
+    const risk = computedRisks[asset.id];
+    const isUnavailable = risk?.unavailable === true;
+    const level = isUnavailable ? 'unknown' : (getLevel(asset) || 'unknown');
+    return `
     <tr>
       <td>${index + 1}</td>
       <td><strong>${escapeHtml(asset.name || "Activo sin nombre")}</strong><br /><span>${escapeHtml(asset.district || "Sin distrito")}</span></td>
-      <td>${escapeHtml(asset.top_risk || "No especificado")}</td>
-      <td><span class="risk ${riskBadgeClass(asset.risk_level)}">${escapeHtml(RISK_LABELS[asset.risk_level] || asset.risk_level || "Bajo")}</span></td>
-      <td>CMIP6 / GRI</td>
-      <td>SSP245 / SSP585</td>
+      <td>${isUnavailable ? 'Riesgo no disponible' : escapeHtml(asset.top_risk || "No especificado")}</td>
+      <td><span class="risk ${riskBadgeClass(level)}">${escapeHtml(RISK_LABELS[level] || level || "No disponible")}</span></td>
+      <td>${isUnavailable ? 'V2 no disponible' : 'Pipeline V2'}</td>
+      <td>${isUnavailable ? '-' : 'SSP245 / SSP585'}</td>
     </tr>
-  `).join("");
+  `}).join("");
 }
 
 function renderSources() {
@@ -137,8 +155,8 @@ function renderInstitutionNames() {
   return INSTITUTION_BADGES.map((name) => `<span class="institution">${escapeHtml(name)}</span>`).join("");
 }
 
-export function buildEnterprisePdfHtml({ assets, generatedReport }) {
-  const portfolio = computePortfolio(assets);
+export function buildEnterprisePdfHtml({ assets, generatedReport, computedRisks = {} }) {
+  const portfolio = computePortfolio(assets, computedRisks);
   const generatedAt = new Date().toLocaleString("es-PE", { dateStyle: "medium", timeStyle: "short" });
 
   return `<!doctype html>
@@ -175,6 +193,7 @@ export function buildEnterprisePdfHtml({ assets, generatedReport }) {
     .high { background: #ffedd5; color: #9a3412; }
     .medium { background: #fef3c7; color: #92400e; }
     .low { background: #dcfce7; color: #166534; }
+    .unavailable { background: #f4f4f5; color: #71717a; }
     .sources { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; }
     .source-card, .scenario { border: 1px solid #e4e4e7; border-radius: 8px; padding: 9px; background: #fff; break-inside: avoid; }
     .source-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
@@ -212,6 +231,10 @@ export function buildEnterprisePdfHtml({ assets, generatedReport }) {
       <div class="callout">
         El portafolio se interpreta mediante evidencia fisica: senales climaticas, exposicion territorial, fuente, periodo, escenario SSP y nivel de confianza.
       </div>
+      ${portfolio.unavailableCount > 0 ? `
+      <div class="callout warning">
+        <strong>Aviso:</strong> El analisis V2 no pudo calcular el riesgo para ${portfolio.unavailableCount} activo${portfolio.unavailableCount !== 1 ? 's' : ''}. Los datos mostrados para estos activos no representan su nivel de exposicion real. Contacta al equipo tecnico para revisar el estado del pipeline.
+      </div>` : ''}
     </section>
 
     <section class="section">
@@ -226,7 +249,7 @@ export function buildEnterprisePdfHtml({ assets, generatedReport }) {
         <thead>
           <tr><th>#</th><th>Activo</th><th>Senal observada</th><th>Estado</th><th>Fuente</th><th>Escenario</th></tr>
         </thead>
-        <tbody>${renderTopRiskRows(portfolio.topRisks)}</tbody>
+        <tbody>${renderTopRiskRows(portfolio.topRisks, computedRisks)}</tbody>
       </table>
     </section>
 
@@ -281,8 +304,8 @@ export function buildEnterprisePdfHtml({ assets, generatedReport }) {
 </html>`;
 }
 
-export function exportEnterprisePdf({ assets, generatedReport }) {
-  const portfolio = computePortfolio(assets);
+export function exportEnterprisePdf({ assets, generatedReport, computedRisks = {} }) {
+  const portfolio = computePortfolio(assets, computedRisks);
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const margin = 16;
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -373,6 +396,17 @@ export function exportEnterprisePdf({ assets, generatedReport }) {
   addMetric("Senales", portfolio.signalCount, margin + (metricWidth + metricGap) * 3, metricWidth);
   y += 27;
   addText("El portafolio se interpreta mediante evidencia fisica: senales climaticas, exposicion territorial, fuentes, escenarios SSP y confianza.", { size: 9 });
+  if (portfolio.unavailableCount > 0) {
+    ensureSpace(10);
+    doc.setDrawColor(217, 119, 6);
+    doc.setFillColor(255, 251, 235);
+    doc.roundedRect(margin, y, contentWidth, 12, 2, 2, "FD");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.setTextColor(146, 64, 14);
+    doc.text(`AVISO: El analisis V2 no esta disponible para ${portfolio.unavailableCount} activo${portfolio.unavailableCount !== 1 ? 's' : ''}. Contacta al equipo tecnico.`, margin + 3, y + 7);
+    y += 16;
+  }
 
   addHeading("Como interpretar este reporte");
   addBullets([
@@ -386,6 +420,9 @@ export function exportEnterprisePdf({ assets, generatedReport }) {
     addText("No hay activos disponibles para priorizacion.", { size: 9 });
   } else {
     portfolio.topRisks.forEach((asset, index) => {
+      const risk = computedRisks[asset.id];
+      const isUnavailable = risk?.unavailable === true;
+      const riskLevel = isUnavailable ? 'unknown' : (risk?.risk_level ?? asset.risk_level);
       ensureSpace(16);
       doc.setDrawColor(228, 228, 231);
       doc.setFillColor(250, 250, 250);
@@ -396,10 +433,10 @@ export function exportEnterprisePdf({ assets, generatedReport }) {
       doc.text(`${index + 1}. ${asset.name || "Activo sin nombre"}`, margin + 3, y + 5);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(82, 82, 91);
-      doc.text(`${asset.district || "Sin distrito"} | ${asset.top_risk || "Riesgo no especificado"}`, margin + 3, y + 10);
+      doc.text(`${asset.district || "Sin distrito"} | ${isUnavailable ? "Riesgo no disponible" : (asset.top_risk || "Riesgo no especificado")}`, margin + 3, y + 10);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(15, 118, 110);
-      doc.text("CMIP6 / GRI | SSP245 / SSP585", pageWidth - margin - 58, y + 8);
+      doc.setTextColor(isUnavailable ? 146 : 15, isUnavailable ? 64 : 118, isUnavailable ? 14 : 110);
+      doc.text(`${isUnavailable ? 'V2 no disponible' : 'Pipeline V2'}${riskLevel ? ` | ${riskLevel.toUpperCase()}` : ""}`, pageWidth - margin - 62, y + 8);
       y += 17;
     });
   }

@@ -27,6 +27,10 @@ const IMPACTS_BY_TAXONOMY = {
       'Riesgo crítico de falla en sistemas de refrigeración de data center',
       '↑ demanda de servicios digitales por migración de clientes',
     ],
+    moderate_heat: [
+      '↑ consumo energético moderado en climatización',
+      'Reducción parcial de afluencia en horas de calor',
+    ],
     drought: [
       'Restricción hídrica en edificios corporativos',
       'Riesgo operativo en zonas con racionamiento de agua',
@@ -37,6 +41,10 @@ const IMPACTS_BY_TAXONOMY = {
       'Interrupción de accesos a sucursales',
       'Daño a cajeros automáticos en vía pública',
       'Riesgo de filtración en data center y salas de servidores',
+    ],
+    extreme_rain_frequency: [
+      '↑ frecuencia de días con lluvia intensa afectando operaciones presenciales',
+      'Riesgo de saturación de sistemas de drenaje en sucursales',
     ],
     temp_increase: [
       '↑ costos energéticos estructurales por climatización continua',
@@ -76,6 +84,10 @@ const IMPACTS_BY_TAXONOMY = {
       'Riesgo de falla en equipos de comunicaciones financieras',
       'Posible trabajo remoto obligatorio del equipo',
     ],
+    moderate_heat: [
+      '↑ consumo energético en oficinas',
+      'Posible reducción de horario presencial',
+    ],
     drought: [
       'Restricción hídrica en edificio corporativo',
       'Sin impacto directo en operaciones de inversión',
@@ -83,6 +95,9 @@ const IMPACTS_BY_TAXONOMY = {
     extreme_rain: [
       'Inundación de sótanos y estacionamientos del edificio corporativo',
       'Interrupción de accesos para personal clave',
+    ],
+    extreme_rain_frequency: [
+      '↑ frecuencia de lluvia afectando accesos a oficinas',
     ],
     flood_risk: [
       'Riesgo de inundación en distrito financiero',
@@ -103,6 +118,10 @@ const IMPACTS_BY_TAXONOMY = {
     severe_heat: [
       'Riesgo crítico de falla en sistemas de refrigeración del data center',
       'Posible interrupción de servicio de pagos electrónicos',
+    ],
+    moderate_heat: [
+      '↑ consumo energético en data center',
+      'Posible degradación parcial de throughput',
     ],
     drought: [
       'Sin impacto directo en procesamiento de pagos',
@@ -133,6 +152,10 @@ const IMPACTS_BY_TAXONOMY = {
     severe_heat: [
       'Incremento significativo de reclamos de seguros de vida y salud',
       'Posible activación de cláusulas de fuerza mayor en pólizas',
+    ],
+    moderate_heat: [
+      '↑ reclamos menores por gastos médicos por calor',
+      '↑ consultas en seguros de salud ambulatorios',
     ],
     drought: [
       '↑ reclamos de seguros agrícolas',
@@ -717,10 +740,22 @@ const IMPACTS_BY_TAXONOMY = {
  * @param {string} signalType - Tipo de señal climática (ej. "extreme_heat", "flood_risk")
  * @returns {string[]|null} Array de impactos o null si no hay mapeo
  */
+// Generic fallback impacts for signal types not yet mapped per-taxonomy
+const FALLBACK_IMPACTS = {
+  moderate_heat: [
+    '↑ consumo energético moderado en climatización',
+    'Posible reducción de productividad en horas de calor',
+  ],
+  extreme_rain_frequency: [
+    '↑ frecuencia de interrupciones logísticas por lluvia intensa',
+    'Riesgo de saturación de infraestructura de drenaje',
+  ],
+};
+
 export function getTaxonomyImpacts(taxonomia, signalType) {
   const byTaxonomy = IMPACTS_BY_TAXONOMY[taxonomia];
   if (!byTaxonomy) return null;
-  return byTaxonomy[signalType] ?? null;
+  return byTaxonomy[signalType] ?? FALLBACK_IMPACTS[signalType] ?? null;
 }
 
 /**

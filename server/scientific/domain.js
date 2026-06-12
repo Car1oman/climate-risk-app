@@ -72,6 +72,22 @@ export const SIGNAL_TAXONOMY = {
     layer2_signal_type:   'severe_heat',
   },
 
+  moderate_heat: {
+    label:                'Moderate Heat Days',
+    category:             'temperature',
+    observed_or_projected:'projected',
+    unit:                 'days/year',
+    indicator:            'hd30',
+    description:          'Days per year with maximum temperature exceeding 30°C. ' +
+                          'Lower-tier heat stress indicator for moderate heat events.',
+    threshold:            '+15 days/yr above historical baseline (regionalizado)',
+    threshold_reference:  'SENAMHI Perú — Thresholds regionalizados por macro-región',
+    primary_evidence:     'CMIP6_CCKP',
+    secondary_evidence:   null,
+    geographic_scope:     'Regional (~25 km CMIP6 grid cell)',
+    layer2_signal_type:   'moderate_heat',
+  },
+
   tropical_nights: {
     label:                'Tropical Nights',
     category:             'temperature',
@@ -143,6 +159,22 @@ export const SIGNAL_TAXONOMY = {
     secondary_evidence:   null,
     geographic_scope:     'Regional (~25 km CMIP6 grid cell)',
     layer2_signal_type:   'extreme_rain',
+  },
+
+  extreme_rain_frequency: {
+    label:                'Extreme Rain Frequency',
+    category:             'precipitation',
+    observed_or_projected:'projected',
+    unit:                 'days/year',
+    indicator:            'r20mm',
+    description:          'Days per year with precipitation exceeding 20mm (r20mm). ' +
+                          'Measures rain frequency rather than intensity, complementing rx5day/rx1day.',
+    threshold:            '+5 days/yr above historical baseline (regionalizado)',
+    threshold_reference:  'WMO 2023 — Heavy precipitation frequency; SENAMHI thresholds regionalizados',
+    primary_evidence:     'CMIP6_CCKP',
+    secondary_evidence:   null,
+    geographic_scope:     'Regional (~25 km CMIP6 grid cell)',
+    layer2_signal_type:   'extreme_rain_frequency',
   },
 
   // ── Hydrology ────────────────────────────────────────────────────────────────
@@ -402,9 +434,10 @@ export const SYSTEM_LIMITATIONS = [
     id: 'SYS-001',
     title: 'hd40 no disponible en climate_cells (DB)',
     description: 'La variable hd40 (días con Tmax > 40°C) no existe en la tabla climate_cells. ' +
-                 'La señal severe_heat se eliminó del pipeline. Open-Meteo puede computar hd40 como fallback.',
+                 'Open-Meteo computa hd40 como fallback para severe_heat.',
     severity: 'info',
-    mitigation: 'Commit 1 — eliminado de Layer2. Usar GRI extreme_heat como proxy de calor severo.',
+    mitigation: '004-hd40-extreme-heat — severe_heat re-activado usando Open-Meteo hd40. ' +
+                'Migrar a climate_cells cuando hd40 esté disponible en DB.',
   },
   {
     id: 'SYS-002',
@@ -442,6 +475,14 @@ export const SYSTEM_LIMITATIONS = [
     description: 'historical: 100 reemplazado por valor real de pr histórico como baseline.',
     severity: 'info',
     mitigation: 'N/A — corrección cosmética para reportes.',
+  },
+  {
+    id: 'SYS-007',
+    title: 'hd30, r20mm, hd40 como nuevas señales (004-hd40-extreme-heat)',
+    description: 'hd30 (moderate_heat), r20mm (extreme_rain_frequency) y hd40 (severe_heat) ' +
+                 'agregados como señales en Layer2 V2. Deduplicación: severe_heat > extreme_heat > moderate_heat.',
+    severity: 'info',
+    mitigation: 'Monitorear tasa de detección — puede aumentar número de señales por análisis.',
   },
 ];
 

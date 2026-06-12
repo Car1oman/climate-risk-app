@@ -2,7 +2,7 @@
 
 Plataforma de análisis de riesgo climático para activos de retail en Perú. Usa datos CMIP6 ensemble (SSP2-4.5 y SSP5-8.5) para proyecciones a 2020–2080 y un modelo descriptivo multicapa para cuantificar señales, impacto operacional e incertidumbre.
 
-**Stack:** React 18 + Vite 6 · Express.js · Supabase/PostgreSQL + PostGIS · Google Gemini · Tailwind CSS + shadcn/ui · Leaflet · Recharts
+**Stack:** React 18 + Vite 6 · Express.js · Supabase/PostgreSQL + PostGIS · Google Gemini · Anthropic Claude · Tailwind CSS + shadcn/ui · Leaflet · Recharts · NASA POWER / MODIS NDVI / GRACE-FO · Cloudflare R2
 
 ---
 
@@ -21,10 +21,11 @@ npm run dev       # Frontend en http://localhost:5173
 npm run server    # Backend en http://localhost:3001
 
 # 4. Ejecutar tests
-npm test                    # Suite completa (770+ tests)
-npm run test:frontend       # Tests de frontend (normalización, narrativa)
+npm test                    # Suite completa (644 tests, 78 suites)
+npm run test:frontend       # Tests de frontend (normalización, narrativa, sanitize)
 npm run test:regression     # Tests de regresión (Layers 2, 7, 8, 9, 10, 11)
 npm run test:baselines      # Validación de escenarios baseline
+npm run test:deprecated     # Tests legacy (fórmula, risk-model)
 
 # 5. Quality gate
 npm run quality             # Lint + typecheck
@@ -98,18 +99,20 @@ climate-risk-app/
 ├── server/                       # Backend (Express.js)
 │   ├── server.js                 #     Entry point Express
 │   ├── config/                   #     env.js, corsOptions.js
-│   ├── routes/                   #     10 modulos de rutas
-│   │   ├── health.js             #     /api/test, health probes
+│   ├── routes/                   #     12 modulos de rutas
+│   │   ├── health.js             #     /api/test, health probes /healthz, /readyz
 │   │   ├── climate.js            #     /api/climate, /api/climate-cells/*,
 │   │   │                         #     /api/climate-risks/*, /api/external-risks/*,
-│   │   │                         #     /api/v2/climate-risk-analysis
+│   │   │                         #     /api/v2/climate-risk-analysis, /api/v2/open-meteo-cache
 │   │   ├── assets.js             #     /api/assets CRUD
 │   │   ├── ai.js                 #     /api/ai (Gemini)
 │   │   ├── alerts.js             #     /api/alerts CRUD
-│   │   ├── documentos.js         #     /api/documentos upload/list/delete
+│   │   ├── documentos.js         #     /api/documentos upload/list/delete/context
 │   │   ├── search.js             #     /api/search, /api/places/assets
 │   │   ├── enso.js               #     /api/enso/status, refresh, cache-stats
-│   │   └── terrain.js            #     /api/terrain/slope, cache-stats, cache
+│   │   ├── terrain.js            #     /api/terrain/slope, cache-stats, cache
+│   │   ├── nasa.js               #     /api/nasa-power/health
+│   │   └── nasaMetrics.js        #     /api/nasa-metrics
 │   ├── middleware/               #     5 middlewares
 │   │   ├── auth.js               #     Autenticacion
 │   │   ├── validate.js           #     Validacion con Zod
@@ -119,20 +122,36 @@ climate-risk-app/
 │   │   └── requestId.js          #     Generacion de IDs unicos
 │   ├── validators/               #     Esquemas Zod por endpoint
 │   │   ├── climate.js, alerts.js, assets.js, ai.js
-│   ├── services/                 #     12+ servicios externos
+│   ├── services/                 #     20+ servicios externos
 │   │   ├── climateService.js     #     Orquestacion de datos climaticos
 │   │   ├── climateImportService.js#    Pipeline ETL
+│   │   ├── climateGeospatialService.js # Consultas PostGIS
 │   │   ├── openMeteoService.js   #     Open-Meteo API + cache
-│   │   ├── ensoService.js        #     ENSO (El Nino/La Nina)
+│   │   ├── openMeteoCache.js     #     Cache en memoria Open-Meteo
+│   │   ├── ensoService.js        #     ENSO (El Nino/La Nina) — NOAA CPC
+│   │   ├── ensoCache.js          #     Cache en memoria ENSO
 │   │   ├── terrainService.js     #     Pendiente del terreno (SRTM)
+│   │   ├── terrainCache.js       #     Cache en memoria Terrain
 │   │   ├── griRiskService.js     #     Riesgos GRI Oxford
 │   │   ├── worldBankService.js   #     Datos socioeconomicos
 │   │   ├── documentosService.js  #     Gestion de documentos
 │   │   ├── documentosEnrichmentService.js # Enriquecimiento IA
+│   │   ├── documentEmbeddingService.js # Embeddings pgvector
+│   │   ├── documentTextExtractor.js # Extraccion de texto PDF/DOCX/XLS
+│   │   ├── s3Client.js           #     Cliente S3 para Cloudflare R2
+│   │   ├── earthdataAuth.js      #     Autenticacion Earthdata NASA
+│   │   ├── nasaPowerService.js   #     NASA POWER (meteorologia reanalisis)
+│   │   ├── nasaPowerCache.js     #     Cache NASA POWER
+│   │   ├── modisNdviService.js   #     MODIS NDVI (vegetacion)
+│   │   ├── modisNdvCache.js      #     Cache MODIS NDVI
+│   │   ├── graceFoService.js     #     GRACE-FO (agua terrestre)
+│   │   ├── graceFoCache.js       #     Cache GRACE-FO
+│   │   ├── nasaMetrics.js        #     Metricas de servicios NASA
 │   │   └── supabaseClient.js     #     Singleton Supabase
 │   ├── layers/                   #     Pipeline Phase 2 (Layers 1–6)
 │   │   ├── Layer1_ClimateDataFusion.js
-│   │   ├── Layer2_SignalEngine.js
+│   │   ├── Layer2_SignalEngineV2.js #   Motor activo (umbrales regionalizados)
+│   │   ├── Layer2_SignalEngine.js #     Motor v1 legacy (solo tests)
 │   │   ├── Layer3_BusinessRiskEngine.js
 │   │   ├── Layer5_AdaptationEngine.js
 │   │   └── Layer6_NarrativeEngine.js
@@ -162,6 +181,8 @@ climate-risk-app/
 │   └── baselines/                #     Validacion de escenarios baseline
 │       ├── baseline-validation.test.js
 │       └── scenarios.js
+├── server/scripts/               # Scripts de servidor
+│   └── backfillDocumentosToR2.js #     Backfill documentos a Cloudflare R2
 ├── scripts/                      # Herramientas ETL de datos climaticos
 │   ├── test-climate-api.js       #     Suite de integracion (8 tests)
 │   ├── test-jsonl-upload.js      #     Pruebas de rendimiento (11 tests)
@@ -169,12 +190,17 @@ climate-risk-app/
 ├── entities/                     # Esquemas JSON de entidades
 │   ├── Asset                     #     26 propiedades
 │   └── RiskAlert                 #     8 propiedades
-├── supabase/migrations/          # Migraciones SQL
+├── server/db/migrations/         # Migraciones SQL adicionales
+│   ├── 001_document_chunks.sql   #     Tabla document_chunks (pgvector)
+│   └── 002_asset_risk_summary_view.sql # Vista asset_risk_summary
+├── supabase/migrations/          # Migraciones SQL Supabase
 │   └── 20260512_create_alerts_table.sql
 ├── docs/                         # Documentacion tecnica
 │   ├── SCIENTIFIC_METHOD.md      #     Metodologia cientifica completa
 │   ├── DATA_SOURCES.md           #     8 fuentes de datos catalogadas
-│   └── UNCERTAINTY_POLICY.md     #     Politica de incertidumbre
+│   ├── UNCERTAINTY_POLICY.md     #     Politica de incertidumbre
+│   ├── runbooks/nasa-sources.md  #     Runbook fuentes NASA (POWER, NDVI, GRACE-FO)
+│   └── migrations/r2-migration-status.md # Migracion Cloudflare R2
 └── project-memory/               # Memoria del proyecto
     ├── auditoria.md              #     Auditoria estructural (19 hallazgos)
     └── HISTORIAL_SPRINTS.md      #     Historial de Sprints 12–22
@@ -237,7 +263,8 @@ La plataforma es **descriptiva, no prescriptiva**: reporta senales observables y
 | `climate_cells` | Datos CMIP6 ensemble (PostGIS nearest-cell) | `id` (bigint PK), `lat`, `lon`, `geom` (PostGIS), `data` (jsonb) |
 | `climate_data` | Datos meteorologicos actuales | `id` (uuid PK), `lat`, `lng`, `temperature`, `humidity`, `wind_kph`, `precipitation`, `source` |
 | `climate_dataset_control` | Control de version de dataset activo | `id` (uuid PK), `version`, `is_active` |
-| `archivos` | Archivos/documentos climaticos | `id` (bigint PK), `nombre`, `tipo` (pdf/xls/xlsx/doc/docx), `url`, `tamanio_bytes` |
+| `archivos` | Archivos/documentos climaticos | `id` (bigint PK), `nombre`, `tipo` (pdf/xls/xlsx/doc/docx), `url`, `categoria`, `tamanio_bytes`, `metadata` |
+| `document_chunks` | Fragmentos de documentos para busqueda semantica (pgvector) | `id` (uuid PK), `archivo_id` (FK), `content`, `embedding` (vector), `chunk_index` |
 | `function_audit_debug` | Auditoria de funciones DB | `id` (bigint PK), `function_name`, `execution_success`, `error_message`, `inspected_at` |
 | `spatial_ref_sys` | Catalogo de sistemas de referencia espacial (PostGIS nativo) | `srid` (integer PK), `auth_name`, `auth_srtext`, `proj4text` |
 
@@ -315,8 +342,8 @@ places (1) ──→ (N) assets (1) ──→ (N) asset_metrics
 ## Pipeline de Analisis (11 Capas)
 
 ```
-Layer 1  - ClimateDataFusion      Fusion de datos climaticos (CMIP6 + GRI + Open-Meteo + World Bank)
-Layer 2  - SignalEngine           Deteccion de senales de riesgo con umbrales cuantitativos
+Layer 1  - ClimateDataFusion      Fusion de datos climaticos (CMIP6 + GRI + Open-Meteo + World Bank + ENSO + Terrain + NASA POWER/NDVI/GRACE-FO)
+Layer 2  - SignalEngineV2         Deteccion de senales con umbrales regionalizados (costa/sierra/selva/puna)
 Layer 3  - BusinessRiskEngine     Interpretacion de impacto operacional por tipo de activo
 Layer 5  - AdaptationEngine       Medidas de adaptacion descriptivas
 Layer 6  - NarrativeEngine        Narrativa ejecutiva resumida
@@ -411,10 +438,17 @@ GET    /api/terrain/cache-stats                # Estadisticas de cache
 DELETE /api/terrain/cache                      # Limpia cache de terreno
 ```
 
-### IA (Gemini)
+### NASA Data Sources
 
 ```
-POST   /api/ai                                 # Genera reporte TCFD/ESRS
+GET    /api/nasa-power/health                  # Health check NASA POWER
+GET    /api/nasa-metrics                       # Metricas de servicios NASA (POWER, NDVI, GRACE-FO)
+```
+
+### IA (Gemini / Claude)
+
+```
+POST   /api/ai                                 # Genera reporte TCFD/ESRS con Google Gemini
 Body: { "prompt": "..." }
 ```
 
@@ -435,24 +469,27 @@ Body: { "prompt": "..." }
 | `npm run typecheck` | TypeScript validation |
 | `npm run quality` | Lint + typecheck |
 | `npm run ci` | Quality + build |
-| `npm test` | Suite completa (770+ tests) |
-| `npm run test:frontend` | Tests de frontend |
+| `npm test` | Suite completa (644 tests, 78 suites) |
+| `npm run test:frontend` | Tests de frontend (normalizeRisks, narrative, sanitize) |
 | `npm run test:regression` | Tests de regresion (Layers 2, 7–11) |
 | `npm run test:baselines` | Validacion de escenarios baseline |
+| `npm run test:deprecated` | Tests legacy (risk-model, formula) |
 
-### ETL (/scripts/)
+### ETL (/scripts/ y /server/scripts/)
 
 | Script | Proposito |
 |--------|-----------|
 | `test-climate-api.js` | Suite de pruebas de integracion API (8 tests) |
 | `test-jsonl-upload.js` | Pruebas de rendimiento para carga JSONL (11 tests) |
 | `transform-climate-data.js` | Convierte datos CMIP6 a formato climate_cells |
+| `server/scripts/backfillDocumentosToR2.js` | Backfill de documentos historicos a Cloudflare R2 |
 
 **Uso:**
 ```bash
 node scripts/test-climate-api.js
 node scripts/test-jsonl-upload.js
 node scripts/transform-climate-data.js input.csv output.jsonl
+node server/scripts/backfillDocumentosToR2.js
 ```
 
 ---
@@ -470,6 +507,9 @@ Ver `.env.example` para la lista completa. Las variables `VITE_*` son expuestas 
 | `WEATHER_API_KEY` | WeatherAPI para clima actual |
 | `GOOGLE_GEOCODING_KEY` | Google Geocoding para busqueda de direcciones |
 | `MAPBOX_TOKEN` | Mapbox para busqueda geografica alternativa |
+| `EARTHDATA_TOKEN` | Token de autenticacion NASA Earthdata (MODIS/GRACE-FO) |
+| `R2_ENDPOINT` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | Cloudflare R2 para almacenamiento de documentos |
+| `R2_BUCKET` / `R2_PUBLIC_URL` | Bucket y URL publica de Cloudflare R2 |
 | `VITE_API_URL` | URL del backend (frontend) |
 | `PORT` | Puerto del servidor Express (default: 3001) |
 | `NODE_ENV` | Entorno (development/production) |
@@ -518,11 +558,9 @@ places (direccion, lat, lng) ──→ assets (name, unidad_negocio)
 
 ```
 npm test
-  ├── test:frontend (4 suites)
+  ├── test:frontend (2 suites)
   │   ├── normalizeRisks.test.js
-  │   ├── buildNarrativeReport.test.js
-  │   ├── sanitizeNarrative.test.js
-  │   └── sprint22_interactive_timeline.test.js
+  │   └── buildNarrativeReport.test.js
   ├── test:regression (6 suites)
   │   ├── layer2-signal-engine.test.js
   │   ├── layer7-interpretation-engine.test.js
@@ -532,6 +570,9 @@ npm test
   │   └── layer11-governance-engine.test.js
   └── test:baselines (1 suite)
       └── baseline-validation.test.js
+      
+Resultado actual: 644 pass / 6 fail (6 fail son por severe_heat/hd40 —
+señal desactivada intencionalmente porque hd40 no existe en DB)
 ```
 
 ### Archivos Protegidos (No Modificar Sin Plan)
@@ -539,7 +580,7 @@ npm test
 | Archivo | Razon |
 |---------|-------|
 | `server/layers/Layer1_ClimateDataFusion.js` | Core data fusion |
-| `server/layers/Layer2_SignalEngine.js` | CMIP6 signal detection |
+| `server/layers/Layer2_SignalEngineV2.js` | CMIP6 signal detection (regionalizado) |
 | `server/layers/Layer3_BusinessRiskEngine.js` | Contextual business interpretation |
 | `server/layers/Layer5_AdaptationEngine.js` | Descriptive adaptation measures |
 | `server/layers/Layer6_NarrativeEngine.js` | Executive narrative |
@@ -554,6 +595,11 @@ npm test
 | `server/services/terrainService.js` | Terrain slope analysis service |
 | `server/services/griRiskService.js` | GRI external risks integration |
 | `server/services/worldBankService.js` | World Bank socioeconomic data |
+| `server/services/nasaPowerService.js` | NASA POWER meteorology |
+| `server/services/modisNdviService.js` | MODIS NDVI vegetation index |
+| `server/services/graceFoService.js` | GRACE-FO terrestrial water storage |
+| `server/services/s3Client.js` | Cloudflare R2 S3 client |
+| `server/services/documentEmbeddingService.js` | pgvector embeddings |
 | `server/supabaseClient.js` | Singleton DB connection |
 | `src/domain/normalizeRisks.ts` | Risk normalization core logic |
 | `src/domain/consolidatedRisk.ts` | ConsolidatedRisk domain model |
@@ -571,8 +617,10 @@ npm test
 | `docs/SCIENTIFIC_METHOD.md` | Metodologia cientifica completa: taxonomia de 10 senales, modelo H×E×I, capas 2–11, controles de calidad |
 | `docs/DATA_SOURCES.md` | 8 fuentes de datos catalogadas: CMIP6 CCKP, IPCC AR6, NASA SRTM, INGEMMET, NOAA CPC, WRI Aqueduct, SENAMHI, GRI Oxford |
 | `docs/UNCERTAINTY_POLICY.md` | Tres fuentes de incertidumbre, marco de confianza, propagacion a traves de capas, lenguaje prohibido |
+| `docs/runbooks/nasa-sources.md` | Runbook de fuentes NASA: POWER, MODIS NDVI, GRACE-FO con metricas y thresholds |
+| `docs/migrations/r2-migration-status.md` | Estado de migracion a Cloudflare R2 (6 sprints, ~80% completado) |
 | `scripts/README.md` | Documentacion de scripts ETL |
-| `project-memory/auditoria.md` | Auditoria estructural (19 hallazgos: P0, P1, P2, P3) |
+| `project-memory/auditoria.md` | Auditoria estructural (19 hallazgos) |
 | `project-memory/HISTORIAL_SPRINTS.md` | Historial de Sprints 12–22 |
 
 ---
@@ -611,4 +659,4 @@ Proyecto interno Intercorp Retail.
 
 ---
 
-**Ultima actualizacion:** Mayo 2026
+**Ultima actualizacion:** Junio 2026

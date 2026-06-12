@@ -29,6 +29,7 @@ import { assessBusinessRisk }   from '../layers/Layer3_BusinessRiskEngine.js';
 import { getAdaptations, enrichAdaptationsWithAI } from '../layers/Layer5_AdaptationEngine.js';
 import { generateNarrative, enhanceNarrativeWithAI } from '../layers/Layer6_NarrativeEngine.js';
 import { buildProjectionContext } from '../scientific/projection.js';
+import { runProjectionEngine } from '../layers/Layer9_ProjectionEngine.js';
 import { listBusinessUnits, getBusinessProfile } from '../layers/businessProfiles.js';
 
 const router = express.Router();
@@ -738,12 +739,12 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
     // ── Capa 3: Evaluación de riesgo de negocio ─────────────────────────────
     let businessRiskOutput;
     try {
-      businessRiskOutput = await assessBusinessRisk(signalOutput, { sector, asset_type, docContext, business_unit_id });
+      businessRiskOutput = await assessBusinessRisk(signalOutput, { sector, asset_type, docContext, business_unit_id, fusedData });
       partialResult.layer3 = 'ok';
     } catch (err) {
       console.error('[v2] Layer3 falló:', err.message);
       errors.layer3 = err.message;
-      businessRiskOutput = { risks: [], overall_exposure: 'bajo', sector_key: 'otros' };
+      businessRiskOutput = { risks: [], overall_exposure: null, sector_key: 'otros' };
     }
 
     // ── Interpretacion contextual: riesgos descriptivos sin ranking ni scores ──
@@ -832,10 +833,16 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
       }
     }
 
-    // ── Capa 9: Escenarios de proyección ────────────────────────────────────
+    // ── Capa 9: Escenarios de proyección (IPCC + Observacional) ──────────
     let projectionOutput;
     try {
-      projectionOutput = buildProjectionContext(signalOutput);
+      const ipccProjections = buildProjectionContext(signalOutput);
+      const obsProjections  = runProjectionEngine(fusedData, fusedData.scenario);
+      projectionOutput = {
+        ...ipccProjections,
+        ndvi_projection:    obsProjections?.ndvi_projection    ?? null,
+        grace_fo_projection: obsProjections?.grace_fo_projection ?? null,
+      };
       partialResult.layer9 = 'ok';
     } catch (err) {
       console.error('[v2] Layer9 falló:', err.message);
@@ -849,7 +856,16 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
         lon:        lonNum,
         distanceKm: fusedData.distanceKm,
       },
-      signals:     signalOutput,
+      signals:          signalOutput,
+      overall_exposure: contextualRisks.overall_exposure ?? null,
+      unavailable: !contextualRisks.overall_exposure,
+      overall_risk_score: contextualRisks.overall_risk_score ??
+        (contextualRisks.overall_exposure === 'critico' ? 0.9
+          : contextualRisks.overall_exposure === 'alto'   ? 0.7
+          : contextualRisks.overall_exposure === 'medio'  ? 0.4
+          : contextualRisks.overall_exposure === 'bajo'   ? 0.1
+          : null),
+      financial_impact: businessRiskOutput.financial_impact ?? null,
       risks:       contextualRisks.risks,
       adaptations: adaptationOutput,
       projections: projectionOutput,
@@ -909,6 +925,76 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
       details: err.message,
       partial: partialResult,
     });
+  }
+});
+
+/**
+ * POST /api/v2/climate-risk-analysis/batch
+ * Batch risk analysis for multiple assets (list pages).
+ * Groups by unique coordinates to avoid redundant pipeline runs.
+ * Returns a map of asset_id → { overall_exposure, overall_risk_score }.
+ */
+router.post('/v2/climate-risk-analysis/batch', requireAuth, async (req, res) => {
+  try {
+    const { assets } = req.body;
+    if (!Array.isArray(assets) || assets.length === 0) {
+      return res.status(400).json({ error: 'Se esperaba un array de activos' });
+    }
+
+    // Group by unique (lat, lng) to deduplicate pipeline calls
+    const coordMap = new Map();
+    for (const a of assets) {
+      if (a.lat == null || a.lng == null) continue;
+      const key = `${parseFloat(a.lat).toFixed(4)}_${parseFloat(a.lng).toFixed(4)}`;
+      if (!coordMap.has(key)) {
+        coordMap.set(key, { lat: a.lat, lng: a.lng, assetIds: [] });
+      }
+      coordMap.get(key).assetIds.push(a.id);
+    }
+
+    const results = {};
+    const errors = [];
+
+    for (const [, group] of coordMap) {
+      const cacheKey = `v2-${parseFloat(group.lat).toFixed(4)}-${parseFloat(group.lng).toFixed(4)}-retail-none`;
+      const cached = climateCache[cacheKey];
+      let riskData;
+
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        riskData = cached.data;
+      } else {
+        // Run a lightweight version: only layers 1-3 for risk level
+        try {
+          const fusedData = await fusionClimateData({ lat: group.lat, lon: group.lng });
+          const signals = detectSignalsV2(fusedData);
+          const businessRisk = await assessBusinessRisk(signals, { sector: 'retail' });
+          const exposure = businessRisk.overall_exposure ?? null;
+          riskData = {
+            overall_exposure: exposure,
+            unavailable: !exposure,
+            overall_risk_score: exposure === 'critico' ? 0.9
+              : exposure === 'alto' ? 0.7
+              : exposure === 'medio' ? 0.4
+              : exposure === 'bajo' ? 0.1
+              : null,
+            signal_count: signals.signals?.length ?? 0,
+          };
+          climateCache[cacheKey] = { data: riskData, timestamp: Date.now() };
+        } catch (err) {
+          errors.push({ lat: group.lat, lng: group.lng, error: err.message });
+          riskData = { unavailable: true, overall_exposure: null, overall_risk_score: null, signal_count: 0, error_code: 'PIPELINE_ERROR', error_message: err.message };
+        }
+      }
+
+      for (const assetId of group.assetIds) {
+        results[assetId] = riskData;
+      }
+    }
+
+    return res.json({ results, errors: errors.length > 0 ? errors : undefined });
+  } catch (err) {
+    console.error('[v2] Batch error:', err.message);
+    return res.status(500).json({ error: err.message });
   }
 });
 
