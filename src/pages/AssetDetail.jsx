@@ -14,6 +14,7 @@ import HistoricalEventsCard from "@/components/climate/HistoricalEventsCard";
 import ProjectionScenarioCard from "@/components/climate/ProjectionScenarioCard";
 import ScientificEvidenceCard from "@/components/climate/ScientificEvidenceCard";
 import TerrainContextCard from "@/components/climate/TerrainContextCard";
+import EnsoAdvisoryBanner from "@/components/climate/EnsoAdvisoryBanner";
 import "leaflet/dist/leaflet.css";
 
 const TYPE_LABELS = {
@@ -136,6 +137,9 @@ Genera exactamente 3 recomendaciones de adaptacion climatica especificas para es
           El analisis de riesgo V2 no esta disponible para este activo. Los datos mostrados son informativos.
         </div>
       )}
+
+      <EnsoAdvisoryBanner />
+
       <div className="flex items-start justify-between">
         <div>
           <Link to="/assets" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-3 transition-colors">

@@ -1,20 +1,22 @@
 /**
- * ENSO Intelligence Service — Sprint 5
+ * ENSO Intelligence Service — Sprint 5 + Advisory Integration
  *
- * Integrates NOAA Oceanic Niño Index (ONI) to provide current ENSO phase
- * intelligence for Peru-specific climate risk narratives.
+ * Two-source ENSO intelligence:
+ *   1. NOAA ONI (Oceanic Niño Index) — numerical threshold (±0.5°C, seasonal)
+ *      URL: https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt
+ *   2. NOAA ENSO Diagnostic Discussion (Spanish) — official advisory status
+ *      URL: https://www.cpc.ncep.noaa.gov/products/analysis_monitoring/enso_advisory/ensodisc_Sp.shtml
  *
- * Data source:
- *   NOAA Climate Prediction Center — ONI (Oceanic Niño Index)
- *   URL: https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt
- *   No authentication required. Updated monthly.
- *   Measures: 3-month running mean SST anomaly in Niño-3.4 region (5°N–5°S, 120°W–170°W)
+ * When an active Warning or Watch is issued, the advisory phase supersedes the
+ * ONI threshold. NOAA can declare El Niño even with ONI < 0.5°C when ocean-
+ * atmosphere coupling indicators (winds, subsurface, convection) confirm the phase.
  *
  * IMPORTANT: This service is additive and non-blocking.
  * Any failure degrades gracefully — callers receive null instead of throwing.
  */
 
 import * as ensoCache from './ensoCache.js';
+import { fetchEnsoAdvisory } from './ensoAdvisoryService.js';
 
 const NOAA_ONI_URL = 'https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt';
 const FETCH_TIMEOUT_MS = 10_000; // 10 s — NOAA CPC is reliable but can be slow
@@ -198,20 +200,31 @@ async function fetchONIRaw() {
 }
 
 /**
- * Builds the normalized ENSO context object from parsed ONI records.
+ * Builds the normalized ENSO context object from parsed ONI records + advisory.
+ *
+ * Phase resolution priority:
+ *   1. Advisory (Warning/Watch) → advisory.alert_phase  [most authoritative]
+ *   2. ONI threshold (±0.5°C)  → classifyPhase(oni)    [numerical fallback]
+ *
  * @param {Array} sorted - chronologically sorted ONI records
+ * @param {Object|null} advisory - parsed advisory from ensoAdvisoryService
  * @returns {Object}
  */
-function buildEnsoContext(sorted) {
+function buildEnsoContext(sorted, advisory = null) {
   if (!sorted.length) return null;
 
-  const latest     = sorted[sorted.length - 1];
-  const prev3      = sorted.slice(-4, -1); // 3 seasons before latest
-  const phase      = classifyPhase(latest.anom);
-  const intensity  = classifyIntensity(latest.anom);
-  const trend      = detectTrend(sorted, 4);
-  const persistence = countConsecutiveSeasonsInPhase(sorted, phase);
-  const impacts    = PERU_IMPACTS[phase] ?? PERU_IMPACTS.neutral;
+  const latest      = sorted[sorted.length - 1];
+  const oniPhase    = classifyPhase(latest.anom);
+  const intensity   = classifyIntensity(latest.anom);
+  const trend       = detectTrend(sorted, 4);
+  const persistence = countConsecutiveSeasonsInPhase(sorted, oniPhase);
+
+  // Advisory supersedes ONI when NOAA has issued an active Warning or Watch
+  const advisoryActive = advisory?.is_active_alert && advisory?.alert_phase;
+  const phase       = advisoryActive ? advisory.alert_phase : oniPhase;
+  const phaseSource = advisoryActive ? 'advisory' : 'oni';
+
+  const impacts     = PERU_IMPACTS[phase] ?? PERU_IMPACTS.neutral;
 
   // Recent 12 seasons for sparkline / trend context
   const history = sorted.slice(-12).map(r => ({
@@ -222,10 +235,12 @@ function buildEnsoContext(sorted) {
   }));
 
   return {
-    // Current status
+    // Current status — phase may come from advisory, not just ONI threshold
     phase,           // 'el_nino' | 'la_nina' | 'neutral'
+    phase_source: phaseSource, // 'advisory' | 'oni'
     intensity,       // 'muy_fuerte' | 'fuerte' | 'moderado' | 'débil' | 'neutro'
     oni_latest:      latest.anom,   // latest 3-month running mean anomaly (°C)
+    oni_phase:       oniPhase,      // raw ONI-derived phase (for transparency)
     season_latest:   latest.season, // e.g. 'JFM'
     year_latest:     latest.year,
 
@@ -233,6 +248,9 @@ function buildEnsoContext(sorted) {
     trend,           // 'increasing' | 'decreasing' | 'stable'
     consecutive_seasons: persistence.count,
     officially_declared: persistence.isOfficiallyDeclared,
+
+    // Official NOAA advisory (null when unavailable)
+    advisory: advisory ?? null,
 
     // Peru-specific intelligence
     summary:              impacts.summary,
@@ -246,8 +264,9 @@ function buildEnsoContext(sorted) {
     history,
 
     // Data provenance
-    source:           'NOAA CPC — Oceanic Niño Index (ONI), NINO3.4 region',
+    source:           'NOAA CPC — Oceanic Niño Index (ONI) + Discusión Diagnóstica ENSO',
     source_url:       NOAA_ONI_URL,
+    advisory_url:     'https://www.cpc.ncep.noaa.gov/products/analysis_monitoring/enso_advisory/ensodisc_Sp.shtml',
     fetched_at:       new Date().toISOString(),
   };
 }
@@ -266,8 +285,25 @@ export async function getEnsoContext() {
   if (cached) return cached;
 
   try {
-    const raw     = await fetchONIRaw();
-    const parsed  = parseONIText(raw);
+    // Fetch ONI data and NOAA advisory in parallel (both non-blocking)
+    const [oniResult, advisoryResult] = await Promise.allSettled([
+      fetchONIRaw(),
+      fetchEnsoAdvisory(),
+    ]);
+
+    const advisory = advisoryResult.status === 'fulfilled' ? advisoryResult.value : null;
+    if (!advisory) {
+      console.warn('[ensoService] Advisory fetch failed or returned null — using ONI only');
+    } else {
+      console.info(`[ensoService] Advisory: ${advisory.alert_code} (${advisory.issued_date})`);
+    }
+
+    if (oniResult.status !== 'fulfilled') {
+      console.warn('[ensoService] NOAA ONI fetch failed (non-blocking):', oniResult.reason?.message);
+      return null;
+    }
+
+    const parsed  = parseONIText(oniResult.value);
     const sorted  = sortChronologically(parsed);
 
     if (!sorted.length) {
@@ -275,11 +311,11 @@ export async function getEnsoContext() {
       return null;
     }
 
-    const context = buildEnsoContext(sorted);
+    const context = buildEnsoContext(sorted, advisory);
     if (context) ensoCache.set(context);
     return context;
   } catch (err) {
-    console.warn('[ensoService] NOAA ONI fetch failed (non-blocking):', err.message);
+    console.warn('[ensoService] ENSO context build failed (non-blocking):', err.message);
     return null;
   }
 }
@@ -326,24 +362,47 @@ export function buildEnsoNarrative(ensoData) {
  */
 export function buildEnsoAlertSignal(ensoData) {
   if (!ensoData || ensoData.phase === 'neutral') return null;
-  if (!['moderado', 'fuerte', 'muy_fuerte'].includes(ensoData.intensity)) return null;
+
+  const advisory       = ensoData.advisory;
+  const advisoryActive = advisory?.is_active_alert;
+
+  // Emit alert when advisory is active regardless of ONI intensity
+  // (fixes edge case: ONI=0.48 but NOAA issued official Warning)
+  const intensityOk = ['moderado', 'fuerte', 'muy_fuerte'].includes(ensoData.intensity);
+  if (!advisoryActive && !intensityOk) return null;
 
   const phaseLabel = ensoData.phase === 'el_nino' ? 'El Niño' : 'La Niña';
-  const severity   = ensoData.intensity === 'muy_fuerte' ? 'crítico'
-                   : ensoData.intensity === 'fuerte'      ? 'alto'
-                   : 'medio';
+
+  // Severity from advisory when available, otherwise from ONI intensity
+  let severity;
+  if (advisoryActive) {
+    severity = advisory.alert_severity ?? 'medio';
+  } else {
+    severity = ensoData.intensity === 'muy_fuerte' ? 'crítico'
+             : ensoData.intensity === 'fuerte'      ? 'alto'
+             : 'medio';
+  }
+
+  const title = advisory?.alert_label_es
+    ? `${advisory.alert_label_es} — NOAA CPC`
+    : `${phaseLabel} ${ensoData.intensity} activo`;
 
   return {
-    type:        'enso_phase',
+    type:         'enso_phase',
     severity,
-    phase:       ensoData.phase,
-    intensity:   ensoData.intensity,
-    oni:         ensoData.oni_latest,
-    title:       `${phaseLabel} ${ensoData.intensity} activo`,
-    message:     ensoData.summary,
-    regions:     ensoData.affected_regions,
-    risks:       ensoData.operational_risks,
-    source:      'NOAA CPC ONI',
+    phase:        ensoData.phase,
+    phase_source: ensoData.phase_source,
+    intensity:    ensoData.intensity,
+    oni:          ensoData.oni_latest,
+    title,
+    message:      advisory?.synopsis ?? ensoData.summary,
+    synopsis:     advisory?.synopsis ?? null,
+    regions:      ensoData.affected_regions,
+    risks:        ensoData.operational_risks,
+    issued_date:  advisory?.issued_date ?? null,
+    next_discussion: advisory?.next_discussion ?? null,
+    source:       advisory ? 'NOAA CPC — Discusión Diagnóstica ENSO + ONI' : 'NOAA CPC ONI',
+    advisory_url: ensoData.advisory_url,
     generated_at: new Date().toISOString(),
   };
 }
