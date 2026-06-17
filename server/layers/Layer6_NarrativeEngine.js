@@ -54,6 +54,14 @@ const SIGNAL_LABELS = {
   enso_phase:      'fase ENSO activa (ONI)',      // Sprint 5
   landslide_risk:  'riesgo de deslizamiento (pendiente crítica)',  // Sprint 6
   huayco_risk:     'riesgo de huayco (flujo de detritos)',         // Sprint 6
+  // Fase 2-3: Nuevas señales compuestas
+  heat_stress:     'estrés térmico compuesto (WBGT + AQI)',
+  drought_composite:   'índice compuesto de sequía multi-señal',
+  conditional_enso_risk: 'riesgo condicional ENSO por fase ONI',
+  exposure:        'exposición multi-amenaza (GRI Oxford)',
+  vulnerability:   'vulnerabilidad climática (GRI Oxford)',
+  calibrated_risk: 'riesgo calibrado (P×I)/CA del Manual de Adaptación Intercorp',
+  adaptive_capacity: 'tendencia de capacidad adaptativa',
 };
 
 // Etiquetas de horizonte temporal
@@ -174,6 +182,31 @@ function buildMainSentence(contextualRisk, lat, lon) {
     const d = signal.delta != null ? `+${Math.round(signal.delta)} días` : 'aumento significativo';
     const proj = signal.projected != null ? `${Math.round(signal.projected)} días/año` : '';
     deltaDesc = `${d} de lluvia intensa (>20mm/día) ${proj}`.trim();
+  } else if (signal.signalType === 'heat_stress') {
+    const wbgt = signal.projected != null ? `${signal.projected.toFixed(1)}°C` : 'elevado';
+    const nivel = signal.projected >= 32 ? 'extremo' : signal.projected >= 28 ? 'alto' : signal.projected >= 26 ? 'moderado' : 'bajo';
+    deltaDesc = `índice WBGT de ${wbgt} (${nivel}) según Stull (2011), integrando temperatura, humedad y radiación solar. Senamhi/IPCC AR6 advierten que olas de calor recurrentes reducen la productividad laboral e incrementan el consumo energético en climatización`;
+  } else if (signal.signalType === 'drought_composite') {
+    const score = signal.projected != null ? `${(signal.projected * 100).toFixed(0)}%` : 'no determinado';
+    const clase = signal.threshold_reference?.match(/— (\w+)\./) ? signal.threshold_reference.match(/— (\w+)\./)[1] : 'indetectable';
+    deltaDesc = `índice compuesto de sequía de ${score} (${clase}) integrando CDD, TWSA (GRACE), humedad del suelo y delta de precipitación. En la costa sur del Perú, la escasez hídrica crónica afecta operaciones hoteleras, retail y agroindustria (Anexo 10.2)`;
+  } else if (signal.signalType === 'conditional_enso_risk') {
+    const amplif = signal.projected != null ? `${Math.round(signal.projected)} amenaza(s) amplificada(s)` : 'amplificación detectada';
+    deltaDesc = `${amplif} por fase ENSO activa, basado en la matriz de transición ONI 1950-2026. El FEN es el principal generador de lluvias extremas en la costa norte peruana, afectando cadenas logísticas, infraestructura y continuidad operativa (Anexo 10.2, Manual Adaptación 30-03)`;
+  } else if (signal.signalType === 'exposure') {
+    const score = signal.projected != null ? `${(signal.projected * 100).toFixed(0)}%` : 'no determinada';
+    deltaDesc = `exposición multi-amenaza de ${score} según GRI Oxford, integrando peligros físicos como inundación, calor, sequía y deslizamiento con ponderación SENAMHI/MINAM`;
+  } else if (signal.signalType === 'vulnerability') {
+    const score = signal.projected != null ? `${(signal.projected * 100).toFixed(0)}%` : 'no determinada';
+    deltaDesc = `vulnerabilidad climática de ${score} según GRI Oxford, incluyendo incertidumbre multi-modelo. El Perú es uno de los países más vulnerables al cambio climático, con el 67% de sus desastres asociados a eventos climáticos (PNACC al 2050)`;
+  } else if (signal.signalType === 'calibrated_risk') {
+    const score = signal.projected != null ? `${(signal.projected * 100).toFixed(0)}` : 'no determinado';
+    const clasif = signal.threshold_reference?.match(/: (\w+)\./)?.[1] ?? 'no clasificado';
+    deltaDesc = `riesgo calibrado de ${score}/100 (${clasif}) según fórmula (Probabilidad × Impacto) / Capacidad Adaptativa del Manual de Adaptación Intercorp. Los umbrales del Anexo 10.1 definen: bajo < 2.0, medio 2.0–4.0, alto > 4.0`;
+  } else if (signal.signalType === 'adaptive_capacity') {
+    const score = signal.projected != null ? `${(signal.projected * 100).toFixed(0)}%` : 'no determinada';
+    const nivel = signal.projected >= 0.7 ? 'alta' : signal.projected >= 0.4 ? 'media' : signal.projected > 0 ? 'baja' : 'sin datos';
+    deltaDesc = `capacidad adaptativa de ${score} (${nivel}) medida a través de 6 dimensiones proxy del Manual de Adaptación: acceso a electricidad, conectividad, agua potable, capital humano, profundidad financiera y telefonía, con tendencia histórica 2000-actual`;
   }
 
   return `Para esta ubicación (${lat.toFixed(4)}, ${lon.toFixed(4)}), el análisis identifica ${signalLabel} con ${deltaDesc} hacia ${horizonLabel}.`;
@@ -186,8 +219,9 @@ function buildMainSentence(contextualRisk, lat, lon) {
 function buildCompoundRiskSentence(signals) {
   if (!signals || signals.length <= 1) return null;
 
-  // Excluir la señal dominante (ya cubierta en sentence1) y tomar hasta 3 adicionales
-  const secondary = signals.slice(1, 4);
+  // Excluir la señal dominante (ya cubierta en sentence1) y las compuestas informacionales
+  const informational = new Set(['exposure', 'vulnerability', 'conditional_enso_risk', 'adaptive_capacity', 'enso_phase', 'landslide_risk', 'huayco_risk']);
+  const secondary = signals.slice(1, 4).filter(s => !informational.has(s.signalType));
   const labels = secondary.map(s => SIGNAL_LABELS[s.signalType] ?? s.signalType);
   if (labels.length === 0) return null;
 
@@ -308,6 +342,14 @@ export function generateNarrative({
   const terrainData = fusedData?.terrainData ?? null;  // Sprint 6
   const powerData   = fusedData?.nasaPowerData?.recent ?? null; // Sprint 7: NASA POWER
 
+  // Fase 2-3: Nuevos compuestos
+  const heatStress  = fusedData?.heatStressIndex ?? null;
+  const droughtIdx  = fusedData?.droughtIndex ?? null;
+  const ensoRisk    = fusedData?.conditionalEnsoRisk ?? null;
+  const griEV       = fusedData?.griExposureVulnerability ?? null;
+  const calRisk     = fusedData?.calibratedRisk ?? null;
+  const adaptCap    = fusedData?.adaptiveCapacity ?? null;
+
   // Construir executive_summary con datos numéricos reales
   const sentence1 = buildMainSentence(contextualRisk, latNum, lonNum);
   const compoundSentence = buildCompoundRiskSentence(signals);
@@ -323,7 +365,24 @@ export function generateNarrative({
   const ndviSentence     = buildNdviNarrative(fusedData?.ndviData?.anomaly);
   const graceSentence    = buildGraceFoNarrative(fusedData?.graceFoData?.anomaly);
 
-  const executive_summary = [sentence1, compoundSentence, sentence2, ensoSentence, terrainSentence, powerSentence, ndviSentence, graceSentence]
+  // Fase 2-3: Narrative enrichment for composite signals
+  const heatStressSentence = heatStress?.wbgt != null
+    ? `El índice de estrés térmico WBGT de ${heatStress.wbgt.toFixed(1)}°C (${heatStress.aqi_label ?? 'N/A'} AQI) integra temperatura, humedad, radiación y calidad del aire — relevante para protocolos de seguridad laboral en olas de calor (ISO 7243, Anexo 10.2).`
+    : null;
+  const droughtSentence = droughtIdx?.compositeIndex != null
+    ? `El índice compuesto de sequía de ${(droughtIdx.compositeIndex * 100).toFixed(0)}% (${droughtIdx.classification}) integra CDD, GRACE TWSA, humedad del suelo y delta de precipitación — crítica para monitorear estrés hídrico en la costa sur y sierra peruana.`
+    : null;
+  const ensoRiskSentence = ensoRisk?.currentPhase && ensoRisk.currentPhase !== 'neutral'
+    ? `El análisis condicional ENSO muestra ${ensoRisk.currentPhase} activo con matriz de transición 1950-2026. Los fenómenos El Niño son el principal generador de lluvias extremas en la costa norte, con impactos documentados en retail, logística y continuidad operativa (Manual Adaptación 30-03, Anexo 10.2).`
+    : null;
+  const calRiskSentence = calRisk?.score != null
+    ? `El riesgo calibrado es de ${calRisk.score}/100 (${calRisk.classification}) según la fórmula (Probabilidad × Impacto) / Capacidad Adaptativa del Manual de Adaptación Intercorp.`
+    : null;
+  const adaptCapSentence = adaptCap?.compositeIndex != null
+    ? `La capacidad adaptativa del país es de ${(adaptCap.compositeIndex * 100).toFixed(0)}% (${adaptCap.level}), basada en tendencias históricas de 6 dimensiones proxy — refleja la brecha estructural de Perú frente al cambio climático identifcada en el PNACC al 2050.`
+    : null;
+
+  const executive_summary = [sentence1, compoundSentence, sentence2, ensoSentence, terrainSentence, powerSentence, ndviSentence, graceSentence, heatStressSentence, droughtSentence, ensoRiskSentence, calRiskSentence, adaptCapSentence]
     .filter(Boolean)
     .join(' ') || buildFallbackSummary(fusedData);
 
@@ -356,6 +415,18 @@ export function generateNarrative({
     power_precip_mm:        powerData?.PRECTOT?.value      ?? null,
     power_wind_ms:          powerData?.WS2M?.value         ?? null,
     power_radiation:        powerData?.ALLSKY_SFC_SW_DWN?.value ?? null,
+    // Fase 2-3: Nuevos índices compuestos
+    heat_stress_wbgt:       heatStress?.wbgt               ?? null,
+    heat_stress_aqi:        heatStress?.aqi_label          ?? null,
+    drought_composite:      droughtIdx?.compositeIndex     ?? null,
+    drought_classification: droughtIdx?.classification     ?? null,
+    enso_conditional_phase: ensoRisk?.currentPhase         ?? null,
+    exposure_gri:           griEV?.exposure?.score         ?? null,
+    vulnerability_gri:      griEV?.vulnerability?.score    ?? null,
+    calibrated_risk:        calRisk?.score                 ?? null,
+    calibrated_class:       calRisk?.classification        ?? null,
+    adaptive_capacity:      adaptCap?.compositeIndex       ?? null,
+    adaptive_capacity_level: adaptCap?.level               ?? null,
   };
 
   // Trazabilidad: qué fuentes de datos alimentaron el análisis
@@ -376,6 +447,13 @@ export function generateNarrative({
     // Sprint 8: Observational provenance
     ndvi:            fusedData?.ndviData?.anomaly != null,
     grace_fo:        fusedData?.graceFoData?.anomaly != null,
+    // Fase 2-3: Composite provenance
+    heat_stress:     heatStress != null,
+    drought_index:   droughtIdx != null,
+    conditional_enso: ensoRisk != null,
+    gri_exposure_vulnerability: griEV != null,
+    calibrated_risk: calRisk != null,
+    adaptive_capacity: adaptCap != null,
     distance_km:     fusedData?.distanceKm      ?? null,
     scenario:        fusedData?.scenario        ?? null,
   };
