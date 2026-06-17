@@ -8,14 +8,15 @@ import { supabase } from '../supabaseClient.js';
 import { getGriRiskByLocation }    from '../services/griRiskService.js';
 import { getClimateTrends }        from '../services/openMeteoService.js';
 import { getTerritorialContext }   from '../services/worldBankService.js';
-import { getEnsoContext }          from '../services/ensoService.js';
+import { getEnsoContext, getFullOniHistory } from '../services/ensoService.js';
+import { computeConditionalEnsoRisk } from '../services/conditionalEnsoRiskService.js'; // Fase 2.3: conditional risk
+import { downscaleClimateData, getEffectiveResolution } from '../services/downscaleService.js'; // 002-downscaling-aal
+import { computeHeatStressIndex } from '../services/heatStressService.js'; // Fase 2.1: WBGT + AQI
+import { computeDroughtCompositeIndex } from '../services/droughtCompositeService.js'; // Fase 2.2: Drought Composite
 import { getTerrainIntelligence }  from '../services/terrainService.js';  // Sprint 6
 import { getNasaPowerData }        from '../services/nasaPowerService.js'; // Sprint 7: NASA POWER
 import { getModisNdviData }        from '../services/modisNdviService.js'; // Sprint 7: MODIS NDVI
 import { getGraceFoData }          from '../services/graceFoService.js'; // Sprint 7: GRACE-FO
-import { downscaleClimateData, getEffectiveResolution } from '../services/downscaleService.js'; // 002-downscaling-aal
-import { computeHeatStressIndex } from '../services/heatStressService.js'; // Fase 2.1: WBGT + AQI
-import { computeDroughtCompositeIndex } from '../services/droughtCompositeService.js'; // Fase 2.2: Drought Composite
 
 // Variables climáticas extraídas del JSONB de climate_cells
 // Refleja las columnas reales de la DB: tr (noches tropicales), prpercnt (% cambio precip),
@@ -173,7 +174,7 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
   const lonNum = Number(lon);
 
   // Ejecutar todas las fuentes en paralelo; cada una falla silenciosamente
-  const [cellResult, griResult, meteoResult, territorialResult, ensoResult, terrainResult, powerResult, ndviResult, graceResult] = await Promise.allSettled([
+  const [cellResult, griResult, meteoResult, territorialResult, ensoResult, terrainResult, powerResult, ndviResult, graceResult, oniHistoryResult] = await Promise.allSettled([
     fetchClimateCell(latNum, lonNum, scenario),
     getGriRiskByLocation(latNum, lonNum),
     getClimateTrends(latNum, lonNum),
@@ -183,6 +184,7 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
     getNasaPowerData(latNum, lonNum),           // Sprint 7: NASA POWER — informacional, non-blocking
     getModisNdviData(latNum, lonNum),           // Sprint 7: MODIS NDVI — informacional, non-blocking
     getGraceFoData(latNum, lonNum),             // Sprint 7: GRACE-FO — informacional, non-blocking
+    getFullOniHistory(),                        // Fase 2.3: ONI history — informacional, non-blocking
   ]);
 
   const cellData      = cellResult.status      === 'fulfilled' ? cellResult.value      : null;
@@ -194,6 +196,7 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
   const powerData     = powerResult.status       === 'fulfilled' ? powerResult.value       : null;
   const ndviData      = ndviResult.status        === 'fulfilled' ? ndviResult.value        : null;
   const graceFoData   = graceResult.status       === 'fulfilled' ? graceResult.value        : null;
+  const oniHistory    = oniHistoryResult.status   === 'fulfilled' ? oniHistoryResult.value    : null;
 
   if (cellResult.status === 'rejected')
     console.warn('[Layer1] climate_cells falló:', cellResult.reason?.message);
@@ -244,6 +247,9 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
     ensoData
   );
 
+  // ── Fase 2.3: Conditional ENSO risk ───────────────────────────────────────
+  const conditionalEnsoRisk = computeConditionalEnsoRisk(oniHistory, ensoData);
+
   return {
     // Datos climáticos normalizados: climate_cells (preferido) u Open-Meteo computed
     climateData,
@@ -272,6 +278,8 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
     heatStressIndex: heatStress               ?? null,
     // Fase 2.2: Multi-signal drought composite index
     droughtIndex:    droughtIndex             ?? null,
+    // Fase 2.3: Conditional ENSO risk framework
+    conditionalEnsoRisk: conditionalEnsoRisk   ?? null,
     // Metadatos de ubicación
     distanceKm:      cellData?.distanceKm     ?? null,
     scenario,

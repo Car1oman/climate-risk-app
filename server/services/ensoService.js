@@ -17,6 +17,7 @@
 
 import * as ensoCache from './ensoCache.js';
 import { fetchEnsoAdvisory } from './ensoAdvisoryService.js';
+import { logger } from '../utils/logger.js';
 
 const NOAA_ONI_URL = 'https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt';
 const FETCH_TIMEOUT_MS = 10_000; // 10 s — NOAA CPC is reliable but can be slow
@@ -329,6 +330,37 @@ export async function getEnsoContext() {
 export async function refreshEnsoContext() {
   ensoCache.invalidate();
   return getEnsoContext();
+}
+
+/**
+ * Returns the FULL parsed ONI history (1950–present) for use by
+ * conditional risk analysis services (Fase 2.3).
+ *
+ * Cached separately with same TTL as getEnsoContext().
+ *
+ * @returns {Promise<Array<{season: string, year: number, effectiveYear: number, month: number, anom: number, phase: string, intensity: string}>|null>}
+ */
+export async function getFullOniHistory() {
+  const cacheKey = 'oni_full_history';
+  const cached = ensoCache.get(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const raw = await fetchONIRaw();
+    const parsed = parseONIText(raw);
+    const sorted = sortChronologically(parsed);
+    const enriched = sorted.map(r => ({
+      ...r,
+      phase: classifyPhase(r.anom),
+      intensity: classifyIntensity(r.anom),
+    }));
+    ensoCache.set(cacheKey, enriched);
+    logger.info('ensoService', 'Full ONI history fetched', { records: enriched.length });
+    return enriched;
+  } catch (err) {
+    logger.warn('ensoService', 'getFullOniHistory failed', { error: err.message });
+    return null;
+  }
 }
 
 /**
