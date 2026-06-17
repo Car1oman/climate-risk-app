@@ -12,6 +12,7 @@ import { getEnsoContext, getFullOniHistory } from '../services/ensoService.js';
 import { computeConditionalEnsoRisk } from '../services/conditionalEnsoRiskService.js'; // Fase 2.3: conditional risk
 import { extractGriExposureVulnerability } from '../services/griExposureVulnerabilityService.js'; // Fase 3.1: E/V extraction
 import { computeCalibratedRisk } from '../services/riskCalibrationService.js'; // Fase 3.2: Risk score
+import { getAdaptiveCapacityTrend } from '../services/adaptiveCapacityService.js'; // Fase 3.3: Adaptive capacity
 import { downscaleClimateData, getEffectiveResolution } from '../services/downscaleService.js'; // 002-downscaling-aal
 import { computeHeatStressIndex } from '../services/heatStressService.js'; // Fase 2.1: WBGT + AQI
 import { computeDroughtCompositeIndex } from '../services/droughtCompositeService.js'; // Fase 2.2: Drought Composite
@@ -176,7 +177,7 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
   const lonNum = Number(lon);
 
   // Ejecutar todas las fuentes en paralelo; cada una falla silenciosamente
-  const [cellResult, griResult, meteoResult, territorialResult, ensoResult, terrainResult, powerResult, ndviResult, graceResult, oniHistoryResult] = await Promise.allSettled([
+  const [cellResult, griResult, meteoResult, territorialResult, ensoResult, terrainResult, powerResult, ndviResult, graceResult, oniHistoryResult, adaptiveResult] = await Promise.allSettled([
     fetchClimateCell(latNum, lonNum, scenario),
     getGriRiskByLocation(latNum, lonNum),
     getClimateTrends(latNum, lonNum),
@@ -187,6 +188,7 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
     getModisNdviData(latNum, lonNum),           // Sprint 7: MODIS NDVI — informacional, non-blocking
     getGraceFoData(latNum, lonNum),             // Sprint 7: GRACE-FO — informacional, non-blocking
     getFullOniHistory(),                        // Fase 2.3: ONI history — informacional, non-blocking
+    getAdaptiveCapacityTrend(),                 // Fase 3.3: Adaptive capacity trend — informacional
   ]);
 
   const cellData      = cellResult.status      === 'fulfilled' ? cellResult.value      : null;
@@ -199,6 +201,7 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
   const ndviData      = ndviResult.status        === 'fulfilled' ? ndviResult.value        : null;
   const graceFoData   = graceResult.status       === 'fulfilled' ? graceResult.value        : null;
   const oniHistory    = oniHistoryResult.status   === 'fulfilled' ? oniHistoryResult.value    : null;
+  const adaptiveData  = adaptiveResult.status     === 'fulfilled' ? adaptiveResult.value      : null;
 
   if (cellResult.status === 'rejected')
     console.warn('[Layer1] climate_cells falló:', cellResult.reason?.message);
@@ -218,6 +221,8 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
     console.warn('[Layer1] MODIS NDVI falló (non-blocking):', ndviResult.reason?.message);
   if (graceResult.status === 'rejected')
     console.warn('[Layer1] GRACE-FO falló (non-blocking):', graceResult.reason?.message);
+  if (adaptiveResult.status === 'rejected')
+    console.warn('[Layer1] Adaptive Capacity falló (non-blocking):', adaptiveResult.reason?.message);
 
   // Cuando climate_cells no tiene datos, usar los índices extremos computados
   // por Open-Meteo (hd35, hd40, cdd, rx5day, rx1day, pr, tas) como fallback.
@@ -303,6 +308,8 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
     griExposureVulnerability: griEandV         ?? null,
     // Fase 3.2: Calibrated risk score (baseline automated)
     calibratedRisk:         calibratedRisk     ?? null,
+    // Fase 3.3: Adaptive capacity trend (World Bank time series)
+    adaptiveCapacity:       adaptiveData       ?? null,
     // Metadatos de ubicación
     distanceKm:      cellData?.distanceKm     ?? null,
     scenario,
