@@ -32,8 +32,7 @@ async function fetchOpenMeteo(lat, lon) {
       start_date: '1980-01-01',
       end_date:   '2049-12-31',
       models:     model,
-      // tmax para computar hd35, hd40, txx; mean+precip para tas, pr, cdd
-      daily:      'temperature_2m_mean,temperature_2m_max,precipitation_sum',
+      daily:      'temperature_2m_mean,temperature_2m_max,temperature_2m_min,precipitation_sum,relative_humidity_2m,wind_speed_10m,cloud_cover,shortwave_radiation_sum,surface_pressure,soil_moisture_0_to_10cm',
     });
     try {
       const res = await fetchWithTimeout(`${OPEN_METEO_URL}?${params}`, 45000);
@@ -84,9 +83,16 @@ function computeExtremeIndices(records) {
   const yearStats = Object.values(byYear)
     .filter(days => days.length >= 30)
     .map(days => {
-      const tmaxVals   = days.map(d => d.tmax).filter(v => v != null);
-      const tmeanVals  = days.map(d => d.tmean).filter(v => v != null);
-      const precipVals = days.map(d => d.precip).filter(v => v != null);
+      const tmaxVals     = days.map(d => d.tmax).filter(v => v != null);
+      const tmeanVals    = days.map(d => d.tmean).filter(v => v != null);
+      const tminVals     = days.map(d => d.tmin).filter(v => v != null);
+      const precipVals   = days.map(d => d.precip).filter(v => v != null);
+      const humVals      = days.map(d => d.humidity).filter(v => v != null);
+      const windVals     = days.map(d => d.wind).filter(v => v != null);
+      const cloudVals    = days.map(d => d.cloud_cover).filter(v => v != null);
+      const radVals      = days.map(d => d.radiation).filter(v => v != null);
+      const pressVals    = days.map(d => d.pressure).filter(v => v != null);
+      const soilMVals    = days.map(d => d.soil_moisture).filter(v => v != null);
 
       // Días calurosos (requieren tmax; null si no disponible)
       const hd35 = tmaxVals.length ? tmaxVals.filter(t => t > 35).length : null;
@@ -97,6 +103,9 @@ function computeExtremeIndices(records) {
       const tas = tmeanVals.length
         ? tmeanVals.reduce((s, v) => s + v, 0) / tmeanVals.length
         : null;
+
+      // Temperatura mínima anual (tnn)
+      const tnn = tminVals.length ? Math.min(...tminVals) : null;
 
       // Precipitación anual total
       const pr = precipVals.length ? precipVals.reduce((s, v) => s + v, 0) : null;
@@ -122,11 +131,19 @@ function computeExtremeIndices(records) {
         else run = 0;
       }
 
+      const avg = (arr) => arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : null;
+
       return {
-        hd35, hd40, tas, txx,
+        hd35, hd40, tas, txx, tnn,
         pr, rx1day, rx5day,
         cdd: precipVals.length ? cdd : null,
         cwd: precipVals.length ? cwd : null,
+        avg_humidity:      avg(humVals),
+        avg_wind:          avg(windVals),
+        avg_cloud_cover:   avg(cloudVals),
+        avg_radiation:     avg(radVals),
+        avg_pressure:      avg(pressVals),
+        avg_soil_moisture: avg(soilMVals),
       };
     });
 
@@ -143,12 +160,18 @@ function computeExtremeIndices(records) {
     hd40:   avgOf(y => y.hd40),
     tas:    avgOf(y => y.tas),
     txx:    avgOf(y => y.txx),
+    tnn:    avgOf(y => y.tnn),
     pr:     avgOf(y => y.pr),
     rx1day: avgOf(y => y.rx1day),
     rx5day: avgOf(y => y.rx5day),
     cdd:    avgOf(y => y.cdd),
     cwd:    avgOf(y => y.cwd),
-    tnn:    null, // requeriría temperature_2m_min; se puede agregar si se necesita
+    avg_humidity:      avgOf(y => y.avg_humidity),
+    avg_wind:          avgOf(y => y.avg_wind),
+    avg_cloud_cover:   avgOf(y => y.avg_cloud_cover),
+    avg_radiation:     avgOf(y => y.avg_radiation),
+    avg_pressure:      avgOf(y => y.avg_pressure),
+    avg_soil_moisture: avgOf(y => y.avg_soil_moisture),
   };
 }
 
@@ -158,11 +181,18 @@ function computeExtremeIndices(records) {
  * - `climateIndices`: índices extremos por período, compatibles con Layer 2
  */
 function processData(data) {
-  const daily   = data.daily || {};
-  const dates   = daily.time                  || [];
-  const tmeans  = daily.temperature_2m_mean   || [];
-  const tmaxs   = daily.temperature_2m_max    || [];
-  const precips = daily.precipitation_sum     || [];
+  const daily     = data.daily || {};
+  const dates     = daily.time                          || [];
+  const tmeans    = daily.temperature_2m_mean           || [];
+  const tmaxs     = daily.temperature_2m_max            || [];
+  const tmins     = daily.temperature_2m_min            || [];
+  const precips   = daily.precipitation_sum             || [];
+  const humidities = daily.relative_humidity_2m         || [];
+  const winds     = daily.wind_speed_10m                || [];
+  const clouds    = daily.cloud_cover                   || [];
+  const radiations = daily.shortwave_radiation_sum      || [];
+  const pressures  = daily.surface_pressure             || [];
+  const soilMoist  = daily.soil_moisture_0_to_10cm      || [];
 
   // Agrupar registros por período IPCC
   const buckets = {
@@ -173,7 +203,11 @@ function processData(data) {
 
   dates.forEach((date, i) => {
     const year   = parseInt(date.slice(0, 4), 10);
-    const record = { year, tmean: tmeans[i], tmax: tmaxs[i], precip: precips[i] };
+    const record = {
+      year, tmean: tmeans[i], tmax: tmaxs[i], tmin: tmins[i], precip: precips[i],
+      humidity: humidities[i], wind: winds[i], cloud_cover: clouds[i],
+      radiation: radiations[i], pressure: pressures[i], soil_moisture: soilMoist[i],
+    };
 
     if (year >= PERIODS.historical.from && year <= PERIODS.historical.to) {
       buckets.historical.push(record);
