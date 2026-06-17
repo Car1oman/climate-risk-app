@@ -64,6 +64,13 @@ export const SIGNAL_META = {
   extreme_rain:    { icon: "🌧️", label: "Lluvia extrema",            unit: "mm"          },
   temp_increase:   { icon: "📈", label: "Aumento temperatura media", unit: "°C"          },
   flood_risk:      { icon: "🌊", label: "Riesgo de inundación",      unit: "%"           },
+  heat_stress:     { icon: "🌡️", label: "Estrés térmico (WBGT+AQI)", unit: "índice"     },
+  drought_composite: { icon: "🏜️", label: "Índice compuesto sequía",  unit: "0-1"        },
+  conditional_enso_risk: { icon: "🌊", label: "Riesgo condicional ENSO", unit: "señales" },
+  exposure:        { icon: "🎯", label: "Exposición multi-amenaza",   unit: "0-1"        },
+  vulnerability:   { icon: "🛡️", label: "Vulnerabilidad GRI",        unit: "0-1"        },
+  calibrated_risk: { icon: "📊", label: "Riesgo calibrado (P×I/CA)", unit: "puntos"     },
+  adaptive_capacity: { icon: "📶", label: "Capacidad adaptativa",    unit: "0-1"        },
 };
 
 export const HORIZON_LABEL = {

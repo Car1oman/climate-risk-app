@@ -196,7 +196,10 @@ function LegacyCard({ asset, climateData, evidence, traceability, signals }) {
   const confidence = evidence?.confidence  || climateData?.confidence || "medium";
 
   const activeSignals = (signals ?? []).filter(
-    s => !["enso_phase", "landslide_risk", "huayco_risk"].includes(s.signalType)
+    s => !["enso_phase", "landslide_risk", "huayco_risk", "exposure", "vulnerability", "conditional_enso_risk", "adaptive_capacity"].includes(s.signalType)
+  );
+  const contextSignals = (signals ?? []).filter(
+    s => ["enso_phase", "landslide_risk", "huayco_risk", "exposure", "vulnerability", "conditional_enso_risk", "adaptive_capacity"].includes(s.signalType)
   );
   const ensoSignal    = (signals ?? []).find(s => s.signalType === "enso_phase");
   const terrainSignal = (signals ?? []).find(s => ["landslide_risk", "huayco_risk"].includes(s.signalType));
@@ -230,7 +233,7 @@ function LegacyCard({ asset, climateData, evidence, traceability, signals }) {
         </div>
       )}
 
-      {(ensoSignal || terrainSignal) && (
+      {(ensoSignal || terrainSignal || contextSignals.length > 0) && (
         <div className="space-y-2">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Contexto informacional</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -250,6 +253,13 @@ function LegacyCard({ asset, climateData, evidence, traceability, signals }) {
                 value={terrainSignal.threshold_reference ?? "Susceptibilidad topográfica detectada"}
               />
             )}
+            {contextSignals.filter(s => !["enso_phase", "landslide_risk", "huayco_risk"].includes(s.signalType)).map((s, i) => (
+              <LegacyContextRow
+                key={i}
+                label={s.signalType === "exposure" ? "Exposición" : s.signalType === "vulnerability" ? "Vulnerabilidad" : s.signalType === "conditional_enso_risk" ? "Riesgo ENSO" : s.signalType === "adaptive_capacity" ? "Cap. adaptativa" : s.signalType}
+                value={s.threshold_reference ?? `Score: ${s.projected != null ? s.projected.toFixed(3) : "N/A"}`}
+              />
+            ))}
           </div>
         </div>
       )}
@@ -277,6 +287,9 @@ function LegacySignalRow({ signal }) {
     extreme_rain:    "Lluvia extrema",
     temp_increase:   "Aumento temperatura media",
     flood_risk:      "Riesgo de inundación",
+    heat_stress:     "Estrés térmico (WBGT + AQI)",
+    drought_composite: "Índice compuesto de sequía",
+    calibrated_risk: "Riesgo calibrado (P×I/CA)",
   };
   const label   = labels[signal.signalType] ?? signal.signalType;
   const delta   = signal.delta != null
