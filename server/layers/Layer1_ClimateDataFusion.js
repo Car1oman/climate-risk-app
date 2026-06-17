@@ -11,6 +11,7 @@ import { getTerritorialContext }   from '../services/worldBankService.js';
 import { getEnsoContext, getFullOniHistory } from '../services/ensoService.js';
 import { computeConditionalEnsoRisk } from '../services/conditionalEnsoRiskService.js'; // Fase 2.3: conditional risk
 import { extractGriExposureVulnerability } from '../services/griExposureVulnerabilityService.js'; // Fase 3.1: E/V extraction
+import { computeCalibratedRisk } from '../services/riskCalibrationService.js'; // Fase 3.2: Risk score
 import { downscaleClimateData, getEffectiveResolution } from '../services/downscaleService.js'; // 002-downscaling-aal
 import { computeHeatStressIndex } from '../services/heatStressService.js'; // Fase 2.1: WBGT + AQI
 import { computeDroughtCompositeIndex } from '../services/droughtCompositeService.js'; // Fase 2.2: Drought Composite
@@ -254,6 +255,20 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
   // ── Fase 3.1: GRI Exposure & Vulnerability extraction ─────────────────────
   const griEandV = extractGriExposureVulnerability(griData);
 
+  // ── Fase 3.2: Calibrated risk score (baseline, sin datos de activo) ──────
+  const fusedClimateData = {
+    griData,
+    griExposureVulnerability: griEandV,
+    droughtIndex,
+    conditionalEnsoRisk,
+    scenario,
+  };
+  const calibratedRisk = computeCalibratedRisk(
+    fusedClimateData,
+    { region: null, sector: 'default' },
+    {}
+  );
+
   return {
     // Datos climáticos normalizados: climate_cells (preferido) u Open-Meteo computed
     climateData,
@@ -286,6 +301,8 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
     conditionalEnsoRisk: conditionalEnsoRisk   ?? null,
     // Fase 3.1: GRI Exposure & Vulnerability components
     griExposureVulnerability: griEandV         ?? null,
+    // Fase 3.2: Calibrated risk score (baseline automated)
+    calibratedRisk:         calibratedRisk     ?? null,
     // Metadatos de ubicación
     distanceKm:      cellData?.distanceKm     ?? null,
     scenario,
