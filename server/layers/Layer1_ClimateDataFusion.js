@@ -10,6 +10,7 @@ import { getClimateTrends }        from '../services/openMeteoService.js';
 import { getTerritorialContext }   from '../services/worldBankService.js';
 import { getEnsoContext, getFullOniHistory } from '../services/ensoService.js';
 import { computeConditionalEnsoRisk } from '../services/conditionalEnsoRiskService.js'; // Fase 2.3: conditional risk
+import { extractGriExposureVulnerability } from '../services/griExposureVulnerabilityService.js'; // Fase 3.1: E/V extraction
 import { downscaleClimateData, getEffectiveResolution } from '../services/downscaleService.js'; // 002-downscaling-aal
 import { computeHeatStressIndex } from '../services/heatStressService.js'; // Fase 2.1: WBGT + AQI
 import { computeDroughtCompositeIndex } from '../services/droughtCompositeService.js'; // Fase 2.2: Drought Composite
@@ -250,6 +251,9 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
   // ── Fase 2.3: Conditional ENSO risk ───────────────────────────────────────
   const conditionalEnsoRisk = computeConditionalEnsoRisk(oniHistory, ensoData);
 
+  // ── Fase 3.1: GRI Exposure & Vulnerability extraction ─────────────────────
+  const griEandV = extractGriExposureVulnerability(griData);
+
   return {
     // Datos climáticos normalizados: climate_cells (preferido) u Open-Meteo computed
     climateData,
@@ -280,6 +284,8 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
     droughtIndex:    droughtIndex             ?? null,
     // Fase 2.3: Conditional ENSO risk framework
     conditionalEnsoRisk: conditionalEnsoRisk   ?? null,
+    // Fase 3.1: GRI Exposure & Vulnerability components
+    griExposureVulnerability: griEandV         ?? null,
     // Metadatos de ubicación
     distanceKm:      cellData?.distanceKm     ?? null,
     scenario,
