@@ -15,6 +15,7 @@ import { getModisNdviData }        from '../services/modisNdviService.js'; // Sp
 import { getGraceFoData }          from '../services/graceFoService.js'; // Sprint 7: GRACE-FO
 import { downscaleClimateData, getEffectiveResolution } from '../services/downscaleService.js'; // 002-downscaling-aal
 import { computeHeatStressIndex } from '../services/heatStressService.js'; // Fase 2.1: WBGT + AQI
+import { computeDroughtCompositeIndex } from '../services/droughtCompositeService.js'; // Fase 2.2: Drought Composite
 
 // Variables climáticas extraídas del JSONB de climate_cells
 // Refleja las columnas reales de la DB: tr (noches tropicales), prpercnt (% cambio precip),
@@ -236,6 +237,13 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
     ? computeHeatStressIndex(powerData, null)
     : null;
 
+  // ── Fase 2.2: Multi-signal drought composite index ────────────────────────
+  const droughtIndex = computeDroughtCompositeIndex(
+    meteoResult_?.climateIndices ?? null,
+    graceFoData,
+    ensoData
+  );
+
   return {
     // Datos climáticos normalizados: climate_cells (preferido) u Open-Meteo computed
     climateData,
@@ -262,6 +270,8 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
     graceFoData:     graceFoData              ?? null,
     // Fase 2.1: Heat stress index
     heatStressIndex: heatStress               ?? null,
+    // Fase 2.2: Multi-signal drought composite index
+    droughtIndex:    droughtIndex             ?? null,
     // Metadatos de ubicación
     distanceKm:      cellData?.distanceKm     ?? null,
     scenario,
