@@ -93,13 +93,19 @@ function climateSourceLabel(climateSource) {
 
 function endpointForSignal(signal, fusedData) {
   const indicator = signal.indicator ?? '';
-  if (signal.signalType === 'enso_phase') return 'NOAA CPC ONI via getEnsoContext()';
-  if (signal.signalType === 'landslide_risk' || signal.signalType === 'huayco_risk') {
+  const st = signal.signalType;
+  if (st === 'enso_phase') return 'NOAA CPC ONI via getEnsoContext()';
+  if (st === 'landslide_risk' || st === 'huayco_risk') {
     return 'Terrain intelligence API via getTerrainIntelligence()';
   }
-  if (indicator.startsWith('gri_') || signal.signalType === 'flood_risk') {
+  if (indicator.startsWith('gri_') || st === 'flood_risk') {
     return 'GRI Infrastructure Resilience via getGriRiskByLocation()';
   }
+  if (st === 'heat_stress') return 'NASA POWER + WeatherAPI via heatStressService.js';
+  if (st === 'drought_composite') return 'Layer1 multi-signal fusion via droughtCompositeService.js';
+  if (st === 'conditional_enso_risk') return 'NOAA ONI history + Layer1 via conditionalEnsoRiskService.js';
+  if (st === 'calibrated_risk') return 'Layer1 risk module via riskCalibrationService.js';
+  if (st === 'adaptive_capacity') return 'World Bank WDI via adaptiveCapacityService.js';
   if (fusedData?.climateSource === 'climate_cells') {
     return 'Supabase RPC get_nearest_climate_cell';
   }
@@ -110,19 +116,29 @@ function endpointForSignal(signal, fusedData) {
 }
 
 function sourceForSignal(signal, fusedData) {
-  const indicator = signal.indicator ?? '';
-  if (signal.signalType === 'enso_phase') return 'NOAA CPC';
-  if (signal.signalType === 'landslide_risk' || signal.signalType === 'huayco_risk') return 'SRTM terrain + INGEMMET/SENAMHI thresholds';
-  if (indicator.startsWith('gri_')) return 'GRI Infrastructure Resilience';
-  if (signal.signalType === 'flood_risk') return 'GRI Infrastructure Resilience + WRI Aqueduct Floods';
+  const st = signal.signalType;
+  if (st === 'enso_phase') return 'NOAA CPC';
+  if (st === 'landslide_risk' || st === 'huayco_risk') return 'SRTM terrain + INGEMMET/SENAMHI thresholds';
+  if (st === 'heat_stress') return 'NASA POWER + WeatherAPI AQI';
+  if (st === 'drought_composite') return 'NOAA CDO + NASA GRACE + Open-Meteo + ENSO';
+  if (st === 'conditional_enso_risk') return 'NOAA CPC ONI history 1950-2026';
+  if (st === 'calibrated_risk') return 'Layer1 multi-source + Manual Adaptación Intercorp';
+  if (st === 'adaptive_capacity') return 'World Bank WDI (6 proxy indicators)';
+  if ((signal.indicator ?? '').startsWith('gri_')) return 'GRI Infrastructure Resilience';
+  if (st === 'flood_risk') return 'GRI Infrastructure Resilience + WRI Aqueduct Floods';
   return climateSourceLabel(fusedData?.climateSource);
 }
 
 function modelBadgeForSignal(signal, fusedData) {
-  const indicator = signal.indicator ?? '';
-  if (indicator.startsWith('gri_') || signal.signalType === 'flood_risk') return 'GRI/WRI';
-  if (signal.signalType === 'enso_phase') return 'NOAA ONI';
-  if (signal.signalType === 'landslide_risk' || signal.signalType === 'huayco_risk') return 'SRTM';
+  const st = signal.signalType;
+  if ((signal.indicator ?? '').startsWith('gri_') || st === 'flood_risk') return 'GRI/WRI';
+  if (st === 'enso_phase') return 'NOAA ONI';
+  if (st === 'landslide_risk' || st === 'huayco_risk') return 'SRTM';
+  if (st === 'heat_stress') return 'NASA+WAQI';
+  if (st === 'drought_composite') return 'MULTI';
+  if (st === 'conditional_enso_risk') return 'NOAA';
+  if (st === 'calibrated_risk') return 'AHPMAN';
+  if (st === 'adaptive_capacity') return 'WBANK';
   return fusedData?.climateSource === 'climate_cells' ? 'CMIP6 ensemble' : 'Open-Meteo derived';
 }
 
@@ -141,26 +157,42 @@ function transformationForSignal(signal) {
 // ── Evidence metadata helpers (FASE A) ──────────────────────────────────────
 
 function datasetForSignal(signal, fusedData) {
-  const indicator = signal.indicator ?? '';
-  if (signal.signalType === 'enso_phase') return 'NOAA ONI / ERSST v5 — Oceanic Niño Index';
-  if (['landslide_risk', 'huayco_risk'].includes(signal.signalType)) return 'SRTM 30m v3 / NASA — Shuttle Radar Topography Mission 2000';
-  if (indicator.startsWith('gri_') || signal.signalType === 'flood_risk') return 'GRI Infrastructure Resilience / WRI Aqueduct Floods 4.0';
+  const st = signal.signalType;
+  if (st === 'enso_phase') return 'NOAA ONI / ERSST v5 — Oceanic Niño Index';
+  if (['landslide_risk', 'huayco_risk'].includes(st)) return 'SRTM 30m v3 / NASA — Shuttle Radar Topography Mission 2000';
+  if (st === 'heat_stress') return 'NASA POWER CERES + WeatherAPI (WBGT Stull 2011 + AQI compuesto)';
+  if (st === 'drought_composite') return 'NOAA CPC CDO / NASA GRACE Tellus / Open-Meteo / ENSO ONI — weighted IPCC AR6';
+  if (st === 'conditional_enso_risk') return 'NOAA CPC ONI 1950-2026 — 3×3 transition matrix + conditional weights';
+  if (st === 'calibrated_risk') return 'Layer1 ensemble — (Probability × Impact) / Adaptive Capacity — Manual Adaptación Intercorp';
+  if (st === 'adaptive_capacity') return 'World Bank WDI — Access to Electricity, Internet, Water, Human Capital, Financial Depth, Mobile Telephony';
+  if ((signal.indicator ?? '').startsWith('gri_') || st === 'flood_risk') return 'GRI Infrastructure Resilience / WRI Aqueduct Floods 4.0';
   if (fusedData?.climateSource === 'climate_cells') return 'CMIP6 CCKP 2023 — climate_cells ensemble (49+ GCMs)';
   if (fusedData?.climateSource === 'open_meteo_derived') return 'CMIP6 via Open-Meteo API — derived climate indices';
   return 'dataset not identified';
 }
 
 function modelForSignal(signal, fusedData) {
-  if (signal.signalType === 'enso_phase') return 'NOAA CPC ONI (near-real-time observational)';
-  if (['landslide_risk', 'huayco_risk'].includes(signal.signalType)) return 'SRTM topography + INGEMMET/SENAMHI slope thresholds';
-  if ((signal.indicator ?? '').startsWith('gri_') || signal.signalType === 'flood_risk') return 'GRI / ISIMIP2b + WRI Aqueduct hydrological models';
+  const st = signal.signalType;
+  if (st === 'enso_phase') return 'NOAA CPC ONI (near-real-time observational)';
+  if (['landslide_risk', 'huayco_risk'].includes(st)) return 'SRTM topography + INGEMMET/SENAMHI slope thresholds';
+  if (st === 'heat_stress') return 'Stull (2011) WBGT formula + US EPA AQI composite';
+  if (st === 'drought_composite') return 'IPCC AR6 weighted fusion (CDD+TWSA+soil_moisture+precip+ENSO)';
+  if (st === 'conditional_enso_risk') return 'NOAA ONI 1950-2026 — Markov transition + conditional risk matrix';
+  if (st === 'calibrated_risk') return 'Manual Adaptación Intercorp — (P×I)/CA with internal calibration modes';
+  if (st === 'adaptive_capacity') return 'World Bank API — linear trend over 2000-present proxy indicators';
+  if ((signal.indicator ?? '').startsWith('gri_') || st === 'flood_risk') return 'GRI / ISIMIP2b + WRI Aqueduct hydrological models';
   if (fusedData?.climateSource === 'climate_cells') return 'CMIP6 multi-model ensemble (BCC-CSM2-MR, CanESM5, CNRM-CM6, EC-Earth3, GFDL-ESM4, IPSL-CM6A-LR, MIROC6, MPI-ESM1-2-HR, MRI-ESM2-0 + 40 others)';
   if (fusedData?.climateSource === 'open_meteo_derived') return 'CMIP6 ensemble via Open-Meteo aggregation';
   return 'model not identified';
 }
 
 function sspForSignal(signal, fusedData) {
-  if (['enso_phase', 'landslide_risk', 'huayco_risk'].includes(signal.signalType)) return 'N/A — non-projection signal';
+  const nonProjection = new Set([
+    'enso_phase', 'landslide_risk', 'huayco_risk',
+    'heat_stress', 'drought_composite', 'conditional_enso_risk',
+    'exposure', 'vulnerability', 'calibrated_risk', 'adaptive_capacity',
+  ]);
+  if (nonProjection.has(signal.signalType)) return 'N/A — non-projection signal';
   const sc = (fusedData?.scenario ?? 'ssp245').toLowerCase();
   return sc === 'ssp585' ? 'SSP5-8.5 (high emissions)' : 'SSP2-4.5 (moderate emissions)';
 }
@@ -712,12 +744,141 @@ export function detectSignals(fusedData) {
     }));
   }
 
+  // ── Fase 2.1: HEAT STRESS (WBGT + AQI) ───────────────────────────────────
+  // Compuesto: integra temperatura, humedad, radiación solar y calidad del aire.
+  const heatStress = fusedData?.heatStressIndex ?? null;
+  if (heatStress && heatStress.wbgt != null) {
+    const threshold = heatStress.wbgt >= 32 ? 'extremo'
+      : heatStress.wbgt >= 28 ? 'alto'
+      : heatStress.wbgt >= 26 ? 'moderado'
+      : 'bajo';
+    signals.push(buildSignal({
+      signalType:          'heat_stress',
+      indicator:           'wbgt',
+      historical:          null,
+      projected:           heatStress.wbgt,
+      delta:               null,
+      delta_pct:           null,
+      conf:                'medium',
+      horizon:             'short_term',
+      threshold_reference: `ISO 7243 / Stull (2011) — WBGT: ${heatStress.wbgt.toFixed(1)}°C (${threshold}). Umbral moderado: >26°C, alto: >28°C, extremo: >32°C.`,
+      exceeds_threshold:   heatStress.wbgt >= 26,
+    }));
+  }
+
+  // ── Fase 2.2: DROUGHT COMPOSITE ──────────────────────────────────────────
+  const drought = fusedData?.droughtIndex ?? null;
+  if (drought && drought.compositeIndex != null) {
+    signals.push(buildSignal({
+      signalType:          'drought_composite',
+      indicator:           'drought_index',
+      historical:          null,
+      projected:           drought.compositeIndex,
+      delta:               null,
+      delta_pct:           null,
+      conf:                drought.components.cdd != null ? 'high' : 'medium',
+      horizon:             'short_term',
+      threshold_reference: `Índice compuesto multi-señal (CDD+TWSA+soil_moisture+delta_precip+ENSO). Score: ${(drought.compositeIndex * 100).toFixed(0)}% — ${drought.classification}.`,
+      exceeds_threshold:   drought.compositeIndex >= 0.3,
+    }));
+  }
+
+  // ── Fase 2.3: CONDITIONAL ENSO RISK ──────────────────────────────────────
+  const ensoRisk = fusedData?.conditionalEnsoRisk ?? null;
+  if (ensoRisk && ensoRisk.currentPhase !== 'neutral') {
+    const amplifiedCount = Object.values(ensoRisk.conditionalRisks || {})
+      .filter(r => r.amplified).length;
+    signals.push(buildSignal({
+      signalType:          'conditional_enso_risk',
+      indicator:           'enso_conditional_risk',
+      historical:          null,
+      projected:           amplifiedCount,
+      delta:               null,
+      delta_pct:           null,
+      conf:                'high',
+      horizon:             'short_term',
+      threshold_reference: ensoRisk.narrative,
+      exceeds_threshold:   amplifiedCount > 0,
+    }));
+  }
+
+  // ── Fase 3.1: EXPOSURE ───────────────────────────────────────────────────
+  const griEV = fusedData?.griExposureVulnerability ?? null;
+  if (griEV?.exposure?.score != null) {
+    signals.push(buildSignal({
+      signalType:          'exposure',
+      indicator:           'gri_exposure',
+      historical:          null,
+      projected:           griEV.exposure.score,
+      delta:               null,
+      delta_pct:           null,
+      conf:                'medium',
+      horizon:             'short_term',
+      threshold_reference: `Exposición multi-amenaza GRI Oxford: ${(griEV.exposure.score * 100).toFixed(0)}% — ${griEV.exposure.level}. ${griEV.exposure.narrative}`,
+      exceeds_threshold:   griEV.exposure.score >= 0.4,
+    }));
+  }
+
+  // ── Fase 3.1: VULNERABILITY ──────────────────────────────────────────────
+  if (griEV?.vulnerability?.score != null) {
+    signals.push(buildSignal({
+      signalType:          'vulnerability',
+      indicator:           'gri_vulnerability',
+      historical:          null,
+      projected:           griEV.vulnerability.score,
+      delta:               null,
+      delta_pct:           null,
+      conf:                'medium',
+      horizon:             'short_term',
+      threshold_reference: `Vulnerabilidad GRI Oxford: ${(griEV.vulnerability.score * 100).toFixed(0)}% — ${griEV.vulnerability.level}. ${griEV.vulnerability.narrative}`,
+      exceeds_threshold:   griEV.vulnerability.score >= 0.4,
+    }));
+  }
+
+  // ── Fase 3.2: CALIBRATED RISK ────────────────────────────────────────────
+  const risk = fusedData?.calibratedRisk ?? null;
+  if (risk?.score != null) {
+    signals.push(buildSignal({
+      signalType:          'calibrated_risk',
+      indicator:           'ahp_risk_score',
+      historical:          null,
+      projected:           risk.score / 100,
+      delta:               null,
+      delta_pct:           null,
+      conf:                risk.calibration?.confidence === 'alta' ? 'high' : 'medium',
+      horizon:             risk.horizon || 'short_term',
+      threshold_reference: `Riesgo calibrado (P×I/CA): ${risk.score}/100 — ${risk.classification}. Modo: ${risk.calibration?.mode || 'default'}. ${risk.recommendation}`,
+      exceeds_threshold:   risk.score >= 34,
+    }));
+  }
+
+  // ── Fase 3.3: ADAPTIVE CAPACITY TREND ────────────────────────────────────
+  const adaptive = fusedData?.adaptiveCapacity ?? null;
+  if (adaptive?.compositeIndex != null) {
+    signals.push(buildSignal({
+      signalType:          'adaptive_capacity',
+      indicator:           'adaptive_capacity_index',
+      historical:          null,
+      projected:           adaptive.compositeIndex,
+      delta:               null,
+      delta_pct:           null,
+      conf:                'medium',
+      horizon:             'long_term',
+      threshold_reference: `Capacidad adaptativa: ${(adaptive.compositeIndex * 100).toFixed(0)}% — ${adaptive.level}. ${adaptive.narrative}`,
+      exceeds_threshold:   adaptive.compositeIndex < 0.4,
+    }));
+  }
+
   // ── Señal dominante: la de mayor delta absoluto o la primera ─────────────
-  // enso_phase, landslide_risk y huayco_risk excluidos de dominancia —
-  // son señales informacionales/estáticas, no proyecciones climáticas primarias.
-  const scorableSignals = signals.filter(s =>
-    !['enso_phase', 'landslide_risk', 'huayco_risk'].includes(s.signalType)
-  );
+  // enso_phase, landslide_risk, huayco_risk y compuestos de Fases 2-5 excluidos
+  // de dominancia — son señales informacionales/estáticas/compuestas,
+  // no proyecciones climáticas primarias con delta temporal.
+  const compositeSignals = new Set([
+    'enso_phase', 'landslide_risk', 'huayco_risk',
+    'heat_stress', 'drought_composite', 'conditional_enso_risk',
+    'exposure', 'vulnerability', 'calibrated_risk', 'adaptive_capacity',
+  ]);
+  const scorableSignals = signals.filter(s => !compositeSignals.has(s.signalType));
   const dominant_signal = scorableSignals.length > 0
     ? scorableSignals.reduce((best, s) =>
         (Math.abs(s.delta ?? 0) > Math.abs(best.delta ?? 0) ? s : best)

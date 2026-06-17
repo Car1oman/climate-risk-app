@@ -82,7 +82,14 @@ export type SignalType =
   | 'flood_risk'
   | 'landslide_susceptibility'
   | 'huayco_risk'
-  | 'enso_phase';
+  | 'enso_phase'
+  | 'heat_stress'
+  | 'drought_composite'
+  | 'conditional_enso_risk'
+  | 'exposure'
+  | 'vulnerability'
+  | 'calibrated_risk'
+  | 'adaptive_capacity';
 
 /** Broad thematic grouping of signal types. */
 export type SignalCategory =
