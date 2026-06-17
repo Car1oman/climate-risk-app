@@ -140,18 +140,24 @@ export async function getRecentPowerData(lat, lon, parameters, community = 'RE')
         continue;
       }
 
-      // Look for most recent date with data (going back up to 7 days)
-      let value = null;
-      let dateFound = null;
-
-      for (let i = 0; i < 7; i++) {
+      // Build full 7-day time series
+      const daily = [];
+      for (let i = 6; i >= 0; i--) {
         const checkDate = new Date(endDate);
         checkDate.setDate(checkDate.getDate() - i);
         const dateStr = formatDate(checkDate);
+        const val = paramData[dateStr] !== undefined && paramData[dateStr] !== null ? paramData[dateStr] : null;
+        daily.push({ date: dateStr, value: val });
+      }
 
-        if (paramData[dateStr] !== null && paramData[dateStr] !== undefined) {
-          value = paramData[dateStr];
-          dateFound = dateStr;
+      // Look for most recent non-null value
+      let value = null;
+      let dateFound = null;
+      for (let i = 0; i < 7; i++) {
+        const entry = daily[6 - i];
+        if (entry.value !== null) {
+          value = entry.value;
+          dateFound = entry.date;
           break;
         }
       }
@@ -159,7 +165,8 @@ export async function getRecentPowerData(lat, lon, parameters, community = 'RE')
       result[param] = {
         value: value,
         date: dateFound,
-        units: getParameterUnits(param)
+        units: getParameterUnits(param),
+        daily: daily,
       };
     }
 
