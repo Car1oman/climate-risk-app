@@ -340,6 +340,25 @@ export function buildPowerNarrative(powerData) {
     );
   }
 
+  // Dew point narrative (for humidity/comfort context)
+  if (powerData.T2MDEW && powerData.T2MDEW.value !== null) {
+    const dew = powerData.T2MDEW.value;
+    const spread = powerData.T2M && powerData.T2M.value !== null
+      ? (powerData.T2M.value - dew).toFixed(1)
+      : null;
+    let dewContext = '';
+    if (dew > 20) dewContext = ' — muy húmedo, sensación de bochorno';
+    else if (dew > 15) dewContext = ' — húmedo';
+    else if (dew < 0) dewContext = ' — aire seco';
+
+    const suffix = spread
+      ? ` (brecha temp−rocío ${spread}°C)`
+      : '';
+    sentences.push(
+      `Punto de rocío: ${dew.toFixed(1)}°C${dewContext}${suffix} (NASA POWER).`
+    );
+  }
+
   // Solar radiation narrative
   if (powerData.ALLSKY_SFC_SW_DWN && powerData.ALLSKY_SFC_SW_DWN.value !== null) {
     const solar = powerData.ALLSKY_SFC_SW_DWN.value;
@@ -363,7 +382,7 @@ export function buildPowerNarrative(powerData) {
  * @returns {Promise<Object|null>} { recent, climatology } or null on failure
  */
 export async function getNasaPowerData(lat, lon) {
-  const parameters = ['T2M', 'T2M_MAX', 'T2M_MIN', 'PRECTOT', 'WS2M', 'RH2M', 'ALLSKY_SFC_SW_DWN'];
+  const parameters = ['T2M', 'T2M_MAX', 'T2M_MIN', 'T2MDEW', 'PRECTOT', 'WS2M', 'RH2M', 'ALLSKY_SFC_SW_DWN'];
   try {
     const [recent, climatology] = await Promise.allSettled([
       getRecentPowerData(lat, lon, parameters),
