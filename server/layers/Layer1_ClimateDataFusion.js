@@ -14,6 +14,7 @@ import { getNasaPowerData }        from '../services/nasaPowerService.js'; // Sp
 import { getModisNdviData }        from '../services/modisNdviService.js'; // Sprint 7: MODIS NDVI
 import { getGraceFoData }          from '../services/graceFoService.js'; // Sprint 7: GRACE-FO
 import { downscaleClimateData, getEffectiveResolution } from '../services/downscaleService.js'; // 002-downscaling-aal
+import { computeHeatStressIndex } from '../services/heatStressService.js'; // Fase 2.1: WBGT + AQI
 
 // Variables climáticas extraídas del JSONB de climate_cells
 // Refleja las columnas reales de la DB: tr (noches tropicales), prpercnt (% cambio precip),
@@ -230,6 +231,11 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
     }
   }
 
+  // ── Fase 2.1: Heat stress index (WBGT + AQI) ──────────────────────────────
+  const heatStress = powerData
+    ? computeHeatStressIndex(powerData, null)
+    : null;
+
   return {
     // Datos climáticos normalizados: climate_cells (preferido) u Open-Meteo computed
     climateData,
@@ -254,6 +260,8 @@ export async function fusionClimateData({ lat, lon, scenario = 'ssp245' }) {
     ndviData:        ndviData                 ?? null,
     // Sprint 7: GRACE-FO — informacional, null cuando PO.DAAC no responde
     graceFoData:     graceFoData              ?? null,
+    // Fase 2.1: Heat stress index
+    heatStressIndex: heatStress               ?? null,
     // Metadatos de ubicación
     distanceKm:      cellData?.distanceKm     ?? null,
     scenario,

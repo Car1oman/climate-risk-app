@@ -659,4 +659,4 @@ Proyecto interno Intercorp Retail.
 
 ---
 
-**Ultima actualizacion:** Junio 2026
+**Ultima actualizacion:** Junio 2026 — Limpieza de artefactos historicos (27 archivos md, carpeta specs/)

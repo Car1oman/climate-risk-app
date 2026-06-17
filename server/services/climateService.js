@@ -42,7 +42,7 @@ const getClimateData = async (lat, lng) => {
       }
     }
 
-    const url = `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${latNum},${lngNum}&aqi=no`;
+    const url = `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${latNum},${lngNum}&aqi=yes`;
     console.log("🌐 Llamando WeatherAPI:", url.replace(apiKey, "***"));
 
     const response = await fetch(url);
@@ -62,6 +62,14 @@ const getClimateData = async (lat, lng) => {
       precipitation: data.current?.precip_mm ?? 0,
       condition: data.current?.condition?.text ?? "Desconocido",
       icon: data.current?.condition?.icon ?? null,
+      uv: data.current?.uv ?? null,
+      pm2_5: data.current?.air_quality?.pm2_5 ?? null,
+      pm10: data.current?.air_quality?.pm10 ?? null,
+      o3: data.current?.air_quality?.o3 ?? null,
+      no2: data.current?.air_quality?.no2 ?? null,
+      so2: data.current?.air_quality?.so2 ?? null,
+      co: data.current?.air_quality?.co ?? null,
+      "us-epa-index": data.current?.air_quality?.["us-epa-index"] ?? null,
       source: "weatherapi",
       recorded_at: new Date().toISOString(),
     };

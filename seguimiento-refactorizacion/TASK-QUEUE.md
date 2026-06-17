@@ -1,6 +1,6 @@
 # TASK QUEUE — Cola de Tareas de Refactorización
 
-> Archivo dinámico: las tareas se actualizan en esta tabla (no se añaden líneas infinitas).
+> Archivo dinámico: las tareas se actualizan en esta tabla.
 > Estados: `pending` → `in_progress` → `completed` | `blocked` | `manual_action_required`
 
 ---
@@ -9,9 +9,9 @@
 
 | ID | Tarea | Fase | Estado | Dependencia | Resultado Observable | Commit |
 |---|---|---|---|---|---|---|
-| 0.1 | Crear infraestructura de memoria dinámica | 0 | ✅ `completed` | — | 3 archivos creados en `seguimiento-refactorizacion/` | — |
-| 1.1 | Añadir soil_moisture + RH + wind + pressure + cloud_cover a Open-Meteo | 1 | ⏳ `pending` | 0.1 | `climateData` incluye `soil_moisture`, `relative_humidity`, `wind_speed` por período | — |
-| 1.2 | Añadir T2MDEW (punto de rocío) a NASA POWER | 1 | ⏳ `pending` | 1.1 | `nasaPowerData` incluye `T2MDEW` en la respuesta | — |
+| 0.1 | Crear infraestructura de memoria dinámica | 0 | ✅ `completed` | — | 3 archivos creados en `seguimiento-refactorizacion/` | `db28ea4` |
+| 1.1 | Añadir soil_moisture + RH + wind + pressure + cloud_cover + radiation a Open-Meteo | 1 | ✅ `completed` | 0.1 | `climateData` incluye `soil_moisture`, `relative_humidity`, `wind_speed`, `avg_soil_moisture`, `avg_humidity`, `avg_wind`, `avg_cloud_cover`, `avg_radiation`, `avg_pressure` y `tnn` por período | `c8b50ef` |
+| **1.2** | **Añadir T2MDEW (punto de rocío) a NASA POWER** | **1** | **🏗️ `in_progress`** | **1.1** | **`nasaPowerData` incluye `T2MDEW` en la respuesta** | **—** |
 | 1.3 | Añadir slums (EN.POP.SLUM.UR.ZS) y conectar GDP/cápita a World Bank | 1 | ⏳ `pending` | 1.2 | `territorialData.indicators` incluye slums, GDP usado en `contextMessages` | — |
 | 1.4 | Preservar serie temporal 7d de NASA POWER en lugar de colapsar a 1 punto | 1 | ⏳ `pending` | 1.3 | `nasaPowerData.recent.daily` contiene los 7 valores diarios | — |
 | 2.1 | Implementar WBGT + AQI compuesto | 2 | ⏳ `pending` | 1.2, 1.4 | `fusedData.heatStressIndex` con valor numérico y categoría | — |
