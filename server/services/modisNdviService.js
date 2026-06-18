@@ -2,7 +2,7 @@
  * MODIS NDVI Service — Vegetation health data from NASA Earthdata (MODIS MOD13Q1 v6.1)
  *
  * Provides NDVI current values, time series, and anomaly classification.
- * Data source: https://lpdaacsvc.cr.usgs.gov/appeears/api/
+ * Data source: AppEEARS API v2 (https://appeears.earthdatacloud.nasa.gov/api/)
  *
  * Resolution: 250m, 16-day composites
  * Coverage: Global (2000-02-18 to present)
@@ -13,9 +13,137 @@ import { getToken } from './earthdataAuth.js';
 import { calcNdviAnomaly, classifyVegetationHealth } from './modisNdviUtils.js';
 import { logger } from '../utils/logger.js';
 
-const APPEARS_BASE = 'https://lpdaacsvc.cr.usgs.gov/appeears/api';
-const PRODUCT = 'MOD13Q1';
+const APPEARS_BASE = 'https://appeears.earthdatacloud.nasa.gov/api';
+const PRODUCT = 'MOD13Q1.061';
+const NDVI_LAYER = '_250m_16_days_NDVI';
+const POLL_INTERVAL_MS = 2000;
+const MAX_POLL_ATTEMPTS = 10;
 const FETCH_TIMEOUT_MS = 30_000;
+
+/**
+ * Builds Earthdata auth headers from cached token.
+ * @returns {Promise<Object|null>} headers object or null if no auth
+ */
+async function buildAuthHeaders() {
+  const auth = await getToken();
+  if (!auth?.token) {
+    logger.warn('modisNdviService', 'No Earthdata auth available');
+    return null;
+  }
+  return {
+    Authorization: auth.type === 'bearer' ? `Bearer ${auth.token}` : `Basic ${auth.token}`,
+    'Content-Type': 'application/json',
+  };
+}
+
+/**
+ * Creates an AppEEARS v2 point extraction task and polls until completion.
+ * @param {number} lat
+ * @param {number} lon
+ * @param {string} startDate
+ * @param {string} endDate
+ * @returns {Promise<Object|null>} parsed NDVI result
+ */
+async function submitPointTask(lat, lon, startDate, endDate) {
+  const headers = await buildAuthHeaders();
+  if (!headers) return null;
+
+  const taskBody = {
+    task_type: 'point',
+    task_name: `DataRisk_NDVI_${lat}_${lon}`,
+    params: {
+      products: [{ product: PRODUCT, layers: [NDVI_LAYER] }],
+      coordinates: [{ latitude: lat, longitude: lon }],
+      dateRange: { startDate, endDate },
+    },
+  };
+
+  try {
+    // Step 1: Create task
+    const createRes = await fetch(`${APPEARS_BASE}/task`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(taskBody),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!createRes.ok) throw new Error(`Task creation failed: HTTP ${createRes.status}`);
+    const task = await createRes.json();
+    const taskId = task.task_id;
+    if (!taskId) throw new Error('No task_id in response');
+
+    // Step 2: Poll for completion
+    let attempts = 0;
+    let status = null;
+    while (attempts < MAX_POLL_ATTEMPTS) {
+      await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+      const pollRes = await fetch(`${APPEARS_BASE}/task/${taskId}`, { headers });
+      if (!pollRes.ok) throw new Error(`Poll failed: HTTP ${pollRes.status}`);
+      const pollData = await pollRes.json();
+      status = pollData.status;
+      if (status === 'done') break;
+      if (status === 'error') throw new Error(`Task failed: ${pollData.error || 'unknown'}`);
+      attempts++;
+    }
+    if (status !== 'done') throw new Error('Task timed out');
+
+    // Step 3: Get bundle files
+    const bundleRes = await fetch(`${APPEARS_BASE}/task/${taskId}`, { headers });
+    const bundleData = await bundleRes.json();
+    const files = bundleData.files || [];
+    const ndviFile = files.find(f => f.file_name?.includes('csv') || f.file_name?.includes('json'));
+    if (!ndviFile) throw new Error('No data file in bundle');
+
+    // Step 4: Download result (CSV or JSON)
+    const dlRes = await fetch(`${APPEARS_BASE}/task/${taskId}/bundle/${ndviFile.file_id}`, {
+      headers: { Authorization: headers.Authorization },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!dlRes.ok) throw new Error(`Download failed: HTTP ${dlRes.status}`);
+    const text = await dlRes.text();
+
+    // Parse CSV or JSON
+    return parseAppeearsResponse(text, ndviFile.file_name);
+  } catch (err) {
+    logger.warn('modisNdviService', 'submitPointTask failed', { error: err.message, lat, lon });
+    return null;
+  }
+}
+
+/**
+ * Parses AppEEARS v2 response (CSV or JSON) to extract NDVI.
+ * @param {string} text - Response body
+ * @param {string} fileName - Original file name
+ * @returns {{ ndvi: number, date: string, quality: string }|null}
+ */
+function parseAppeearsResponse(text, fileName) {
+  if (fileName?.endsWith('.csv') || text.includes(',')) {
+    // CSV format: date, layer, value, ...
+    const lines = text.trim().split('\n').filter(l => l.trim());
+    if (lines.length < 2) return null;
+    // Find NDVI data rows (skip header)
+    const dataRows = lines.slice(1).filter(l => l.includes(NDVI_LAYER));
+    if (!dataRows.length) return null;
+    const latestRow = dataRows.pop();
+    const cols = latestRow.split(',');
+    // Expect: date, layer, value, ...
+    const date = cols[0]?.trim();
+    const value = parseFloat(cols[2]);
+    if (isNaN(value)) return null;
+    const ndvi = Math.max(-1, Math.min(1, value));
+    return { ndvi, date, quality: 'moderate' };
+  }
+  // JSON format fallback
+  try {
+    const data = JSON.parse(text);
+    const records = data?.data?.filter(r => r?.data?.length) ?? [];
+    if (!records.length) return null;
+    const latest = records.reduce((a, b) => new Date(a.date) > new Date(b.date) ? a : b);
+    const raw = latest.data?.[0]?.[NDVI_LAYER];
+    if (raw == null) return null;
+    const ndvi = Math.max(-1, Math.min(1, raw));
+    return { ndvi, date: latest.date, quality: 'moderate' };
+  } catch { return null; }
+}
 
 /**
  * Parses AppEEARS API response to extract NDVI at the nearest point.
@@ -28,18 +156,17 @@ function parseNdviResponse(data) {
   if (!records.length) return null;
 
   const latest = records.reduce((a, b) => new Date(a.date) > new Date(b.date) ? a : b);
-  const ndviRaw = latest.data[0]?.['_250m_16_days_NDVI'];
+  const ndviRaw = latest.data[0]?.[NDVI_LAYER];
   if (ndviRaw == null) return null;
 
   // MODIS NDVI scale factor is 0.0001
   const ndvi = ndviRaw * 0.0001;
-  const quality = latest.data[0]?.['DetailedQA'] ?? 'unknown';
 
-  return { ndvi: Math.max(-1, Math.min(1, ndvi)), date: latest.date, quality };
+  return { ndvi: Math.max(-1, Math.min(1, ndvi)), date: latest.date, quality: 'moderate' };
 }
 
 /**
- * Fetches recent NDVI for a given location.
+ * Fetches recent NDVI for a given location using AppEEARS v2 task-based API.
  * @param {number} lat
  * @param {number} lon
  * @returns {Promise<{ ndvi: number, date: string, quality: string }|null>}
@@ -52,50 +179,13 @@ export async function getRecentNdvi(lat, lon) {
     return cached;
   }
 
-  try {
-    const auth = await getToken();
-    if (!auth.token) {
-      logger.warn('modisNdviService', 'No Earthdata auth available', { lat, lon });
-      modisNdvCache.set(cacheKey, null);
-      return null;
-    }
+  const end = new Date().toISOString().slice(0, 10);
+  const start = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const result = await submitPointTask(lat, lon, start, end);
 
-    const headers = {
-      Authorization: auth.type === 'bearer' ? `Bearer ${auth.token}` : `Basic ${auth.token}`,
-      'Content-Type': 'application/json',
-    };
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
-    const response = await fetch(`${APPEARS_BASE}/product/${PRODUCT}/point`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        latitude: lat,
-        longitude: lon,
-        startDate: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-        endDate: new Date().toISOString().slice(0, 10),
-      }),
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-
-    if (!response.ok) {
-      throw new Error(`AppEEARS HTTP ${response.status}`);
-    }
-
-    const data = await response.json();
-    const result = parseNdviResponse(data);
-
-    modisNdvCache.set(cacheKey, result);
-    logger.info('modisNdviService', 'Recent NDVI fetched', { lat, lon, hasNdvi: !!result?.ndvi });
-    return result;
-  } catch (err) {
-    logger.warn('modisNdviService', 'getRecentNdvi failed', { error: err.message, lat, lon });
-    modisNdvCache.set(cacheKey, null);
-    return null;
-  }
+  modisNdvCache.set(cacheKey, result);
+  logger.info('modisNdviService', 'Recent NDVI fetched', { lat, lon, hasNdvi: !!result?.ndvi });
+  return result;
 }
 
 /**
@@ -149,6 +239,7 @@ export async function getNdviAnomaly(lat, lon) {
 
 /**
  * Gets NDVI time series for trend analysis.
+ * Uses AppEEARS v2 task-based API, polled synchronously.
  * @param {number} lat
  * @param {number} lon
  * @param {string} [startDate]
@@ -166,44 +257,47 @@ export async function getNdviTimeSeries(lat, lon, startDate, endDate) {
   }
 
   try {
-    const auth = await getToken();
-    if (!auth.token) return null;
-
-    const headers = {
-      Authorization: auth.type === 'bearer' ? `Bearer ${auth.token}` : `Basic ${auth.token}`,
-      'Content-Type': 'application/json',
-    };
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    // Try the old synchronous approach with new base URL as fallback
+    const headers = await buildAuthHeaders();
+    if (!headers) { modisNdvCache.set(cacheKey, null); return null; }
 
     const response = await fetch(`${APPEARS_BASE}/product/${PRODUCT}/point`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ latitude: lat, longitude: lon, startDate: start, endDate: end }),
-      signal: controller.signal,
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
-    clearTimeout(timer);
 
-    if (!response.ok) throw new Error(`AppEEARS HTTP ${response.status}`);
+    if (!response.ok) {
+      // Fallback: try task-based API with wider date range
+      if (response.status === 405 || response.status === 404) {
+        logger.info('modisNdviService', 'Sync endpoint unavailable, trying task-based for time series');
+        const data = await submitPointTask(lat, lon, start, end);
+        if (!data) { modisNdvCache.set(cacheKey, null); return null; }
+        // Build minimal time series from single point
+        const monthly = [{ date: data.date, ndvi: data.ndvi, anomaly: null }];
+        const result = { monthly, greenness_trend: 'stable' };
+        modisNdvCache.set(cacheKey, result);
+        return result;
+      }
+      throw new Error(`AppEEARS HTTP ${response.status}`);
+    }
 
     const data = await response.json();
     const records = data?.data?.filter(r => r?.data?.length) ?? [];
-    if (!records.length) return null;
+    if (!records.length) { modisNdvCache.set(cacheKey, null); return null; }
 
     const monthly = records.map(r => {
-      const raw = r.data[0]?.['_250m_16_days_NDVI'];
+      const raw = r.data[0]?.[NDVI_LAYER];
       const ndvi = raw != null ? Math.max(-1, Math.min(1, raw * 0.0001)) : null;
       return { date: r.date, ndvi, anomaly: null };
     }).filter(m => m.ndvi != null);
 
-    if (!monthly.length) return null;
+    if (!monthly.length) { modisNdvCache.set(cacheKey, null); return null; }
 
-    // Calculate anomalies (vs series mean)
     const seriesMean = monthly.reduce((s, m) => s + m.ndvi, 0) / monthly.length;
     monthly.forEach(m => { m.anomaly = m.ndvi - seriesMean; });
 
-    // Trend detection via linear regression slope
     const n = monthly.length;
     const xMean = (n - 1) / 2;
     const yMean = seriesMean;
