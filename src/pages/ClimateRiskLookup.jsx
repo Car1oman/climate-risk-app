@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState, useCallback, useMemo, lazy, Suspense } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -17,6 +16,9 @@ import ExecutiveSummaryCard     from "@/features/climate-lookup/components/Execu
 import RiskTimeline             from "@/features/climate-lookup/components/RiskTimeline";
 import RiskPeriodTabs           from "@/features/climate-lookup/components/RiskPeriodTabs";
 
+/** @typedef {import('@/domain/consolidatedRisk').ConsolidatedRisk} ConsolidatedRisk */
+/** @typedef {import('@/domain/consolidatedRisk').TemporalPeriod} TemporalPeriod */
+
 // Lazy-loaded heavy/deferred chunks — Vite splits these into separate bundles
 const MapView          = lazy(() => import("@/features/climate-lookup/components/MapView"));
 const AdaptationPanel  = lazy(() => import("@/features/climate-lookup/components/AdaptationPanel"));
@@ -24,6 +26,7 @@ const ScientificFooter = lazy(() => import("@/features/climate-lookup/components
 
 // ─── Empty states ──────────────────────────────────────────────────────────────
 
+/** @returns {import('react').JSX.Element} */
 function EmptyNoRisks() {
   return (
     <div className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 px-5 py-8 text-center space-y-2">
@@ -36,6 +39,7 @@ function EmptyNoRisks() {
   );
 }
 
+/** @returns {import('react').JSX.Element} */
 function EmptyInitial() {
   return (
     <div className="text-center py-12 space-y-2">
@@ -50,18 +54,30 @@ function EmptyInitial() {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+/**
+ * ClimateRiskLookup — Sprint 20.
+ * Análisis de Riesgo Climático con mapa, timeline, tab periodos y panel ejecutivo.
+ * @returns {import('react').JSX.Element}
+ */
 export default function ClimateRiskLookup() {
   // ── UI state only ─────────────────────────────────────────────────────────
+  /** @type {[string, import('react').Dispatch<import('react').SetStateAction<string>>]} */
   const [lat,            setLat]            = useState("");
+  /** @type {[string, import('react').Dispatch<import('react').SetStateAction<string>>]} */
   const [lng,            setLng]            = useState("");
+  /** @type {[string, import('react').Dispatch<import('react').SetStateAction<string>>]} */
   const [sector,         setSector]         = useState("retail");
+  /** @type {[string, import('react').Dispatch<import('react').SetStateAction<string>>]} */
   const [businessUnit,   setBusinessUnit]   = useState("none");
+  /** @type {[string, import('react').Dispatch<import('react').SetStateAction<string>>]} */
   const [tileLayer,      setTileLayer]      = useState("osm");
-  const [markerPos,      setMarkerPos]      = useState(null);
-  const [flyTarget,      setFlyTarget]      = useState(null);
-  // Shared temporal period — null until RiskPeriodTabs resolves first available from data
-  const [selectedPeriod,  setSelectedPeriod]  = useState(null);
-  // Shared emission scenario — drives RiskTimeline + RiskPeriodTabs + ExecutiveSummaryCard
+  /** @type {[[number, number] | null, import('react').Dispatch<import('react').SetStateAction<[number, number] | null>>]} */
+  const [markerPos,      setMarkerPos]      = useState(/** @type {[number, number] | null} */ (null));
+  /** @type {[{ pos: [number, number], zoom: number } | null, import('react').Dispatch<import('react').SetStateAction<{ pos: [number, number], zoom: number } | null>>]} */
+  const [flyTarget,      setFlyTarget]      = useState(/** @type {{ pos: [number, number], zoom: number } | null} */ (null));
+  /** @type {[TemporalPeriod | null, import('react').Dispatch<import('react').SetStateAction<TemporalPeriod | null>>]} */
+  const [selectedPeriod,  setSelectedPeriod]  = useState(/** @type {TemporalPeriod | null} */ (null));
+  /** @type {[string, import('react').Dispatch<import('react').SetStateAction<string>>]} */
   const [activeScenario,  setActiveScenario]  = useState("emisiones_moderadas");
 
   // ── All data / async logic lives in the hook ──────────────────────────────
@@ -82,9 +98,9 @@ export default function ClimateRiskLookup() {
   } = useClimateAnalysis(sector, businessUnit);
 
   // Auto-ajustar sector cuando se selecciona una unidad de negocio
+  /** @type {(value: string) => void} */
   const handleBusinessUnitChange = useCallback((value) => {
     setBusinessUnit(value);
-    // Si es "ninguna", mantener el sector actual
     if (value === "none") return;
     const found = BUSINESS_UNITS.find(bu => bu.id === value);
     if (found && found.sectorSugerido) {
@@ -93,6 +109,7 @@ export default function ClimateRiskLookup() {
   }, []);
 
   // ── Map event handlers ────────────────────────────────────────────────────
+  /** @type {(clickLat: number, clickLng: number) => void} */
   const handleMapClick = useCallback((clickLat, clickLng) => {
     setLat(String(clickLat));
     setLng(String(clickLng));
@@ -100,6 +117,7 @@ export default function ClimateRiskLookup() {
     reset();
   }, [reset]);
 
+  /** @type {(newLat: number, newLng: number) => void} */
   const handleLocationSelect = useCallback((newLat, newLng) => {
     if (!isFinite(newLat) || !isFinite(newLng)) return;
     setLat(String(newLat));
@@ -109,6 +127,7 @@ export default function ClimateRiskLookup() {
     reset();
   }, [reset]);
 
+  /** @type {() => Promise<void>} */
   const handleSearch = useCallback(async () => {
     const latNum = parseFloat(lat);
     const lngNum = parseFloat(lng);

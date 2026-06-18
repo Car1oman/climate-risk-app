@@ -1,29 +1,35 @@
-// @ts-nocheck
 import { useEffect, useMemo } from "react";
 import RiskPeriodSection from "./RiskPeriodSection";
 
+/** @typedef {import('@/domain/consolidatedRisk').ConsolidatedRisk} ConsolidatedRisk */
+/** @typedef {import('@/domain/consolidatedRisk').NarrativeReport} NarrativeReport */
+/** @typedef {import('@/domain/consolidatedRisk').TemporalPeriod} TemporalPeriod */
+
+/** @type {{ key: TemporalPeriod, label: string, period: string }[]} */
 const PERIOD_TABS = [
   { key: 'historico',     label: 'Histórico',      period: '1980–2014' },
-  { key: 'corto_plazo',   label: 'Corto plazo',    period: '2020–2039' },
+  { key: 'corto_plazo',   label: 'Cerca de 2030',  period: '2020–2039' },
   { key: 'mediano_plazo', label: 'Mediano plazo',   period: '2040–2059' },
   { key: 'largo_plazo',   label: 'Largo plazo',     period: '2060–2079' },
 ];
 
 /**
  * RiskPeriodTabs — Sprint 20.
- * Collapses histórico / mediano plazo / largo plazo into a single tabbed section.
+ * Collapses histórico / corto / mediano / largo plazo into a single tabbed section.
  * Eliminates ~60% of vertical scroll caused by three consecutive full-height sections.
  *
- * Props:
- * @param {ConsolidatedRisk[]} historicalRisks
- * @param {ConsolidatedRisk[]} midTermRisks
- * @param {ConsolidatedRisk[]} longTermRisks
- * @param {NarrativeReport}    narrativeReport
- * @param {object|null}        projections       - Layer9 projection context
- * @param {string}             selectedPeriod    - controlled from ClimateRiskLookup
- * @param {function}           onPeriodChange    - elevates tab selection to parent
- * @param {string}             activeScenario    - shared scenario state
- * @param {function}           onScenarioChange  - update shared scenario state
+ * @param {Object} props
+ * @param {ConsolidatedRisk[]}  props.historicalRisks
+ * @param {ConsolidatedRisk[]}  props.shortTermRisks
+ * @param {ConsolidatedRisk[]}  props.midTermRisks
+ * @param {ConsolidatedRisk[]}  props.longTermRisks
+ * @param {NarrativeReport | null | undefined} props.narrativeReport
+ * @param {Object|null}         props.projections       - Layer9 projection context
+ * @param {TemporalPeriod | null} props.selectedPeriod  - controlled from ClimateRiskLookup
+ * @param {(period: TemporalPeriod) => void} props.onPeriodChange - elevates tab selection
+ * @param {string}             props.activeScenario      - shared scenario state
+ * @param {(scenario: string) => void} props.onScenarioChange - update shared scenario
+ * @returns {import('react').JSX.Element | null}
  */
 export default function RiskPeriodTabs({
   historicalRisks,

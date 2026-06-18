@@ -26,7 +26,7 @@ import assert from 'node:assert/strict';
 // Mirrors the PERIOD_TABS constant in RiskPeriodTabs.jsx (must stay in sync)
 const PERIOD_TABS = [
   { key: 'historico',     label: 'Histórico',    period: '1980–2014' },
-  { key: 'corto_plazo',   label: 'Corto plazo',  period: '2020–2039' },
+  { key: 'corto_plazo',   label: 'Cerca de 2030', period: '2020–2039' },
   { key: 'mediano_plazo', label: 'Mediano plazo', period: '2040–2059' },
   { key: 'largo_plazo',   label: 'Largo plazo',   period: '2060–2079' },
 ];
@@ -59,9 +59,9 @@ describe('RiskPeriodTabs — corto_plazo tab (regression)', () => {
     );
   });
 
-  it('corto_plazo tab label is "Corto plazo"', () => {
+  it('corto_plazo tab label is "Cerca de 2030"', () => {
     const tab = PERIOD_TABS.find(t => t.key === 'corto_plazo');
-    assert.equal(tab?.label, 'Corto plazo');
+    assert.equal(tab?.label, 'Cerca de 2030');
   });
 
   it('available includes corto_plazo when shortTermRisks is non-empty', () => {

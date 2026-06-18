@@ -131,7 +131,7 @@ export const TEMPORAL_HORIZONS = [
   },
   {
     code: "short_term",
-    label: "Corto plazo",
+    label: "Cerca de 2030",
     period: "2020–2039",
     description:
       "Horizonte cercano para decisiones de inversion y operacion inmediata. Datos completos SSP2-4.5 y SSP5-8.5.",

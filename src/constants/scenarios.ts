@@ -67,7 +67,7 @@ export const TIME_WINDOWS_UI: Record<TemporalPeriod | string, TimeWindowDisplay>
     period: '1980–2014',
   },
   corto_plazo: {
-    label: 'Corto plazo',
+    label: 'Cerca de 2030',
     description: 'Proyección 2020–2039',
     period: '2020–2039',
   },
@@ -83,7 +83,7 @@ export const TIME_WINDOWS_UI: Record<TemporalPeriod | string, TimeWindowDisplay>
   },
   // API aliases
   historical:  { label: 'Histórico',     description: 'Período de referencia observada', period: '1980–2014' },
-  short_term:  { label: 'Corto plazo',   description: 'Proyección 2020–2039',             period: '2020–2039' },
+  short_term:  { label: 'Cerca de 2030',  description: 'Proyección 2020–2039',             period: '2020–2039' },
   mid_term:    { label: 'Mediano plazo', description: 'Próximos 15–35 años',             period: '2040–2059' },
   long_term:   { label: 'Largo plazo',   description: 'Próximos 35–55 años',            period: '2060–2080' },
 };

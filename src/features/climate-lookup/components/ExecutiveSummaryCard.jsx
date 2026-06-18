@@ -1,13 +1,19 @@
-// @ts-nocheck
 import { Building2, Calendar, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { RISK_TYPE_DISPLAY } from "@/constants/riskTypes";
 
+/** @typedef {import('@/domain/consolidatedRisk').ConsolidatedRisk} ConsolidatedRisk */
+/** @typedef {import('@/domain/consolidatedRisk').NarrativeReport} NarrativeReport */
+/** @typedef {import('@/domain/consolidatedRisk').TemporalPeriod} TemporalPeriod */
+/** @typedef {import('@/domain/consolidatedRisk').AdaptationSummary} AdaptationSummary */
+
+/** @type {{ alta: { label: string, dot: string, text: string }, media: { label: string, dot: string, text: string }, baja: { label: string, dot: string, text: string } }} */
 const CONFIDENCE_CONFIG = {
   alta:  { label: 'Alta confianza',  dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400' },
   media: { label: 'Confianza media', dot: 'bg-amber-500',   text: 'text-amber-600 dark:text-amber-400'    },
   baja:  { label: 'Baja confianza',  dot: 'bg-rose-500',    text: 'text-rose-600 dark:text-rose-400'       },
 };
 
+/** @type {Record<TemporalPeriod, string>} */
 const PERIOD_LABEL = {
   historico:     'Período histórico',
   corto_plazo:   'Proyección 2020–2039',
@@ -15,10 +21,15 @@ const PERIOD_LABEL = {
   largo_plazo:   'Proyección 2060–2079',
 };
 
+/** @type {Record<'alta'|'media'|'baja', number>} */
 const CONF_RANK = { alta: 3, media: 2, baja: 1 };
 
+/**
+ * @param {ConsolidatedRisk[]} risks
+ * @returns {AdaptationSummary | null}
+ */
 function getTopAction(risks) {
-  for (const eff of ['alta', 'media']) {
+  for (const eff of /** @type {const} */ (['alta', 'media'])) {
     for (const risk of risks ?? []) {
       const m = (risk.adaptationMeasures ?? []).find(a => a.effectiveness === eff);
       if (m) return m;
@@ -27,12 +38,17 @@ function getTopAction(risks) {
   return null;
 }
 
-// Scenario-aware impact collector: uses scenarioVariants when available
+/**
+ * Scenario-aware impact collector: uses scenarioVariants when available.
+ * @param {ConsolidatedRisk[]} risks
+ * @param {string | null | undefined} activeScenario
+ * @returns {string[]}
+ */
 export function getTopImpactsWithScenario(risks, activeScenario) {
   const seen = new Set();
   const result = [];
   for (const risk of risks ?? []) {
-    const variant = activeScenario && risk.scenarioVariants?.[activeScenario];
+    const variant = /** @type {Record<string, any>|undefined} */ (activeScenario && risk.scenarioVariants?.[activeScenario]);
     const impacts = variant?.impacts?.length ? variant.impacts : (risk.impacts ?? []);
     for (const impact of impacts) {
       if (!seen.has(impact) && result.length < 2) {
@@ -44,19 +60,29 @@ export function getTopImpactsWithScenario(risks, activeScenario) {
   return result;
 }
 
-// Period-filtered unique risks — returns [] when period is null/unset or has no data
+/**
+ * Period-filtered risks — returns [] when period is null/unset or has no data.
+ * @param {ConsolidatedRisk[] | null | undefined} consolidatedRisks
+ * @param {TemporalPeriod | null} selectedPeriod
+ * @returns {ConsolidatedRisk[]}
+ */
 export function getPeriodRisks(consolidatedRisks, selectedPeriod) {
   if (!consolidatedRisks?.length || selectedPeriod == null) return [];
   return consolidatedRisks.filter(r => r.period === selectedPeriod);
 }
 
-// Top confidence from a risk list, scenario-aware
+/**
+ * Top confidence from a risk list, scenario-aware.
+ * @param {ConsolidatedRisk[]} risks
+ * @param {string | null | undefined} activeScenario
+ * @returns {'alta' | 'media' | 'baja'}
+ */
 export function getPeriodConfidence(risks, activeScenario) {
   return risks.reduce((best, r) => {
-    const variant = activeScenario && r.scenarioVariants?.[activeScenario];
+    const variant = /** @type {Record<string, any>|undefined} */ (activeScenario && r.scenarioVariants?.[activeScenario]);
     const c = variant?.confidence ?? r.confidence ?? 'baja';
-    return CONF_RANK[c] > CONF_RANK[best] ? c : best;
-  }, 'baja');
+    return CONF_RANK[/** @type {'alta'|'media'|'baja'} */ (c)] > CONF_RANK[best] ? /** @type {'alta'|'media'|'baja'} */ (c) : best;
+  }, /** @type {'alta'|'media'|'baja'} */ ('baja'));
 }
 
 /**
@@ -68,6 +94,13 @@ export function getPeriodConfidence(risks, activeScenario) {
  *   2. ¿Qué podría pasar?             → narrativa del período + impactos scenario-aware
  *   3. ¿Qué tan confiable es?         → badge de confianza del período/escenario
  *   4. ¿Qué hacer?                    → acción prioritaria del período
+ *
+ * @param {Object} props
+ * @param {NarrativeReport | null | undefined} props.narrativeReport
+ * @param {ConsolidatedRisk[]} props.consolidatedRisks
+ * @param {TemporalPeriod | null} props.selectedPeriod
+ * @param {string} [props.activeScenario='emisiones_moderadas']
+ * @returns {import('react').JSX.Element | null}
  */
 export default function ExecutiveSummaryCard({
   narrativeReport,
