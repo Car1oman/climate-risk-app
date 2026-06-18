@@ -30,6 +30,7 @@ import { getAdaptations, enrichAdaptationsWithAI } from '../layers/Layer5_Adapta
 import { generateNarrative, enhanceNarrativeWithAI } from '../layers/Layer6_NarrativeEngine.js';
 import { buildProjectionContext } from '../scientific/projection.js';
 import { runProjectionEngine } from '../layers/Layer9_ProjectionEngine.js';
+import { buildEnsembleSpread } from '../services/cmip6EnsembleService.js';
 import { listBusinessUnits, getBusinessProfile } from '../layers/businessProfiles.js';
 
 const router = express.Router();
@@ -837,6 +838,13 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
     let projectionOutput;
     try {
       const ipccProjections = buildProjectionContext(signalOutput);
+      // Enrich with multi-model ensemble spread from Open-Meteo Climate API
+      const ensembleResult = await buildEnsembleSpread(latNum, lonNum).catch(() => null);
+      if (ensembleResult?.available) {
+        ipccProjections.uncertainty.spread = ensembleResult.spread;
+        ipccProjections.uncertainty.ensemble_models_used = ensembleResult.models_used;
+        ipccProjections.uncertainty.ensemble_source = ensembleResult.source;
+      }
       const obsProjections  = runProjectionEngine(fusedData, fusedData.scenario);
       projectionOutput = {
         ...ipccProjections,
