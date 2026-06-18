@@ -1,4 +1,6 @@
 const WB_BASE = 'https://api.worldbank.org/v2/country/PE/indicator';
+const WB_FETCH_TIMEOUT_MS = 5_000;  // reducido de 15s — World Bank es rápido en condiciones normales
+const WB_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 h — indicadores macro cambian mensualmente
 
 const INDICATORS = {
   poverty:          'SI.POV.NAHC',
@@ -8,6 +10,9 @@ const INDICATORS = {
   gdp_per_capita:   'NY.GDP.PCAP.CD',
   slums:            'EN.POP.SLUM.UR.ZS',
 };
+
+let _wbCache = null;
+let _wbCacheTs = 0;
 
 async function fetchWithTimeout(url, timeoutMs) {
   const controller = new AbortController();
@@ -21,7 +26,7 @@ async function fetchWithTimeout(url, timeoutMs) {
 
 async function fetchIndicator(code) {
   try {
-    const res = await fetchWithTimeout(`${WB_BASE}/${code}?format=json&per_page=10`, 15000);
+    const res = await fetchWithTimeout(`${WB_BASE}/${code}?format=json&per_page=10`, WB_FETCH_TIMEOUT_MS);
     if (!res.ok) return null;
     const data = await res.json();
     if (!Array.isArray(data) || data.length < 2) return null;
@@ -99,9 +104,11 @@ function buildContextMessages(wb) {
 }
 
 export async function getTerritorialContext() {
+  if (_wbCache && Date.now() - _wbCacheTs < WB_CACHE_TTL_MS) {
+    return _wbCache;
+  }
   const wb = await getWorldBankData();
-  return {
-    indicators: wb,
-    narrative:  buildContextMessages(wb),
-  };
+  _wbCache = { indicators: wb, narrative: buildContextMessages(wb) };
+  _wbCacheTs = Date.now();
+  return _wbCache;
 }

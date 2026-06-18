@@ -687,6 +687,9 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
   const partialResult = {};
   const errors = {};
 
+  // Lanzar ensemble fetch en paralelo con Layer 1 — solo necesita lat/lon
+  const ensemblePromise = buildEnsembleSpread(latNum, lonNum).catch(() => null);
+
   try {
     // ── Capa 1: Fusión de datos climáticos ──────────────────────────────────
     let fusedData;
@@ -783,36 +786,26 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
     };
     partialResult.contextual_interpretation = 'ok';
 
-    // ── Capa 5: Adaptaciones ────────────────────────────────────────────────
-    let adaptationOutput;
+    // ── Capa 5: Adaptaciones (base síncrono) ───────────────────────────────
+    let baseAdaptations;
     try {
-      adaptationOutput = getAdaptations(contextualRisks, sector);
+      baseAdaptations = getAdaptations(contextualRisks, sector);
       partialResult.layer5 = 'ok';
     } catch (err) {
       console.error('[v2] Layer5 falló:', err.message);
       errors.layer5 = err.message;
-      adaptationOutput = { adaptations: [] };
+      baseAdaptations = { adaptations: [] };
     }
 
-    // ── Capa 5 enriquecimiento IA (opcional, no bloqueante) ─────────────────
-    if (process.env.ANTHROPIC_API_KEY && docContext?.ai_context && signalOutput.signals?.length > 0) {
-      try {
-        adaptationOutput = await enrichAdaptationsWithAI(adaptationOutput, signalOutput, sector, docContext);
-        partialResult.layer5_ai = 'ok';
-      } catch (err) {
-        console.warn('[v2] Layer5 AI enrichment failed, usando catálogo base:', err.message);
-      }
-    }
-
-    // ── Capa 6: Narrativa ───────────────────────────────────────────────────
-    let narrativeOutput;
+    // ── Capa 6: Narrativa base (síncrona, usa adaptaciones base) ───────────
+    let baseNarrative;
     try {
-      narrativeOutput = generateNarrative({
+      baseNarrative = generateNarrative({
         fusedData,
         signalOutput,
         businessRiskOutput,
         contextualRisks,
-        adaptationOutput,
+        adaptationOutput: baseAdaptations,
         sector,
         lat: latNum,
         lon: lonNum,
@@ -821,25 +814,39 @@ router.post('/v2/climate-risk-analysis', requireAuth, async (req, res) => {
     } catch (err) {
       console.error('[v2] Layer6 falló:', err.message);
       errors.layer6 = err.message;
-      narrativeOutput = { executive_summary: 'No disponible', key_metrics: {}, generated_from: {} };
+      baseNarrative = { executive_summary: 'No disponible', key_metrics: {}, generated_from: {} };
     }
 
-    // ── Capa 6 enriquecimiento IA (opcional, no bloqueante) ─────────────────
-    if (process.env.ANTHROPIC_API_KEY && signalOutput.signals?.length > 0) {
-      try {
-        narrativeOutput = await enhanceNarrativeWithAI(narrativeOutput, signalOutput, businessRiskOutput, sector, docContext);
-        partialResult.layer6_ai = 'ok';
-      } catch (err) {
-        console.warn('[v2] Layer6 AI enhancement failed, usando narrativa algorítmica:', err.message);
-      }
-    }
+    // ── Capas 5+6 enriquecimiento IA en paralelo (opcionales, no bloqueantes)
+    const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
+    const hasSignals      = signalOutput.signals?.length > 0;
+    const hasAiDocs       = !!(docContext?.ai_context && hasSignals);
+
+    const [adaptationOutput, narrativeOutput] = await Promise.all([
+      hasAnthropicKey && hasAiDocs
+        ? enrichAdaptationsWithAI(baseAdaptations, signalOutput, sector, docContext)
+            .then(r  => { partialResult.layer5_ai = 'ok'; return r; })
+            .catch(err => {
+              console.warn('[v2] Layer5 AI enrichment failed, usando catálogo base:', err.message);
+              return baseAdaptations;
+            })
+        : Promise.resolve(baseAdaptations),
+      hasAnthropicKey && hasSignals
+        ? enhanceNarrativeWithAI(baseNarrative, signalOutput, businessRiskOutput, sector, docContext)
+            .then(r  => { partialResult.layer6_ai = 'ok'; return r; })
+            .catch(err => {
+              console.warn('[v2] Layer6 AI enhancement failed, usando narrativa algorítmica:', err.message);
+              return baseNarrative;
+            })
+        : Promise.resolve(baseNarrative),
+    ]);
 
     // ── Capa 9: Escenarios de proyección (IPCC + Observacional) ──────────
     let projectionOutput;
     try {
       const ipccProjections = buildProjectionContext(signalOutput);
-      // Enrich with multi-model ensemble spread from Open-Meteo Climate API
-      const ensembleResult = await buildEnsembleSpread(latNum, lonNum).catch(() => null);
+      // Reuse the ensemble fetch started in parallel with Layer 1
+      const ensembleResult = await ensemblePromise;
       if (ensembleResult?.available) {
         ipccProjections.uncertainty.spread = ensembleResult.spread;
         ipccProjections.uncertainty.ensemble_models_used = ensembleResult.models_used;

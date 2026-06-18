@@ -16,6 +16,7 @@
  */
 
 import { logger } from '../utils/logger.js';
+import * as openMeteoCache from './openMeteoCache.js';
 
 const CLIMATE_API = 'https://climate-api.open-meteo.com/v1/climate';
 const FETCH_TIMEOUT_MS = 60_000;
@@ -62,8 +63,6 @@ async function fetchModelData(lat, lon) {
 
 
   for (const [batchIdx, batch] of modelBatches.entries()) {
-    // Delay between batches to avoid rate limiting
-    if (batchIdx > 0) await new Promise(r => setTimeout(r, 2000));
     const modelsStr = batch.join(',');
 
     const fetchBatch = async (variables, retries = 2) => {
@@ -168,12 +167,35 @@ function percentile(sorted, p) {
 }
 
 /**
- * Computes population standard deviation.
+ * Computes mean and population stddev in a single O(n) pass (Welford's algorithm).
  */
-function stddev(values) {
-  if (!values.length) return 0;
-  const m = mean(values);
-  return Math.sqrt(values.reduce((s, v) => s + (v - m) ** 2, 0) / values.length);
+function meanAndStddev(values) {
+  if (!values.length) return { mean: 0, stddev: 0 };
+  let m = 0, M2 = 0;
+  for (let i = 0; i < values.length; i++) {
+    const delta = values[i] - m;
+    m += delta / (i + 1);
+    M2 += delta * (values[i] - m);
+  }
+  return { mean: m, stddev: values.length > 1 ? Math.sqrt(M2 / values.length) : 0 };
+}
+
+/**
+ * Binary search on a sorted date-string array. O(log n) vs O(n) findIndex.
+ * mode 'gte': first index where times[i] >= target
+ * mode 'gt':  first index where times[i] >  target
+ */
+function binarySearchDate(times, target, mode) {
+  let lo = 0, hi = times.length - 1, result = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (mode === 'gte' ? times[mid] >= target : times[mid] > target) {
+      result = mid; hi = mid - 1;
+    } else {
+      lo = mid + 1;
+    }
+  }
+  return result;
 }
 
 /**
@@ -187,15 +209,15 @@ function computeWindowEnsemble(data, windowKey) {
   if (!win || !data?.tempData?.daily?.time) return null;
 
   const times = data.tempData.daily.time;
-  // Find indices for this window
-  const startIdx = times.findIndex(t => t >= win.start);
-  const endIdx = times.findIndex(t => t > win.end);
+  // Binary search on sorted date array — O(log n) vs O(n) findIndex
+  const startIdx = binarySearchDate(times, win.start, 'gte');
+  const endIdx   = binarySearchDate(times, win.end,   'gt');
   const range = startIdx >= 0 && endIdx > startIdx ? { startIdx, endIdx } : null;
   if (!range) return null;
 
   // Compute baseline (1981-2014) mean for temperature
-  const blStart = times.findIndex(t => t >= win.baseline_start);
-  const blEnd = times.findIndex(t => t > win.baseline_end);
+  const blStart = binarySearchDate(times, win.baseline_start, 'gte');
+  const blEnd   = binarySearchDate(times, win.baseline_end,   'gt');
 
   const modelValues = [];
 
@@ -270,15 +292,16 @@ function computeWindowEnsemble(data, windowKey) {
   const agreementPrecip = Math.max(dryingModels, modelValues.length - dryingModels) / modelValues.length * 100;
 
   const round2 = v => Math.round(v * 100) / 100;
+  const { mean: ensembleMean, stddev: ensembleStd } = meanAndStddev(tempAnomalies);
 
   return {
     models: modelValues,
     n_models: modelValues.length,
     // Flat summary fields (Fase 5.2 spec: ensemble_mean/min/max/std/models)
-    ensemble_mean: round2(mean(tempAnomalies)),
+    ensemble_mean: round2(ensembleMean),
     ensemble_min:  round2(tempAnomalies[0]),
     ensemble_max:  round2(tempAnomalies[tempAnomalies.length - 1]),
-    ensemble_std:  round2(stddev(tempAnomalies)),
+    ensemble_std:  round2(ensembleStd),
     model_names:   modelValues.map(m => m.model),
     ensemble: {
       temperature: {
@@ -313,6 +336,12 @@ function computeWindowEnsemble(data, windowKey) {
  * @returns {Promise<Object>} { spread: { near_term, mid_term }, source, available }
  */
 export async function buildEnsembleSpread(lat, lon) {
+  const cached = openMeteoCache.get(lat, lon);
+  if (cached) {
+    logger.info('cmip6EnsembleService', 'Cache hit', { lat, lon });
+    return cached;
+  }
+
   try {
     const data = await fetchModelData(lat, lon);
     if (!data) {
@@ -328,7 +357,7 @@ export async function buildEnsembleSpread(lat, lon) {
       midTermModels: midTerm?.n_models ?? 0,
     });
 
-    return {
+    const result = {
       available: true,
       source: 'open_meteo_climate_api',
       models_used: MODELS,
@@ -337,6 +366,8 @@ export async function buildEnsembleSpread(lat, lon) {
         mid_term: midTerm,
       },
     };
+    openMeteoCache.set(lat, lon, result);
+    return result;
   } catch (err) {
     logger.warn('cmip6EnsembleService', 'Failed to compute ensemble spread', {
       error: err.message,

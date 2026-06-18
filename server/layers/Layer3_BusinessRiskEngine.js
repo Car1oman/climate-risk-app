@@ -408,8 +408,7 @@ export async function assessBusinessRisk(signalOutput, { sector, asset_type = nu
                || docContext?.by_category?.riesgo?.length > 0
                || (docContext?.mode === 'semantic' && docContext?.chunks?.length > 0);
 
-  const risks = [];
-  for (const signal of signals) {
+  const risks = await Promise.all(signals.map(async signal => {
     let impacts;
     let provenanceLabel = 'Catálogo interno de referencia';
     let ai_used = false;
@@ -437,7 +436,6 @@ export async function assessBusinessRisk(signalOutput, { sector, asset_type = nu
       ?? FINANCIAL_RANGES[signal.signalType]?.otros
       ?? { min_usd: 0, max_usd: 0 };
 
-    // Escalar rango financiero según cantidad de locales del negocio
     if (profile?.locales_count) {
       financialRange = scaleFinancialRange(financialRange, profile.locales_count);
     }
@@ -449,9 +447,9 @@ export async function assessBusinessRisk(signalOutput, { sector, asset_type = nu
       if (ensemble) {
         const avgImpact = (financialRange.min_usd + financialRange.max_usd) / 2;
         aalResult = computeAAL(ensemble, v => (v / 50) * avgImpact);
-      if (aalResult) {
-        aalResult.warning = 'Inputs are synthetic (100 values from p10/p50/p90). AAL is approximate.';
-      }
+        if (aalResult) {
+          aalResult.warning = 'Inputs are synthetic (100 values from p10/p50/p90). AAL is approximate.';
+        }
       }
     } catch (err) {
       if (process.env.NODE_ENV === 'development') {
@@ -459,21 +457,21 @@ export async function assessBusinessRisk(signalOutput, { sector, asset_type = nu
       }
     }
 
-    risks.push({
+    return {
       signal,
       source_traceability:    signal.source_traceability ?? null,
       operational_impacts:    impacts,
       exposure_level:         calcExposureLevel([signal]),
       sensitivity_level:      calcSensitivityLevel(sectorKey, asset_type, profile),
       financial_impact_range: financialRange,
-      probabilistic_risk:     aalResult, // 002-downscaling-aal
+      probabilistic_risk:     aalResult,
       provenance:             provenanceLabel,
       ai_used,
       ...(ai_fallback_reason && { ai_fallback_reason }),
       ...(profile && { business_unit: profile.id }),
       ...(profile && { business_taxonomia: profile.taxonomia_operativa }),
-    });
-  }
+    };
+  }));
 
   // Síntesis de riesgo compuesto cuando hay 2+ señales co-ocurrentes
   if (signals.length >= 2) {

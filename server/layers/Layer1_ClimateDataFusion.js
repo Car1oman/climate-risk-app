@@ -75,40 +75,35 @@ function extractVarValue(periodData, varName) {
 }
 
 /**
- * Normaliza un período JSONB de climate_cells extrayendo solo las variables de interés.
- * @returns {Object} { txx, tnn, hd35, hd40, rx1day, rx5day, cdd, cwd, pr, tas }
+ * Normaliza un período JSONB en una sola pasada sobre CLIMATE_VARS.
+ * Retorna { values, stats } donde values = { varName: median } y
+ * stats = { varName: { median, p10, p90 } }.
  */
-function normalizePeriod(periodData) {
-  if (!periodData || typeof periodData !== 'object') return null;
-  const result = {};
+function normalizePeriodFull(periodData) {
+  if (!periodData || typeof periodData !== 'object') return { values: null, stats: null };
+  const values = {};
+  const stats  = {};
   for (const v of CLIMATE_VARS) {
-    result[v] = extractVarValue(periodData, v);
-  }
-  return result;
-}
-
-/**
- * Normaliza un período JSONB extrayendo {median, p10, p90} por variable.
- * Usado para transmitir el spread del ensamble CMIP6 a la capa de incertidumbre.
- * @returns {Object} { varName: {median, p10, p90} }
- */
-function normalizePeriodStats(periodData) {
-  if (!periodData || typeof periodData !== 'object') return null;
-  const result = {};
-  for (const v of CLIMATE_VARS) {
-    const entry = periodData?.[v];
-    if (entry == null) continue;
-    if (typeof entry === 'object') {
-      result[v] = {
-        median: entry.median ?? null,
-        p10:    entry.p10   ?? null,
-        p90:    entry.p90   ?? null,
-      };
-    } else if (typeof entry === 'number') {
-      result[v] = { median: entry, p10: null, p90: null };
+    const entry = periodData[v];
+    if (entry == null) {
+      values[v] = null;
+    } else if (typeof entry === 'object') {
+      values[v] = entry.median ?? null;
+      stats[v]  = { median: entry.median ?? null, p10: entry.p10 ?? null, p90: entry.p90 ?? null };
+    } else {
+      values[v] = entry;
+      stats[v]  = { median: entry, p10: null, p90: null };
     }
   }
-  return result;
+  return { values, stats };
+}
+
+function normalizePeriod(periodData) {
+  return normalizePeriodFull(periodData).values;
+}
+
+function normalizePeriodStats(periodData) {
+  return normalizePeriodFull(periodData).stats;
 }
 
 /**
@@ -148,8 +143,9 @@ async function fetchClimateCell(lat, lon, scenario) {
 
     for (const [rawKey, mappedKey] of Object.entries(horizonMap)) {
       if (raw[rawKey]) {
-        climateData[mappedKey]      = normalizePeriod(raw[rawKey]);
-        climateDataStats[mappedKey] = normalizePeriodStats(raw[rawKey]);
+        const { values, stats } = normalizePeriodFull(raw[rawKey]);
+        climateData[mappedKey]      = values;
+        climateDataStats[mappedKey] = stats;
       }
     }
 
