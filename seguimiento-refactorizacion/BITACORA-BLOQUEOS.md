@@ -15,7 +15,7 @@
 
 | ID | Tarea afectada | Descripción | Acción tomada | Fecha resolución |
 |---|---|---|---|---|
-| — | — | — | — | — |
+| B-001 | Fase 5.1 — AppEEARS cloud API v2 | POST /task retorna 403 incluso con Basic Auth y después de autorización del usuario. GET /product funciona (200). | Se abandona AppEEARS. Se reemplaza con ORNL DAAC MODIS Subset REST API (GET público, sin auth, retorna JSON directamente). Eliminada dependencia de earthdataAuth.js. | 2026-06-18 |
 
 ---
 
