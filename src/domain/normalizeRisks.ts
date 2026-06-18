@@ -65,6 +65,12 @@ export const SIGNAL_TO_CONSOLIDATED: Record<string, RiskTypeSlug> = {
   landslide:    'deslizamiento',
   drought_gri:  'sequia',
 
+  // ── Fase 3.1–3.3 composite risk metrics ─────────────────────────────────
+  exposure:             'exposicion',
+  vulnerability:        'vulnerabilidad',
+  calibrated_risk:      'riesgo_calibrado',
+  adaptive_capacity:    'capacidad_adaptativa',
+
   // ── Variants seen in staging responses ─────────────────────────────────
   lluvia_extrema:  'lluvias_extremas',
   calor_extremo:   'calor_extremo',

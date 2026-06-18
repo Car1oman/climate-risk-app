@@ -170,6 +170,9 @@ export async function getRecentPowerData(lat, lon, parameters, community = 'RE')
       };
     }
 
+    // Alias T2MDEW as dew_point for downstream consumers (Fase 1.2)
+    result.dew_point = result.T2MDEW ?? null;
+
     nasaPowerCache.set(cacheKey, result);
     logger.info('nasaPowerService', 'Recent data fetched', { lat, lon, paramsCount: parameters.length });
     return result;
@@ -382,11 +385,32 @@ export function buildPowerNarrative(powerData) {
 }
 
 /**
+ * Transposes the per-parameter daily arrays from getRecentPowerData() into a single
+ * cross-parameter time series: [{date, t2m, t2mdew, rh2m, ps, allsky_sw_dwn}].
+ * Returns an empty array when recentData is null or has no daily entries.
+ * @param {Object|null} recentData - Output of getRecentPowerData()
+ * @returns {Array<{date:string,t2m:number|null,t2mdew:number|null,rh2m:number|null,ps:number|null,allsky_sw_dwn:number|null}>}
+ */
+export function getDailyTimeseries(recentData) {
+  if (!recentData) return [];
+  const ref = recentData.T2M?.daily ?? recentData.dew_point?.daily ?? null;
+  if (!ref) return [];
+  return ref.map(({ date }) => ({
+    date,
+    t2m:          recentData.T2M?.daily?.find(d => d.date === date)?.value ?? null,
+    t2mdew:       recentData.T2MDEW?.daily?.find(d => d.date === date)?.value ?? null,
+    rh2m:         recentData.RH2M?.daily?.find(d => d.date === date)?.value ?? null,
+    ps:           recentData.PS?.daily?.find(d => d.date === date)?.value ?? null,
+    allsky_sw_dwn: recentData.ALLSKY_SFC_SW_DWN?.daily?.find(d => d.date === date)?.value ?? null,
+  }));
+}
+
+/**
  * Consolidated wrapper for Layer1 integration.
  * Fetches recent POWER data + climatology and returns a single structured result.
  * @param {number} lat
  * @param {number} lon
- * @returns {Promise<Object|null>} { recent, climatology } or null on failure
+ * @returns {Promise<Object|null>} { recent, climatology, daily_series } or null on failure
  */
 export async function getNasaPowerData(lat, lon) {
   const parameters = ['T2M', 'T2M_MAX', 'T2M_MIN', 'T2MDEW', 'PRECTOT', 'WS2M', 'RH2M', 'ALLSKY_SFC_SW_DWN'];
@@ -402,7 +426,7 @@ export async function getNasaPowerData(lat, lon) {
       return null;
     }
     logger.info('nasaPowerService', 'Consolidated data retrieved', { lat, lon, hasRecent: !!recentVal, hasClimatology: !!climaVal });
-    return { recent: recentVal, climatology: climaVal };
+    return { recent: recentVal, climatology: climaVal, daily_series: getDailyTimeseries(recentVal) };
   } catch (err) {
     logger.error('nasaPowerService', 'getNasaPowerData unexpected error', { error: err.message, lat, lon });
     return null;

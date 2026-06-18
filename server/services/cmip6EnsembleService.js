@@ -168,6 +168,15 @@ function percentile(sorted, p) {
 }
 
 /**
+ * Computes population standard deviation.
+ */
+function stddev(values) {
+  if (!values.length) return 0;
+  const m = mean(values);
+  return Math.sqrt(values.reduce((s, v) => s + (v - m) ** 2, 0) / values.length);
+}
+
+/**
  * Computes ensemble statistics and per-model breakdown for a given time window.
  * @param {Object} data - Merged temperature + precipitation data
  * @param {string} windowKey - 'near_term' or 'mid_term'
@@ -260,28 +269,36 @@ function computeWindowEnsemble(data, windowKey) {
   const dryingModels = modelValues.filter(m => m.precipitation_change_pct < 0).length;
   const agreementPrecip = Math.max(dryingModels, modelValues.length - dryingModels) / modelValues.length * 100;
 
+  const round2 = v => Math.round(v * 100) / 100;
+
   return {
     models: modelValues,
     n_models: modelValues.length,
+    // Flat summary fields (Fase 5.2 spec: ensemble_mean/min/max/std/models)
+    ensemble_mean: round2(mean(tempAnomalies)),
+    ensemble_min:  round2(tempAnomalies[0]),
+    ensemble_max:  round2(tempAnomalies[tempAnomalies.length - 1]),
+    ensemble_std:  round2(stddev(tempAnomalies)),
+    model_names:   modelValues.map(m => m.model),
     ensemble: {
       temperature: {
-        median: percentile(tempAnomalies, 50),
-        p10: percentile(tempAnomalies, 10),
-        p90: percentile(tempAnomalies, 90),
-        agreement_pct: agreementTemp,
-        range: { min: tempAnomalies[0], max: tempAnomalies[tempAnomalies.length - 1] },
+        median: round2(percentile(tempAnomalies, 50)),
+        p10:    round2(percentile(tempAnomalies, 10)),
+        p90:    round2(percentile(tempAnomalies, 90)),
+        agreement_pct: round2(agreementTemp),
+        range: { min: round2(tempAnomalies[0]), max: round2(tempAnomalies[tempAnomalies.length - 1]) },
       },
       precipitation: {
-        median: percentile(precipChanges, 50),
-        p10: percentile(precipChanges, 10),
-        p90: percentile(precipChanges, 90),
-        agreement_pct: agreementPrecip,
-        range: { min: precipChanges[0], max: precipChanges[precipChanges.length - 1] },
+        median: round2(percentile(precipChanges, 50)),
+        p10:    round2(percentile(precipChanges, 10)),
+        p90:    round2(percentile(precipChanges, 90)),
+        agreement_pct: round2(agreementPrecip),
+        range: { min: round2(precipChanges[0] ?? 0), max: round2(precipChanges[precipChanges.length - 1] ?? 0) },
       },
       hd35_proxy: hd35Counts.length > 0 ? {
-        median: percentile(hd35Counts, 50),
-        p10: percentile(hd35Counts, 10),
-        p90: percentile(hd35Counts, 90),
+        median: round2(percentile(hd35Counts, 50)),
+        p10:    round2(percentile(hd35Counts, 10)),
+        p90:    round2(percentile(hd35Counts, 90)),
       } : null,
     },
   };

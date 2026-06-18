@@ -85,6 +85,46 @@ export const RISK_TYPE_DISPLAY: Record<RiskTypeSlug, RiskTypeDisplay> = {
     briefNarrative:
       'Desborde de cuerpos de agua que puede afectar instalaciones, accesos y operaciones.',
   },
+  exposicion: {
+    label: 'Exposición multi-amenaza',
+    shortLabel: 'Exposición',
+    icon: '🎯',
+    bgColor: 'bg-purple-50 dark:bg-purple-900/20',
+    textColor: 'text-purple-700 dark:text-purple-300',
+    borderColor: 'border-purple-200 dark:border-purple-700',
+    briefNarrative:
+      'Grado en que activos e infraestructura están expuestos a múltiples amenazas climáticas simultáneas.',
+  },
+  vulnerabilidad: {
+    label: 'Vulnerabilidad GRI',
+    shortLabel: 'Vulnerab.',
+    icon: '🛡️',
+    bgColor: 'bg-rose-50 dark:bg-rose-900/20',
+    textColor: 'text-rose-700 dark:text-rose-300',
+    borderColor: 'border-rose-200 dark:border-rose-700',
+    briefNarrative:
+      'Susceptibilidad de sistemas y comunidades a sufrir daños ante el impacto de amenazas climáticas.',
+  },
+  riesgo_calibrado: {
+    label: 'Riesgo calibrado (P×I/CA)',
+    shortLabel: 'R. Calibrado',
+    icon: '📊',
+    bgColor: 'bg-indigo-50 dark:bg-indigo-900/20',
+    textColor: 'text-indigo-700 dark:text-indigo-300',
+    borderColor: 'border-indigo-200 dark:border-indigo-700',
+    briefNarrative:
+      'Índice integrado de riesgo según probabilidad, impacto y capacidad de adaptación (Manual Intercorp).',
+  },
+  capacidad_adaptativa: {
+    label: 'Capacidad adaptativa',
+    shortLabel: 'Cap. Adapt.',
+    icon: '📶',
+    bgColor: 'bg-emerald-50 dark:bg-emerald-900/20',
+    textColor: 'text-emerald-700 dark:text-emerald-300',
+    borderColor: 'border-emerald-200 dark:border-emerald-700',
+    briefNarrative:
+      'Capacidad estructural del territorio para absorber, responder y recuperarse de impactos climáticos.',
+  },
 };
 
 // ─── Technical metric → human label ──────────────────────────────────────────

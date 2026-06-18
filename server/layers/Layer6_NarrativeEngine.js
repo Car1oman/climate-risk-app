@@ -366,8 +366,9 @@ export function generateNarrative({
   const graceSentence    = buildGraceFoNarrative(fusedData?.graceFoData?.anomaly);
 
   // Fase 2-3: Narrative enrichment for composite signals
-  const heatStressSentence = heatStress?.wbgt != null
-    ? `El índice de estrés térmico WBGT de ${heatStress.wbgt.toFixed(1)}°C (${heatStress.aqi_label ?? 'N/A'} AQI) integra temperatura, humedad, radiación y calidad del aire — relevante para protocolos de seguridad laboral en olas de calor (ISO 7243, Anexo 10.2).`
+  const wbgtVal = heatStress?.wbgt?.wbgt ?? null;
+  const heatStressSentence = wbgtVal != null
+    ? `El índice de estrés térmico WBGT de ${wbgtVal.toFixed(1)}°C (${heatStress.aqi?.dominantPollutant ?? 'N/A'} AQI) integra temperatura, humedad y calidad del aire — relevante para protocolos de seguridad laboral en olas de calor (ISO 7243, Anexo 10.2).`
     : null;
   const droughtSentence = droughtIdx?.compositeIndex != null
     ? `El índice compuesto de sequía de ${(droughtIdx.compositeIndex * 100).toFixed(0)}% (${droughtIdx.classification}) integra CDD, GRACE TWSA, humedad del suelo y delta de precipitación — crítica para monitorear estrés hídrico en la costa sur y sierra peruana.`
@@ -416,8 +417,8 @@ export function generateNarrative({
     power_wind_ms:          powerData?.WS2M?.value         ?? null,
     power_radiation:        powerData?.ALLSKY_SFC_SW_DWN?.value ?? null,
     // Fase 2-3: Nuevos índices compuestos
-    heat_stress_wbgt:       heatStress?.wbgt               ?? null,
-    heat_stress_aqi:        heatStress?.aqi_label          ?? null,
+    heat_stress_wbgt:       heatStress?.wbgt?.wbgt         ?? null,
+    heat_stress_aqi:        heatStress?.aqi?.dominantPollutant ?? null,
     drought_composite:      droughtIdx?.compositeIndex     ?? null,
     drought_classification: droughtIdx?.classification     ?? null,
     enso_conditional_phase: ensoRisk?.currentPhase         ?? null,

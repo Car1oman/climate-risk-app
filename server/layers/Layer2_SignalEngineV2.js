@@ -867,10 +867,154 @@ export function detectSignalsV2(fusedData) {
     }));
   }
 
-  // Señal dominante: considerar todas las señales excepto terrain/ENSO puras
-  const scorable = signals.filter(s =>
-    !['landslide_risk', 'huayco_risk'].includes(s.signalType)
-  );
+  // ── Fase 2.1: HEAT STRESS (WBGT + AQI) ──────────────────────────────────
+  const heatStress = fusedData?.heatStressIndex ?? null;
+  if (heatStress?.wbgt?.wbgt != null) {
+    const wbgtVal = heatStress.wbgt.wbgt;
+    const threshold = wbgtVal >= 32 ? 'extremo'
+      : wbgtVal >= 28 ? 'alto'
+      : wbgtVal >= 26 ? 'moderado'
+      : 'bajo';
+    signals.push(buildSignal({
+      signalType: 'heat_stress',
+      indicator: 'wbgt',
+      historical: null,
+      projected: wbgtVal,
+      delta: null,
+      delta_pct: null,
+      conf: 'medium',
+      horizon: 'short_term',
+      threshold_reference: `ISO 7243 / Stull (2011) — WBGT: ${wbgtVal.toFixed(1)}°C (${threshold}). Umbral moderado: >26°C, alto: >28°C, extremo: >32°C.`,
+      exceeds_threshold: wbgtVal >= 26,
+      ensoAmplified: false,
+      region,
+    }));
+  }
+
+  // ── Fase 2.2: DROUGHT COMPOSITE ─────────────────────────────────────────
+  const droughtComposite = fusedData?.droughtIndex ?? null;
+  if (droughtComposite?.compositeIndex != null) {
+    signals.push(buildSignal({
+      signalType: 'drought_composite',
+      indicator: 'drought_index',
+      historical: null,
+      projected: droughtComposite.compositeIndex,
+      delta: null,
+      delta_pct: null,
+      conf: droughtComposite.components?.cdd != null ? 'high' : 'medium',
+      horizon: 'short_term',
+      threshold_reference: `Índice compuesto multi-señal (CDD+TWSA+soil_moisture+delta_precip+ENSO). Score: ${(droughtComposite.compositeIndex * 100).toFixed(0)}% — ${droughtComposite.classification}.`,
+      exceeds_threshold: droughtComposite.compositeIndex >= 0.3,
+      ensoAmplified: false,
+      region,
+    }));
+  }
+
+  // ── Fase 2.3: CONDITIONAL ENSO RISK ─────────────────────────────────────
+  const ensoRisk = fusedData?.conditionalEnsoRisk ?? null;
+  if (ensoRisk && ensoRisk.currentPhase !== 'neutral') {
+    const amplifiedCount = Object.values(ensoRisk.conditionalRisks || {})
+      .filter(r => r.amplified).length;
+    signals.push(buildSignal({
+      signalType: 'conditional_enso_risk',
+      indicator: 'enso_conditional_risk',
+      historical: null,
+      projected: amplifiedCount,
+      delta: null,
+      delta_pct: null,
+      conf: 'high',
+      horizon: 'short_term',
+      threshold_reference: ensoRisk.narrative,
+      exceeds_threshold: amplifiedCount > 0,
+      ensoAmplified: true,
+      region,
+    }));
+  }
+
+  // ── Fase 3.1: EXPOSURE (GRI) ─────────────────────────────────────────────
+  const griEV = fusedData?.griExposureVulnerability ?? null;
+  if (griEV?.exposure?.score != null) {
+    signals.push(buildSignal({
+      signalType: 'exposure',
+      indicator: 'gri_exposure',
+      historical: null,
+      projected: griEV.exposure.score,
+      delta: null,
+      delta_pct: null,
+      conf: 'medium',
+      horizon: 'short_term',
+      threshold_reference: `Exposición multi-amenaza GRI Oxford: ${(griEV.exposure.score * 100).toFixed(0)}% — ${griEV.exposure.level}. ${griEV.exposure.narrative}`,
+      exceeds_threshold: griEV.exposure.score >= 0.4,
+      ensoAmplified: false,
+      region,
+    }));
+  }
+
+  // ── Fase 3.1: VULNERABILITY (GRI) ───────────────────────────────────────
+  if (griEV?.vulnerability?.score != null) {
+    signals.push(buildSignal({
+      signalType: 'vulnerability',
+      indicator: 'gri_vulnerability',
+      historical: null,
+      projected: griEV.vulnerability.score,
+      delta: null,
+      delta_pct: null,
+      conf: 'medium',
+      horizon: 'short_term',
+      threshold_reference: `Vulnerabilidad GRI Oxford: ${(griEV.vulnerability.score * 100).toFixed(0)}% — ${griEV.vulnerability.level}. ${griEV.vulnerability.narrative}`,
+      exceeds_threshold: griEV.vulnerability.score >= 0.4,
+      ensoAmplified: false,
+      region,
+    }));
+  }
+
+  // ── Fase 3.2: CALIBRATED RISK ────────────────────────────────────────────
+  const calibratedRisk = fusedData?.calibratedRisk ?? null;
+  if (calibratedRisk?.score != null) {
+    signals.push(buildSignal({
+      signalType: 'calibrated_risk',
+      indicator: 'ahp_risk_score',
+      historical: null,
+      projected: calibratedRisk.score / 100,
+      delta: null,
+      delta_pct: null,
+      conf: calibratedRisk.calibration?.confidence === 'alta' ? 'high' : 'medium',
+      horizon: calibratedRisk.horizon || 'short_term',
+      threshold_reference: `Riesgo calibrado (P×I/CA): ${calibratedRisk.score}/100 — ${calibratedRisk.classification}. Modo: ${calibratedRisk.calibration?.mode || 'default'}. ${calibratedRisk.recommendation}`,
+      exceeds_threshold: calibratedRisk.score >= 34,
+      ensoAmplified: false,
+      region,
+    }));
+  }
+
+  // ── Fase 3.3: ADAPTIVE CAPACITY ──────────────────────────────────────────
+  const adaptiveCapacity = fusedData?.adaptiveCapacity ?? null;
+  if (adaptiveCapacity?.compositeIndex != null) {
+    signals.push(buildSignal({
+      signalType: 'adaptive_capacity',
+      indicator: 'adaptive_capacity_index',
+      historical: null,
+      projected: adaptiveCapacity.compositeIndex,
+      delta: null,
+      delta_pct: null,
+      conf: 'medium',
+      horizon: 'long_term',
+      threshold_reference: `Capacidad adaptativa: ${(adaptiveCapacity.compositeIndex * 100).toFixed(0)}% — ${adaptiveCapacity.level}. ${adaptiveCapacity.narrative}`,
+      exceeds_threshold: adaptiveCapacity.compositeIndex < 0.4,
+      ensoAmplified: false,
+      region,
+    }));
+  }
+
+  // Señal dominante: excluir señales compuestas/informacionales y terrain/ENSO puras
+  const COMPOSITE_SIGNALS = new Set([
+    'landslide_risk', 'huayco_risk', 'enso_phase',
+    'heat_stress', 'drought_composite', 'conditional_enso_risk',
+    'exposure', 'vulnerability', 'calibrated_risk', 'adaptive_capacity',
+    'drought_compounding', 'drought_observacional',
+    'severe_vegetation_stress', 'vegetation_stress', 'groundwater_depletion',
+  ]);
+  const scorable = signals.filter(s => !COMPOSITE_SIGNALS.has(s.signalType));
   const dominant = scorable.length > 0
     ? scorable.reduce((best, s) =>
         (Math.abs(s.delta ?? 0) > Math.abs(best.delta ?? 0) ? s : best)

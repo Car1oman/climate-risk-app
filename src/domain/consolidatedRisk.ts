@@ -15,7 +15,11 @@ export type RiskTypeSlug =
   | 'deslizamiento'
   | 'heladas'
   | 'fenomeno_enso'
-  | 'inundacion';
+  | 'inundacion'
+  | 'exposicion'
+  | 'vulnerabilidad'
+  | 'riesgo_calibrado'
+  | 'capacidad_adaptativa';
 
 /**
  * Temporal classification aligned with CMIP6 horizon keys.

@@ -1,66 +1,49 @@
 /**
  * Heat Stress Service
  * Calcula WBGT (Wet Bulb Globe Temperature) y AQI compuesto
- * usando NASA POWER (T2M, RH2M, ALLSKY_SFC_SW_DWN) y WeatherAPI (PM2.5, O3).
+ * usando NASA POWER (T2M, RH2M) y WeatherAPI (PM2.5, PM10, O3, NO2).
  *
- * WBGT = 0.7 × Tw + 0.2 × Tg + 0.1 × T
- *   Tw = temperatura bulbo húmedo (derivada de T2M + RH2M)
- *   Tg = temperatura globo (proxy: T2M + radiación solar)
- *   T  = temperatura seca
+ * WBGT = 0.567×T + 0.393×e + 3.94   (Stull 2011, forma psicrométrica simplificada)
+ *   e = presión de vapor actual = (RH/100) × 6.112 × exp(17.67×T / (T + 243.5))
  *
- * AQI_compuesto = max(EPA_PM25, EPA_O3) × factor_temperatura(WBGT)
+ * AQI_compuesto = max(EPA_PM25, EPA_PM10, EPA_O3, EPA_NO2) × factor_temperatura(WBGT)
  */
 import { logger } from '../utils/logger.js';
 
 /**
- * Calcula la temperatura de bulbo húmedo (Tw) usando la fórmula de Stull (2011).
- * @param {number} t - Temperatura seca (°C)
+ * Calcula presión de vapor actual (hPa) — ecuación de Magnus.
+ * @param {number} t  - Temperatura seca (°C)
  * @param {number} rh - Humedad relativa (%)
- * @returns {number} Tw en °C
+ * @returns {number} e en hPa
  */
-function wetBulbStull(t, rh) {
-  const tw = t * Math.atan(0.151977 * Math.sqrt(rh + 8.313659))
-    + Math.atan(t + rh)
-    - Math.atan(rh - 1.676331)
-    + 0.00391838 * Math.pow(rh, 1.5) * Math.atan(0.023101 * rh)
-    - 4.686035;
-  return tw;
+function vaporPressure(t, rh) {
+  const es = 6.112 * Math.exp((17.67 * t) / (t + 243.5));
+  return (rh / 100) * es;
 }
 
 /**
- * Calcula la temperatura de globo (Tg) como proxy de radiación.
- * @param {number} t - Temperatura seca (°C)
- * @param {number} solarRadiation - ALLSKY_SFC_SW_DWN (kWh/m²/day)
- * @returns {number} Tg en °C
- */
-function globeTemperature(t, solarRadiation) {
-  return t + (solarRadiation * 2.5);
-}
-
-/**
- * Calcula el índice WBGT a partir de datos NASA POWER.
- * @param {Object} nasaPower - { recent: { T2M, RH2M, ALLSKY_SFC_SW_DWN } }
- * @returns {Object|null} { wbgt, tw, tg, category } o null
+ * Calcula el índice WBGT usando la fórmula psicrométrica simplificada de Stull (2011).
+ * WBGT = 0.567×T + 0.393×e + 3.94
+ * @param {Object} nasaPower - { recent: { T2M, RH2M } }
+ * @returns {Object|null} { wbgt, e, category } o null
  */
 export function computeWbgt(nasaPower) {
   if (!nasaPower?.recent) return null;
 
-  const t   = nasaPower.recent.T2M?.value;
-  const rh  = nasaPower.recent.RH2M?.value;
-  const rad = nasaPower.recent.ALLSKY_SFC_SW_DWN?.value;
+  const t  = nasaPower.recent.T2M?.value;
+  const rh = nasaPower.recent.RH2M?.value;
 
   if (t == null || rh == null) return null;
 
-  const tw = wetBulbStull(t, rh);
-  const tg = rad != null ? globeTemperature(t, rad) : t + 5;
-  const wbgt = 0.7 * tw + 0.2 * tg + 0.1 * t;
+  const e    = vaporPressure(t, rh);
+  const wbgt = 0.567 * t + 0.393 * e + 3.94;
 
   let category = 'bajo';
   if (wbgt >= 32) category = 'extremo';
   else if (wbgt >= 28) category = 'alto';
   else if (wbgt >= 25) category = 'moderado';
 
-  return { wbgt: Math.round(wbgt * 10) / 10, tw, tg, category };
+  return { wbgt: Math.round(wbgt * 10) / 10, e: Math.round(e * 100) / 100, category };
 }
 
 /**
@@ -76,30 +59,35 @@ function temperatureFactor(wbgt) {
 }
 
 /**
- * Calcula el AQI compuesto: max(PM2.5, O3) × factor WBGT.
+ * Calcula el AQI compuesto: max(PM2.5, PM10, O3, NO2) × factor WBGT.
  * @param {Object} weatherApi - Datos de WeatherAPI con air_quality
  * @param {number} wbgt - WBGT calculado
- * @returns {Object|null} { rawMax, adjusted, factor, dominant }
+ * @returns {Object|null} { rawMax, adjusted, factor, dominant, pollutants }
  */
 export function computeCompositeAqi(weatherApi, wbgt) {
   const pm25 = weatherApi?.pm2_5;
+  const pm10 = weatherApi?.pm10;
   const o3   = weatherApi?.o3;
+  const no2  = weatherApi?.no2;
 
-  if (pm25 == null && o3 == null) return null;
+  if (pm25 == null && pm10 == null && o3 == null && no2 == null) return null;
 
   const values = [];
   if (pm25 != null) values.push({ pollutant: 'PM2.5', value: pm25 });
-  if (o3 != null)   values.push({ pollutant: 'O3', value: o3 });
+  if (pm10 != null) values.push({ pollutant: 'PM10',  value: pm10 });
+  if (o3   != null) values.push({ pollutant: 'O3',    value: o3 });
+  if (no2  != null) values.push({ pollutant: 'NO2',   value: no2 });
 
   const dominant = values.reduce((a, b) => (a.value > b.value ? a : b));
-  const factor = temperatureFactor(wbgt ?? 0);
+  const factor   = temperatureFactor(wbgt ?? 0);
 
   return {
-    rawMax: dominant.value,
-    adjusted: Math.round(dominant.value * factor * 10) / 10,
+    rawMax:           dominant.value,
+    adjusted:         Math.round(dominant.value * factor * 10) / 10,
     factor,
     dominantPollutant: dominant.pollutant,
-    wbgtUsed: wbgt ?? null,
+    pollutants:       Object.fromEntries(values.map(v => [v.pollutant, v.value])),
+    wbgtUsed:         wbgt ?? null,
   };
 }
 
