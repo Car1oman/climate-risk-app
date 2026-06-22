@@ -32,7 +32,7 @@ async function fetchOpenMeteo(lat, lon) {
       start_date: '1980-01-01',
       end_date:   '2049-12-31',
       models:     model,
-      daily:      'temperature_2m_mean,temperature_2m_max,temperature_2m_min,precipitation_sum,relative_humidity_2m,wind_speed_10m,cloud_cover,shortwave_radiation_sum,surface_pressure,soil_moisture_0_to_10cm',
+      daily:      'temperature_2m_mean,temperature_2m_max,temperature_2m_min,precipitation_sum,relative_humidity_2m_mean,wind_speed_10m_mean,cloud_cover_mean,shortwave_radiation_sum,surface_pressure_mean,soil_moisture_0_to_10cm',
     });
     try {
       const res = await fetchWithTimeout(`${OPEN_METEO_URL}?${params}`, 45000);
@@ -187,11 +187,11 @@ function processData(data) {
   const tmaxs     = daily.temperature_2m_max            || [];
   const tmins     = daily.temperature_2m_min            || [];
   const precips   = daily.precipitation_sum             || [];
-  const humidities = daily.relative_humidity_2m         || [];
-  const winds     = daily.wind_speed_10m                || [];
-  const clouds    = daily.cloud_cover                   || [];
+  const humidities = daily.relative_humidity_2m_mean    || [];
+  const winds     = daily.wind_speed_10m_mean           || [];
+  const clouds    = daily.cloud_cover_mean              || [];
   const radiations = daily.shortwave_radiation_sum      || [];
-  const pressures  = daily.surface_pressure             || [];
+  const pressures  = daily.surface_pressure_mean        || [];
   const soilMoist  = daily.soil_moisture_0_to_10cm      || [];
 
   // Agrupar registros por período IPCC
