@@ -1,0 +1,120 @@
+{
+  "_version": "1.0.0",
+  "_description": "H-5.1 (documentacion-v2/stage-05, ALTO): mapeo declarativo fenómeno -> señales contribuyentes, con justificación científica explícita por cada inclusión y exclusión. Reemplaza PHENOMENA_MAP (hardcoded en pipeline/stages/05-phenomena/index.js sin fundamento documentado). Forma según el contrato specs/001-climate-risk-pipeline-rebuild/contracts/stage-05-phenomena.md (config.phenomenon_definitions): required_signals[], optional_signals[], min_confidence.",
+
+  "_methodology": {
+    "signal_viability": "Un fenómeno solo puede listar señales que Stage 04 es capaz de convertir en signal_strength no-nulo (pipeline/stages/04-signals/confidence.js, calculateSignalStrength). Verificado línea por línea contra ese archivo para cada señal candidata antes de incluirla aquí — no se asume viabilidad por el nombre de la señal:\n1) Señales 'static' (sufijo _baseline, todo cc_*, *_historico, elevation) SIEMPRE se descartan en Stage 04 (isBaselineOrStaticVariable -> score=null) y por tanto NUNCA llegan al array `signals` que Stage 05 consume. Listarlas como required/optional documentaría una relación que el pipeline no puede materializar — el mismo tipo de 'fenómeno fantasma' que este hallazgo existe para prevenir.\n2) Señales 'anomaly' dependen de CROSS_SOURCE_BASELINE (confidence.js ~línea 458), que SOLO empareja dos pares fuente:variable con una línea base cc_*: weatherapi:air_temperature_current↔cc_tas y nasa_power:precipitation_sum↔cc_pr. Cualquier otra variable 'anomaly' (relative_humidity, wind_speed, surface_pressure, twsa, oni_index, precipitation_current) cae siempre en el detector 'unclassified' (sin importar la fuente real seleccionada en la ejecución) y por tanto SIEMPRE se descarta — no es una posibilidad ocasional, es una propiedad estructural del código actual, confirmada en el comentario de confidence.js: 'relative_humidity/wind_speed/surface_pressure have NO cc_* counterpart to compare against'.\n3) Señales 'projected' (openmeteo_cmip6, con hermana *_historico emparejada por Stage 3) SÍ tienen detector propio (ProjectionDetector) y son viables.\n4) 'enso_phase_categorical' usa CategoricalDetector, que nunca depende de una línea base externa — siempre produce un score, es la señal más robusta del pipeline.\nEsta nota reemplaza cualquier composición previa que incluyera señales de la categoría (2) como si fueran funcionales.",
+
+    "sign": "Los fenómenos de anomalía continua opuestos (ola_de_calor/ola_de_frio, sequia/inundacion) comparten el mismo par físico de señales pero se distinguen por el signo de signal.anomaly_value (H-08, confidence.js: Δ físico crudo = valor_actual - línea_base). Sin este filtro de signo, un exceso de lluvia activaría 'sequia' con la misma magnitud que un déficit — físicamente incoherente. `sign: \"positive\"` exige anomaly_value > 0; `sign: \"negative\"` exige anomaly_value < 0; `sign: null` se usa solo para fenómenos categóricos (matchValue) donde el concepto de signo no aplica.",
+
+    "required_vs_optional": "El contrato distingue required_signals (al menos una debe estar presente y activa para considerar el fenómeno — Rule 1 de stage-05-phenomena.md) de optional_signals (refuerzan la confianza combinada pero no activan el fenómeno por sí solas). En la composición actual, todas las señales candidatas listadas son evidencia primaria independiente (cada una, individualmente, es suficiente para sustentar el fenómeno según su propia metodología de detector) — ninguna es puramente 'de refuerzo' sin poder sustentar el fenómeno por sí misma. Por eso optional_signals queda vacío en todas las entradas activas: no se fabrica una distinción required/optional donde no hay evidencia epistemológica que la sustente (mismo principio de no-fabricación que H-01/H-08 aplican en Stage 04). El campo existe en el schema (cumple el contrato) pero permanece [] hasta que exista una señal genuinamente secundaria (ej. una vez Stage 04 implemente detectores para humidity/wind/pressure — ver signal_viability arriba).",
+
+    "min_confidence": "null en todas las entradas = usa el piso global thresholds.json signal_activation.min_source_quality (0.30, ISO/IEC 25012:2008 §6.1). No existe una calibración por-fenómeno documentada (encuesta de experto climatológico, análisis de sensibilidad) que justifique un piso distinto para, p.ej., sequía vs. ola_de_calor — mismo vacío que H-4.1 (documentacion-v2/stage-03) encontró para selection_components, resuelto aquí heredando el piso ya justificado en vez de inventar uno nuevo sin respaldo."
+  },
+
+  "phenomena": [
+    {
+      "name": "ola_de_calor",
+      "required_signals": [
+        "temperatura_actual_anomaly",
+        "temperatura_max_projection",
+        "temperatura_max_projection_corto",
+        "temperatura_max_projection_mediano",
+        "temperatura_max_projection_largo"
+      ],
+      "optional_signals": [],
+      "sign": "positive",
+      "matchValue": null,
+      "min_confidence": null,
+      "scientific_reference": "IPCC AR6 WGI (2021) Ch.11: ola de calor = anomalía positiva sostenida de temperatura máxima/media respecto a la norma climatológica. WMO-No.1090 (2016) §2.3: anomalía ≥2°C sobre la norma 1981-2010 define 'evento de temperatura notable' (thresholds.json anomaly.temperature_delta_c). UNFCCC Acuerdo de París Art.2.1(a): +2°C como umbral de referencia de impactos no lineales.",
+      "notes": "temperatura_actual_anomaly cubre la observación presente (weatherapi:air_temperature_current vs. cc_tas, AnomalyDetector); las 3 bandas de temperatura_max_projection cubren corto/mediano/largo plazo (CMIP6 vs. su propia _historico, ProjectionDetector). extreme_heat_occurrence_baseline (GRI) y cc_hd35_baseline/cc_txx_baseline (ETCCDI) NO se incluyen: son 'static', siempre descartadas en Stage 04 (ver _methodology.signal_viability) — no porque sean irrelevantes, sino porque el pipeline no puede producirles un signal_strength con la arquitectura actual."
+    },
+    {
+      "name": "ola_de_frio",
+      "required_signals": [
+        "temperatura_actual_anomaly",
+        "temperatura_min_projection",
+        "temperatura_min_projection_corto",
+        "temperatura_min_projection_mediano",
+        "temperatura_min_projection_largo"
+      ],
+      "optional_signals": [],
+      "sign": "negative",
+      "matchValue": null,
+      "min_confidence": null,
+      "scientific_reference": "IPCC AR6 WGI (2021) Ch.11 trata los cold spells como la cola opuesta de la misma distribución de anomalía de temperatura que las olas de calor. SENAMHI Perú (Aviso Meteorológico de Heladas y Friaje): helada meteorológica en sierra definida por Tmin ≤0°C; friaje en selva por caída abrupta de Tmin asociada a incursiones de aire polar (surazo).",
+      "notes": "NUEVO respecto al PHENOMENA_MAP original — cierra el hallazgo H-5.1 punto 4 ('no existen fenómenos... ni olas de frío'). Reutiliza exactamente el mismo par de señales físicas que ola_de_calor (temperatura_actual_anomaly + temperatura_min/max_projection*), filtrado por signo opuesto — no requiere ninguna señal nueva ni ingestión adicional, solo el filtro de signo ya descrito en _methodology.sign. Antes de este cambio, un descenso térmico marcado no activaba ningún fenómeno; ahora se distingue explícitamente de ola_de_calor en vez de quedar invisible."
+    },
+    {
+      "name": "sequia",
+      "required_signals": [
+        "precipitacion_projection",
+        "precipitacion_projection_corto",
+        "precipitacion_projection_mediano",
+        "precipitacion_projection_largo"
+      ],
+      "optional_signals": [],
+      "sign": "negative",
+      "matchValue": null,
+      "min_confidence": null,
+      "scientific_reference": "Trenberth, K.E. et al. (2014). 'Global warming and changes in drought', Nature Climate Change 4, 17–22: sequía meteorológica = déficit sostenido de precipitación respecto a la norma climatológica. Sheffield, J. & Wood, E.F. (2012). Science 337: métrica estándar de déficit de precipitación. WMO-TD/1200 (2009) §3.2: variación ≥25% bajo la norma clasifica como anomalía significativa (thresholds.json anomaly.precipitation_delta_pct).",
+      "notes": "precipitacion_projection (y sus 3 bandas de horizonte) es viable bajo CUALQUIERA de sus dos fuentes posibles: openmeteo_cmip6 (ProjectionDetector, vs. su propia _historico) o nasa_power (AnomalyDetector, vs. cc_pr — está en CROSS_SOURCE_BASELINE). Se retiró 'humidity_anomaly' del PHENOMENA_MAP original: relative_humidity NO tiene línea base cc_* emparejada (no está en CROSS_SOURCE_BASELINE) — su signal_strength es SIEMPRE null en la arquitectura actual, nunca llega a Stage 05 (ver _methodology.signal_viability punto 2). Tampoco se agrega 'precipitacion_actual_anomaly' (precipitation_current): mismo motivo, ningún par fuente:variable para precipitation_current está en CROSS_SOURCE_BASELINE. 'drought_occurrence_baseline' (GRI) y 'twsa_anomaly' (GRACE-FO), sugeridas en el hallazgo original, se evaluaron y EXCLUYERON explícitamente: la primera es 'static' (siempre descartada); la segunda es 'anomaly' sin línea base emparejada (siempre 'unclassified', siempre descartada) — agregarlas repetiría el mismo error que este hallazgo corrige, documentar una señal que el pipeline no puede producir. Ver excluded_phenomena / _methodology para el registro explícito de este vacío arquitectónico, pendiente de una extensión de Stage 04 (CROSS_SOURCE_BASELINE) fuera del alcance de Stage 05."
+    },
+    {
+      "name": "inundacion",
+      "required_signals": [
+        "precipitacion_projection",
+        "precipitacion_projection_corto",
+        "precipitacion_projection_mediano",
+        "precipitacion_projection_largo"
+      ],
+      "optional_signals": [],
+      "sign": "positive",
+      "matchValue": null,
+      "min_confidence": null,
+      "scientific_reference": "IPCC AR6 WGI (2021) Ch.11: extreme_rain/flood_risk como cola opuesta de la misma distribución de anomalía de precipitación que la sequía. WRI Aqueduct 4.0 / Global Resilience Index (GRI) Oxford, citados en docs/SCIENTIFIC_METHOD.md:72 para flood_risk.",
+      "notes": "NUEVO respecto al PHENOMENA_MAP original — cierra el hallazgo H-5.1 punto 4 y la ausencia notada en data-model.md:98 ('inundacion' como nombre canónico ya esperado mas nunca implementado). Comparte exactamente las señales de 'sequia', distinguidas por signo (ver _methodology.sign): un déficit de precipitación activa sequía, un exceso activa inundación — nunca ambos a la vez para la misma señal. 'flood_occurrence_baseline' (GRI) y los índices ETCCDI de lluvia extrema (cc_rx1day_baseline, cc_rx5day_baseline, cc_r20mm_baseline, cc_r50mm_baseline) NO se incluyen: son 'static', siempre descartadas en Stage 04 — mismo vacío arquitectónico que 'sequia', documentado ahí y en excluded_phenomena, no oculto."
+    },
+    {
+      "name": "el_nino",
+      "required_signals": ["enso_phase_categorical"],
+      "optional_signals": [],
+      "sign": null,
+      "matchValue": "el_nino",
+      "min_confidence": null,
+      "scientific_reference": "NOAA CPC Definición Oficial (2023); Trenberth, K.E. (1997). Bull. Amer. Meteor. Soc., 78, 2771–2777: El Niño requiere ONI ≥+0.5°C durante ≥5 trimestres consecutivos en la región Niño 3.4. Umbral oficial adoptado por WMO, SENAMHI Perú e IDEAM Colombia.",
+      "notes": "Sin cambios respecto al PHENOMENA_MAP original — ya era la composición mejor fundamentada del archivo (ver comentario preexistente en pipeline/shared/enso-classification.js). Único fenómeno cuya señal siempre produce un score no-nulo (CategoricalDetector no depende de línea base externa) — no comparte el vacío estructural de sequía/inundación/ola_de_frio."
+    },
+    {
+      "name": "la_nina",
+      "required_signals": ["enso_phase_categorical"],
+      "optional_signals": [],
+      "sign": null,
+      "matchValue": "la_nina",
+      "min_confidence": null,
+      "scientific_reference": "NOAA CPC Definición Oficial (2023); Trenberth, K.E. (1997). Bull. Amer. Meteor. Soc., 78, 2771–2777: La Niña requiere ONI ≤-0.5°C durante ≥5 trimestres consecutivos en la región Niño 3.4.",
+      "notes": "Simétrico a el_nino — ver esas notas."
+    }
+  ],
+
+  "excluded_phenomena": [
+    {
+      "name": "vientos_fuertes",
+      "reason": "Estaba en el PHENOMENA_MAP original con una única señal ('wind_anomaly'), que NUNCA produce un signal_strength no-nulo bajo la arquitectura actual de Stage 04: wind_speed no tiene línea base cc_* emparejada en CROSS_SOURCE_BASELINE, cae siempre en el detector 'unclassified' (confidence.js, ver signal_viability) y se descarta siempre en Stage 04, para cualquier fuente que la sirva. El hallazgo original sugería agregar 'pressure_anomaly' como señal opcional — se evaluó y se descartó: surface_pressure tiene EXACTAMENTE el mismo problema (mismo comentario en confidence.js las agrupa como sin contraparte cc_*). Agregar dos señales igualmente inviables no habría corregido el fenómeno, solo habría duplicado el error. Con la composición actual del pipeline, 'vientos_fuertes' no tiene NINGUNA señal viable — mantenerlo en phenomenon-definitions.json con señales que nunca activan sería exactamente el tipo de 'fenómeno fantasma documentado como real' que este hallazgo existe para eliminar.",
+      "evidence": "pipeline/stages/04-signals/confidence.js, comentario sobre AnomalyDetector (~línea 452-454): 'relative_humidity/wind_speed/surface_pressure have NO cc_* counterpart to compare against — not fabricated, see the unclassified branch below.' Confirmado también en CROSS_SOURCE_BASELINE (~línea 458-461): solo 2 entradas, ninguna para wind_speed ni surface_pressure.",
+      "revisit_when": "Stage 04 agregue una línea base climatológica para viento/presión (ej. un cc_wind/cc_pressure en climate_cells) que permita un CROSS_SOURCE_BASELINE real, o se ingiera una variable CMIP6 de viento proyectado (openmeteo_cmip6 no publica wind_speed_corto/mediano/largo actualmente). Hasta entonces, cualquier composición de 'vientos_fuertes' sería fabricada, no medida."
+    },
+    {
+      "name": "deslizamiento",
+      "reason": "docs/SCIENTIFIC_METHOD.md:74 define landslide_risk como 'Slope + susceptibility class' (NASA SRTM + INGEMMET 2021) — dos insumos que el pipeline actual NO ingiere. La única señal geofísica de terreno disponible es 'elevation_baseline' (elevación puntual en metros, SRTM 30m), que (a) es 'static' y por tanto siempre descartada en Stage 04 antes de llegar a Stage 05, y (b) aunque no lo fuera, un valor de elevación puntual no es matemáticamente equivalente a pendiente (requiere analizar celdas vecinas) ni a una clase de susceptibilidad (requiere litología/uso de suelo, no solo topografía). Componer 'deslizamiento' a partir de elevation_baseline habría sido exactamente el riesgo que este hallazgo (H-5.1) advierte explícitamente: 'fenómenos fantasma (detectados sin base física real)'.",
+      "evidence": "pipeline/config/signal-taxonomy.json: única entrada de terreno es 'elevation' -> 'elevation_baseline' (signal_type: static). docs/SCIENTIFIC_METHOD.md:74 exige pendiente + clase de susceptibilidad, ninguna de las dos presente en CANONICAL_VARIABLES (pipeline/stages/03-normalization/canonical-schema.js).",
+      "revisit_when": "Se ingiera una fuente de pendiente derivada de DEM (ej. slope raster INGEMMET/USGS) y/o un mapa de susceptibilidad a movimientos en masa (INGEMMET 2021, citado en SCIENTIFIC_METHOD.md) como nueva(s) variable(s) canónica(s)."
+    },
+    {
+      "name": "huayco",
+      "reason": "docs/SCIENTIFIC_METHOD.md:75 define huayco_risk como 'Convergent drainage + slope' (INGEMMET 2021) — ninguno de los dos insumos (red de drenaje, pendiente) existe en el pipeline actual. Mismo razonamiento que 'deslizamiento': no hay una señal disponible que mida el proceso físico que el nombre del fenómeno reclama representar.",
+      "evidence": "Ninguna variable de drenaje/hidrología de ladera en pipeline/stages/03-normalization/canonical-schema.js ni en signal-taxonomy.json.",
+      "revisit_when": "Se ingiera una fuente de convergencia de drenaje (ej. flow accumulation derivado de DEM, INGEMMET) además de la pendiente ya requerida por 'deslizamiento'."
+    }
+  ]
+}

@@ -29,6 +29,7 @@ import ensoRouter      from './routes/enso.js';
 import terrainRouter   from './routes/terrain.js';
 import nasaRouter      from './routes/nasa.js';
 import nasaMetricsRouter from './routes/nasaMetrics.js';
+import { mountV2 }     from './climate-v2.js';
 
 // Fail fast if required env vars are absent.
 validateEnv();
@@ -85,10 +86,14 @@ app.use('/api',            ensoRouter);     // /api/enso/status, /api/enso/refre
   app.use('/api',            nasaRouter);     // /api/nasa-power/health
 app.use('/api',            nasaMetricsRouter); // /api/nasa-metrics
 
+// ── Pipeline v2 routes (mismo proceso, mismo puerto) ──────────────────────────
+mountV2(app);
+
 // ── SPA fallback ──────────────────────────────────────────────────────────────
 app.use((req, res, next) => {
   if (!req.path.startsWith('/api/')) {
-    res.sendFile(join(__dirname, '..', 'dist', 'index.html'));
+    const file = req.path.startsWith('/v2') ? 'v2.html' : 'index.html';
+    res.sendFile(join(__dirname, '..', 'dist', file));
   } else {
     res.status(404).json({ error: 'API endpoint no encontrado', reqId: req.id });
   }

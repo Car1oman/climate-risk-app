@@ -1,0 +1,197 @@
+{
+  "_version": "2.0.0",
+  "_description": "Longitudes de decorrelación espacial por variable climática y reglas para variables no estocásticas",
+  "_rule": "Cobertura espacial usando decaimiento exponencial exp(-d/L). Cada variable climática tiene L basado en literatura revisada por pares.",
+  "_status": "MVP approximation — valores globales no calibrados regionalmente",
+  "_calibration": "Pendiente: validación empírica con estaciones SENAMHI para Perú",
+
+  "_spatial_coverage_model": {
+    "_description": "Distancias máximas derivadas del modelo de correlación espacial exponencial, no valores manuales.",
+    "model": "exponential",
+    "formula": "ρ(d) = exp(-d / L)",
+    "max_distance_formula": "d_max = -L × ln(θ)",
+    "theta": 0.5,
+    "theta_justification": "θ=0.5 representa la distancia donde la correlación espacial cae al 50%. Es el punto de referencia estándar en análisis geoestadístico de variogramas (Isaaks & Srivastava, 1989, 'An Introduction to Applied Geostatistics', Oxford University Press; Journel & Huijbregts, 1978, 'Mining Geostatistics', Academic Press). A ρ=0.5, el campo retiene suficiente señal para ser representativo del punto de consulta. Valores inferiores implican que el dato tiene más ruido que señal espacial.",
+    "non_spatial_sources": "Fuentes país-nivel (World Bank), índices de cuenca (ONI), y datos estáticos con resolution_ratio (elevación, población, edificaciones) no usan este modelo. Se marcan con max_distance_km=null."
+  },
+
+  "default_model": "exponential",
+  "default_formula": "exp(-d / L)",
+
+  "variables": {
+    "air_temperature_current": {
+      "decorrelation_length_km": 500,
+      "max_distance_km": 347,
+      "model": "exponential",
+      "reference": {
+        "citation": "Jones, P.D., T.J. Osborn, and K.R. Briffa (1997). J. Climate, 10, 2548–2568.",
+        "doi": "10.1175/1520-0442(1997)010<2548:ESEILS>2.0.CO;2",
+        "scope": "global mean for mid-latitude annual temperature",
+        "caveat": "Andean topography likely reduces decorrelation to 200–300 km",
+        "confidence": "medium"
+      },
+      "notes": "Jones et al. (1997) zonally averaged correlation decay. Mid-latitudes ~500–1000 km. 500 km conservative for tropics."
+    },
+    "air_temperature_max": {
+      "decorrelation_length_km": 500,
+      "max_distance_km": 347,
+      "model": "exponential",
+      "extends": "air_temperature_current",
+      "reference": {
+        "citation": "Jones, P.D., T.J. Osborn, and K.R. Briffa (1997). J. Climate, 10, 2548–2568.",
+        "doi": "10.1175/1520-0442(1997)010<2548:ESEILS>2.0.CO;2",
+        "scope": "global mean — same decorrelation as mean temperature",
+        "confidence": "medium"
+      }
+    },
+    "air_temperature_min": {
+      "decorrelation_length_km": 500,
+      "max_distance_km": 347,
+      "model": "exponential",
+      "extends": "air_temperature_current",
+      "reference": {
+        "citation": "Jones, P.D., T.J. Osborn, and K.R. Briffa (1997). J. Climate, 10, 2548–2568.",
+        "doi": "10.1175/1520-0442(1997)010<2548:ESEILS>2.0.CO;2",
+        "scope": "global mean — same decorrelation as mean temperature",
+        "confidence": "medium"
+      }
+    },
+    "precipitation_current": {
+      "decorrelation_length_km": 30,
+      "max_distance_km": 21,
+      "model": "exponential",
+      "reference": {
+        "citation": "Huffman, G.J. et al. (2001). J. Hydrometeor., 2(1), 36–50; Yang et al. (2015) Sichuan station density study",
+        "doi": "10.1175/1525-7541(2001)002<0036:GPAODD>2.0.CO;2",
+        "scope": "global mean for daily precipitation",
+        "caveat": "Convective precipitation in tropical Andes has very short decorrelation (~10–30 km). Stratiform events may reach 50 km.",
+        "confidence": "low"
+      },
+      "notes": "Yang et al. (2015): max admissible station spacing in complex Sichuan terrain = 16–42 km. GPCP 1DD at 1° (~110 km) does not resolve sub-grid variability."
+    },
+    "precipitation_sum": {
+      "decorrelation_length_km": 30,
+      "max_distance_km": 21,
+      "model": "exponential",
+      "extends": "precipitation_current",
+      "reference": {
+        "citation": "Huffman, G.J. et al. (2001). J. Hydrometeor., 2(1), 36–50.",
+        "doi": "10.1175/1525-7541(2001)002<0036:GPAODD>2.0.CO;2",
+        "scope": "global mean for daily accumulated precipitation",
+        "confidence": "low"
+      },
+      "notes": "Accumulated precipitation inherits same decorrelation as instantaneous — accumulation period does not significantly change spatial structure at daily scale."
+    },
+    "relative_humidity": {
+      "decorrelation_length_km": 150,
+      "max_distance_km": 104,
+      "model": "exponential",
+      "reference": {
+        "citation": "New, M. et al. (2002). Climate Research, 21, 1–25; Brotzge & Richardson (2003) OK Mesonet study",
+        "doi": "10.3354/cr021001",
+        "scope": "global mean for monthly relative humidity climatology",
+        "caveat": "OK Mesonet: ρ ≥ 0.88 at 100 km for RH. Andean valleys may have shorter decorrelation due to localized moisture sources.",
+        "confidence": "medium"
+      }
+    },
+    "wind_speed": {
+      "decorrelation_length_km": 200,
+      "max_distance_km": 139,
+      "model": "exponential",
+      "reference": {
+        "citation": "Bandyopadhyay, S. et al. (2015). Environ. Res. Lett., 10, 044004.",
+        "doi": "10.1088/1748-9326/10/4/044004",
+        "scope": "global mean — integral length scales from CAN (273 km), AUS (368 km), BPA (89 km)",
+        "caveat": "Andean complex terrain: channeling effects create sharp gradients at ~50–100 km. MVP 200 km is optimistic for Peru.",
+        "confidence": "medium"
+      }
+    },
+    "surface_pressure": {
+      "decorrelation_length_km": 500,
+      "max_distance_km": 347,
+      "model": "exponential",
+      "reference": {
+        "citation": "Thorndike, A.S. (1982). J. Atmos. Sci., 39, 2229–2238; Madaus & Hakim (2013) AMS",
+        "doi": "10.1175/1520-0469(1982)039<2229:SPOTAP>2.0.CO;2",
+        "scope": "global mean for synoptic-scale surface pressure",
+        "caveat": "Pressure is a synoptic-scale field integrating the full atmospheric column. 500 km is conservative — actual synoptic L may be >1000 km.",
+        "confidence": "high"
+      },
+      "notes": "Thorndike (1982): Arctic surface pressure ~1000 km. METAR network at ~100 km spacing is redundant for synoptic pressure field. Surface pressure has the longest decorrelation of any meteorological variable."
+    },
+    "twsa": {
+      "decorrelation_length_km": 300,
+      "max_distance_km": 208,
+      "model": "exponential",
+      "reference": {
+        "citation": "Wahr, J. et al. (1998). J. Geophys. Res., 103(B12), 30205–30229.",
+        "doi": "10.1029/98JB02844",
+        "scope": "GRACE native resolution — Gaussian smoothing radius",
+        "caveat": "GRACE post-processing smoothing radius IS the decorrelation length. DDK1~530 km, DDK2~340 km, DDK3~240 km. 300 km is standard.",
+        "confidence": "high"
+      },
+      "notes": "GRACE gravity field is smoothed to ~300 km by construction (Gaussian kernel). TWSA signals are not resolved below this scale. DDK filtering variants confirm the range."
+    }
+  },
+
+  "non_stochastic": {
+    "elevation": {
+      "rule": "resolution_ratio",
+      "description": "DEM is a fixed topographic field, not a stochastic climate variable. Coverage based on DEM resolution vs required resolution.",
+      "reference": {
+        "citation": "Farr, T.G. et al. (2007). Rev. Geophys., 45(2), RG2004.",
+        "doi": "10.1029/2005RG000183",
+        "confidence": "high"
+      }
+    },
+    "population": {
+      "rule": "resolution_ratio",
+      "description": "Socioeconomic gridded data. Coverage depends on native grid resolution vs required resolution.",
+      "confidence": "medium"
+    },
+    "buildings": {
+      "rule": "resolution_ratio",
+      "description": "Infrastructure density grid. Coverage depends on native grid resolution vs required resolution.",
+      "confidence": "medium"
+    },
+    "land_cover": {
+      "rule": "categorical",
+      "description": "Categorical classification. Coverage is 1.0 if source covers the pixel within its classification period, else null.",
+      "confidence": "medium"
+    },
+    "traveltime_healthcare": {
+      "rule": "resolution_ratio",
+      "description": "Accessibility raster. Coverage depends on native resolution vs required resolution.",
+      "confidence": "low"
+    },
+    "oni_index": {
+      "rule": "always_1",
+      "description": "ONI is a single basin-scale index (Niño 3.4), not a gridded field. Spatial coverage is always 1.0 within tropical Pacific domain.",
+      "reference": {
+        "citation": "Trenberth, K.E. (1997). Bull. Amer. Meteor. Soc., 78, 2771–2777.",
+        "doi": "10.1175/1520-0477(1997)078<2771:TDOENO>2.0.CO;2",
+        "confidence": "high"
+      }
+    },
+    "poverty_rate": {
+      "rule": "always_1",
+      "description": "Country-level socioeconomic indicator. Spatial coverage is 1.0 at national scale.",
+      "confidence": "high"
+    },
+    "gdp_per_capita": {
+      "rule": "always_1",
+      "description": "Country-level socioeconomic indicator. Spatial coverage is 1.0 at national scale.",
+      "confidence": "high"
+    },
+    "water_access": {
+      "rule": "always_1",
+      "description": "Country-level socioeconomic indicator. Spatial coverage is 1.0 at national scale.",
+      "confidence": "high"
+    },
+    "urban_population": {
+      "rule": "always_1",
+      "description": "Country-level socioeconomic indicator. Spatial coverage is 1.0 at national scale.",
+      "confidence": "high"
+    }
+  }
+}

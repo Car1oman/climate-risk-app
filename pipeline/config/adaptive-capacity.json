@@ -1,0 +1,88 @@
+{
+  "_version": "2.0.0",
+  "_description": "Indicadores para el cálculo de Capacidad Adaptativa (CA)",
+  "_methodology": {
+    "framework": "IPCC AR6 Chapter 8 + ND-GAIN Country Index (Chen et al., 2015)",
+    "weighting": "equal — 1/N sobre indicadores con datos disponibles. Pesos diferenciales requieren AHP con panel experto o PCA sobre datos históricos subnacionales; pendiente para v3.",
+    "normalization": "Min-max a escala 1-5. Rangos calibrados en P5-P95 de datos subnacionales Peru (INEI ENAHO 2023 / Censo 2017).",
+    "score_rule": "CA = promedio(scores normalizados) sobre indicadores con datos. Si disponibles < _min_indicators → CA = null."
+  },
+  "_min_indicators": 3,
+  "indicators": [
+    {
+      "id": "poverty_rate",
+      "source": "world_bank",
+      "wb_code": "SI.POV.NAHC",
+      "inverse": true,
+      "normalization": {
+        "min_value": 3,
+        "max_value": 52,
+        "min_score": 5,
+        "max_score": 1,
+        "bounds_basis": "INEI ENAHO 2023: P5=3% (Lima Metropolitana), P95=52% (Puno)"
+      },
+      "citation": "IPCC AR6 Ch.8 §8.2.1: 'Poverty is a key determinant of adaptive capacity.' ND-GAIN: economic component.",
+      "description": "Tasa de pobreza (% población bajo línea de pobreza). A mayor pobreza, menor CA."
+    },
+    {
+      "id": "gdp_per_capita",
+      "source": "world_bank",
+      "wb_code": "NY.GDP.PCAP.CD",
+      "inverse": false,
+      "normalization": {
+        "min_value": 2000,
+        "max_value": 12000,
+        "min_score": 1,
+        "max_score": 5,
+        "bounds_basis": "INEI PBI por departamento 2022: Huancavelica ~USD 2,200; Lima-Callao ~USD 11,500"
+      },
+      "citation": "IPCC AR6 Ch.8 §8.2.1: 'Economic capital (income, GDP) is a fundamental dimension of adaptive capacity.' Brooks et al. (2005).",
+      "description": "GDP per cápita en USD corrientes. A mayor ingreso, mayor CA."
+    },
+    {
+      "id": "access_to_water",
+      "source": "world_bank",
+      "wb_code": "SH.H2O.BASW.ZS",
+      "inverse": false,
+      "normalization": {
+        "min_value": 55,
+        "max_value": 98,
+        "min_score": 1,
+        "max_score": 5,
+        "bounds_basis": "ENAHO 2023: rural disperso ~58%, Lima Metropolitana ~98%"
+      },
+      "citation": "ND-GAIN: water sector adaptive capacity sub-index. WHO/UNICEF JMP 2023. IPCC AR6 Ch.8: water access as infrastructure capital.",
+      "description": "Población con acceso a agua potable básica (% población)."
+    },
+    {
+      "id": "healthcare_access",
+      "source": "gri_oxford",
+      "gri_domain": "traveltime_to_healthcare",
+      "inverse": true,
+      "normalization": {
+        "min_value": 0,
+        "max_value": 120,
+        "min_score": 5,
+        "max_score": 1,
+        "bounds_basis": "Weiss et al. (2020) calibrated model. 120 min = límite práctico de acceso a emergencias según estándares OMS."
+      },
+      "citation": "Weiss et al. (2020) 'Global maps of travel time to healthcare facilities' Nature Medicine. GRI Oxford friction surface v2.0.",
+      "description": "Tiempo de viaje a establecimiento de salud (minutos). A menor tiempo, mayor CA."
+    },
+    {
+      "id": "education_literacy",
+      "source": "world_bank",
+      "wb_code": "SE.ADT.LITR.ZS",
+      "inverse": false,
+      "normalization": {
+        "min_value": 70,
+        "max_value": 99,
+        "min_score": 1,
+        "max_score": 5,
+        "bounds_basis": "Censo Nacional 2017: mínimo departamental ~74% (Apurímac), máximo ~99% (Lima-Callao)"
+      },
+      "citation": "Brooks et al. (2005): 'Literacy rate is among the highest-ranked determinants of adaptive capacity.' ND-GAIN: human component (education sub-index). IPCC AR6 Ch.8 §8.2.1: 'Human capital (education) is a fundamental dimension.'",
+      "description": "Tasa de alfabetismo adulto (% población ≥15 años). Proxy de capital humano."
+    }
+  ]
+}

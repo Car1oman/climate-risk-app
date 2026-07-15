@@ -1,0 +1,50 @@
+{
+  "_version": "1.0.0",
+  "_description": "Metodología del componente coverage_temporal de Source Quality (Stage 04, H-01). Mide si la EXTENSIÓN real de la serie subyacente alcanza la duración requerida para el tipo de dato — NO la densidad de valores válidos dentro de esa ventana. Esa segunda dimensión (fracción de observaciones no-fill dentro de la ventana) ya la calcula Stage 3 como methodology.completeness_ratio (WMO No.100 / GCOS-245, ver pipeline/stages/03-normalization/index.js). Colapsar ambas en un solo número perdería la distinción que motivó separarlas en el spec (stage-guide.md): 'coverage_temporal' (extensión) vs 'data_completeness' (integridad dentro de la ventana obtenida).",
+  "_rule": "coverage_temporal = min(1, actual_span_days / required_span_days) cuando 'extensión de serie' es un concepto aplicable. Para fuentes que devuelven una lectura puntual o una estadística ya fija por construcción, la extensión de serie NO es un concepto aplicable (mismo razonamiento que el tratamiento de elevation/oni_index en spatial-decorrelation.json non_stochastic, coverage_spatial-methodology.md §1) — se reporta 1.0 con reason='point_in_time' o 'climate_normal', no se excluye del promedio.",
+
+  "point_in_time_sources": {
+    "_description": "Lectura instantánea o estadística anual publicada una única vez — no hay 'serie' cuya extensión medir.",
+    "sources": ["weatherapi", "opentopodata_srtm30m", "open_elevation", "world_bank", "noaa_cpc_oni", "noaa_enso_discussion", "gri_oxford"],
+    "rule": "always_1",
+    "reference": "Analogía directa con coverage_spatial-methodology.md §1 (DEM/ONI: 'is NOT a stochastic climate variable... the concept does not apply')."
+  },
+
+  "climate_normal_sources": {
+    "_description": "Estadísticas climatológicas de línea base (grid climate_cells) calculadas offline sobre el período normal OMM 1991-2020 (30 años) por construcción. La extensión real de esa agregación es fija y conocida independientemente de lo que reporte data_time_range en el payload — que hoy refleja el timestamp de la consulta, no el período base (gap documentado, no corregido aquí: ver confidence.js).",
+    "sources": ["supabase_climate_cells"],
+    "rule": "always_1",
+    "reference": {
+      "citation": "WMO (2017). WMO-No. 1203, 'Guidelines on the Calculation of Climate Normals'. World Meteorological Organization, Geneva. §2: standard reference period = 30 years.",
+      "note": "Mismo período (1991-01-01 a 2020-12-31) que pipeline/shared/horizons.js define como HISTORICAL_START/END para el horizonte 'historico'."
+    }
+  },
+
+  "fixed_window_sources": {
+    "_description": "Series diarias agregadas sobre una ventana de solicitud fija y conocida por el adapter (no derivada de un horizonte de proyección).",
+    "sources": {
+      "nasa_power": {
+        "required_span_days": 365,
+        "reference": {
+          "citation": "WMO No. 100 (2018) Guide to Climatological Practices §2.3.2: 'annual' como unidad estándar de agregación climatológica de referencia.",
+          "note": "pipeline/stages/01-acquisition/adapters/nasa-power.js solicita exactamente 365 días (endDate = ayer, startDate = endDate - 1 año); required_span_days replica esa ventana fija del adapter, no un valor inventado."
+        }
+      }
+    }
+  },
+
+  "horizon_projection_sources": {
+    "_description": "Proyecciones CMIP6 por banda de horizonte (historico/corto/mediano/largo). required_span_days y actual_span_days se calculan en tiempo de ejecución contra pipeline/shared/horizons.js (nominal_start/nominal_end vs. la ventana realmente cubierta en data_time_range) — no hardcodeado aquí porque la banda depende de la fecha de ejecución (baselineYear).",
+    "sources": ["openmeteo_cmip6"],
+    "rule": "horizon_ratio",
+    "reference": {
+      "citation": "TCFD (2017) + CEPLAN Perú + World Bank Infrastructure Guidelines (duración nominal de cada banda, ver thresholds.json horizon_years._refs); WMO No. 1203 (2017) para el horizonte 'historico' (1991-2020, 30 años).",
+      "note": "horizons.js ya marca truncated=true cuando la banda nominal excede el archivo fuente disponible (ej. 'largo' recortado a 2050-01-01). Este componente convierte ese mismo hecho en un ratio 0-1 verificable en vez de dejarlo solo como texto en methodology.assumptions."
+    }
+  },
+
+  "unclassified_fallback": {
+    "_description": "Cualquier fuente no listada arriba (incluye adapters declarados en stage-guide.md pero aún no implementados, ej. GRACE-FO) no tiene metodología de coverage_temporal definida — se excluye explícitamente del promedio ponderado (components_excluded) en vez de asumir un valor sin fundamento.",
+    "rule": "excluded"
+  }
+}

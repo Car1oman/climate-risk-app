@@ -35,6 +35,12 @@ The MCP server returns "not initialized." Ask the user: *"I notice this project 
 <!-- CODEGRAPH_END -->
 
 <!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
+Current plan: `specs/001-climate-risk-pipeline-rebuild/plan.md`
+- Full spec: `specs/001-climate-risk-pipeline-rebuild/spec.md`
+- Data model: `specs/001-climate-risk-pipeline-rebuild/data-model.md`
+- Stage contracts: `specs/001-climate-risk-pipeline-rebuild/contracts/`
+
+Focus: Rebuild climate risk pipeline with 7 decoupled stages,
+bidimensional confidence model, evidence artifact, and dual UI.
+New code in `pipeline/`, `server-new/`, `src-new/` — DO NOT modify `server/`.
 <!-- SPECKIT END -->

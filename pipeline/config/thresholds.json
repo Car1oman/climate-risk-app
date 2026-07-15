@@ -1,0 +1,100 @@
+{
+  "_version": "2.0.0",
+  "_description": "Umbrales de activación para señales, cobertura y riesgos — con sustento metodológico por campo",
+  "_methodology": {
+    "framework": "IPCC AR6 Risk Framework (2021-2022) + ISO 31000:2018 + TCFD (2017) + WMO Technical Standards",
+    "risk_formula": "(Probability × Impact) / AdaptiveCapacity — derivado del marco IPCC AR6 WGII: Riesgo = f(Amenaza, Exposición, Vulnerabilidad, CA). Ver stage 06-risk.",
+    "review_date": "2026-06-25",
+    "review_note": "Umbrales calibrados contra literatura científica y estándares operacionales internacionales. Cada campo tiene _refs con cita o justificación explícita."
+  },
+  "source_quality_weights": {
+    "coverage_spatial": 0.30,
+    "coverage_temporal": 0.20,
+    "completeness": 0.20,
+    "resolution": 0.20,
+    "proximity": 0.10,
+    "_refs": {
+      "_status": "Split declarado en specs/001-climate-risk-pipeline-rebuild/stage-guide.md (Stage 04) y en el contrato stage-04-signals.md (config.source_quality_weights). H-01 (documentacion-v2/stage-04, 2026-07-15, CRÍTICO): el runtime solo implementaba 2 de estos 5 componentes con pesos fijos 50/50 sin fundamento — corregido para implementar los 5 componentes con este split.",
+      "_gap": "Este split (30/20/20/20/10) en sí mismo no tiene una derivación independiente documentada en este proyecto (AHP, encuesta de expertos, regresión) que explique por qué coverage_spatial pesa 30% y no otro valor — es el mismo tipo de vacío que H-4.1 (documentacion-v2/stage-03) encontró en selection_components y corrigió rehusando fabricar una elicitación de pesos, usando en su lugar ponderación igual (Laplace) más un análisis de sensibilidad por vértices. Aquí se preserva el split declarado por el spec para cerrar H-01 (código no coincidía con el spec) en lugar de reemplazarlo unilateralmente por un esquema distinto no solicitado; el vacío de fundamento del split en sí queda documentado explícitamente, no oculto, pendiente de una revisión metodológica separada."
+    }
+  },
+  "signal_activation": {
+    "min_signal_strength": 0.40,
+    "min_source_quality": 0.30,
+    "confidence_combination": "geometric_mean",
+    "signal_strength_labels": {
+      "low_max": 0.40,
+      "medium_max": 0.70,
+      "_refs": {
+        "_status": "H-10 (documentacion-v2/stage-04, ALTO): los umbrales previos (0.4/0.7, hardcodeados en confidence.js sin referencia) coincidían con min_signal_strength solo por casualidad numérica — una señal con score=0.40 (justo el mínimo aceptable para no ser descartada, ver H-04) se etiquetaba 'medium', sugiriendo holgura donde en realidad está en el límite. Movidos aquí y anclados explícitamente a min_signal_strength en vez de repetir el número por separado.",
+        "low_max": "Igual a min_signal_strength (mismo campo, arriba) por diseño, no por coincidencia: una señal etiquetada 'low' es, por construcción, exactamente la misma que Stage 04 descarta (H-04) por no alcanzar min_signal_strength. Elimina la ambigüedad que H-10 señaló.",
+        "medium_max": "Punto medio del rango [min_signal_strength, 1.0] = 0.40 + (1.0-0.40)/2 = 0.70. Sin una segunda calibración empírica documentada para el límite superior (mismo vacío que H-4.1, documentacion-v2/stage-03, enfrentó para pesos sin elicitación AHP), se usa espaciado igual desde el piso ya justificado hasta el máximo teórico — Principio de Indiferencia de Laplace, misma convención que H-06 (severityMap) ya aplicó para un vacío de calibración equivalente. Lectura adicional consistente con el marco R²/OECD-JRC ya usado para min_signal_strength: √0.5 ≈ 0.7071 (redondeado a 0.70) es el punto donde R²=0.5 — la señal explica al menos tanta varianza como deja sin explicar."
+      }
+    },
+    "_refs": {
+      "min_signal_strength": "OECD/JRC Handbook on Composite Indicators (2008) §5.2: R ≥ 0.40 como umbral mínimo de correlación aceptable en análisis compuesto. Equivale a R²≥0.16 (≥16% de varianza explicada) — umbral convencional para teleconexiones climáticas significativas (Wilks, 2011, 'Statistical Methods in the Atmospheric Sciences' §6.2.1). Por debajo de 0.40 la señal no aporta información discriminante fiable.",
+      "min_source_quality": "ISO/IEC 25012:2008 (Data Quality) §6.1: piso operativo de calidad para inclusión de fuentes secundarias en modelos multi-fuente. Por debajo de 0.30 la fuente se descarta como no confiable para análisis de riesgo. Se sitúa 10 puntos por debajo de min_signal_strength para permitir fuentes complementarias de menor calidad sin afectar el resultado compuesto.",
+      "confidence_combination": "OECD/JRC Handbook on Composite Indicators (2008) §6.3: 'The geometric mean is recommended when dimensions are not perfectly substitutable — it penalizes large imbalances and prevents full compensation.' Adoptado en HDI (UNDP, 2010) y ND-GAIN Country Index (Chen et al., 2015). La media aritmética permitiría que una señal de calidad máxima compense totalmente una de calidad mínima — inaceptable en análisis de riesgo donde toda dimensión es relevante."
+    }
+  },
+  "anomaly": {
+    "temperature_delta_c": 2.0,
+    "precipitation_delta_pct": 25,
+    "wind_speed_delta_pct": 30,
+    "enso_oni_threshold": 0.5,
+    "_refs": {
+      "temperature_delta_c": "UNFCCC Acuerdo de París (2015) Art. 2.1(a): +2°C como umbral de impactos no lineales sobre nivel preindustrial. IPCC AR6 WGI (2021) Ch.4: escenarios SSP calibrados en torno a 1.5°C y 2°C como hitos de evaluación de impacto. WMO-No.1090 (2016) §2.3: anomalía de temperatura ≥2°C sobre normal climatológica 1981-2010 define 'evento de temperatura notable' para alertas operacionales. El umbral de 2°C para anomalía local es conservador respecto al target global, apropiado para señal de alerta temprana regional.",
+      "precipitation_delta_pct": "ETCCDI (Expert Team on Climate Change Detection and Indices, WMO/WCRP): R25mm como indicador estándar de precipitación extrema. WMO-TD/1200 (2009) §3.2: variación ≥20-30% sobre normal climatológica 1981-2010 clasifica como anomalía significativa. SENAMHI Peru boletines climáticos regionales (2020-2023): umbral ±25% sobre normal para activar alertas de anomalía. Se adopta 25% como punto medio del rango WMO.",
+      "wind_speed_delta_pct": "WMO Technical Document No. 1203 (2020) §4.1: eventos de viento significativo se definen en el percentil 85 de la distribución local histórica, que corresponde a ~25-35% sobre la media para la mayoría de regiones andinas-costeras. Vose et al. (2014) 'Monitoring and Understanding Changes in Extremes', Bull.AMS: cambios ≥30% en velocidad de viento correlacionan con transición entre categorías de severidad. El 30% representa el límite inferior del rango de extremos moderados reconocido por WMO.",
+      "enso_oni_threshold": "NOAA/CPC Definición Oficial (2023): 'El Niño (La Niña) se define por ≥5 trimestres consecutivos con anomalía ONI ≥±0.5°C en región Niño 3.4 (5°N-5°S, 170°W-120°W).' Umbral oficial adoptado por WMO, SENAMHI Peru, IDEAM Colombia y todas las agencias meteorológicas de Sudamérica. Es el valor con mayor respaldo científico-institucional del archivo."
+    }
+  },
+  "spatial_coverage": {
+    "default_max_distance_km": 50,
+    "high_resolution_max_km": 1,
+    "geophysical_max_km": 10,
+    "grid_projection_max_km": 25,
+    "observation_max_km": 25,
+    "enso_max_km": null,
+    "_refs": {
+      "default_max_distance_km": "WMO-No.8 CIMO Guide (2018 ed.) Part I Ch.1 §1.3 'Station Representativeness': en terreno complejo (Andes), radio de representatividad de estaciones sinópticas = 25-50km. Se usa el límite superior (50km) como máximo por defecto para terreno andino-costero mixto peruano.",
+      "high_resolution_max_km": "ESA Sentinel-2 User Handbook (2021): resolución nominal 10m, productos L2A efectivos a escala kilométrica tras corrección atmosférica. Muñoz-Sabater et al. (2021) ERA5-Land, ESSD: grilla 0.1° (~9km) → productos downscaled a 1km estándar. WMO OSCAR (2022): 'alta resolución' = resolución horizontal <1km para observaciones satelitales de superficie.",
+      "geophysical_max_km": "USGS Open-File Report 2012-1215: spacing estándar de 5-10km para redes geofísicas de monitoreo regional. InSAR Sentinel-1: productos de deformación cosísmica y deslizamientos a resolución efectiva de 5-10km en procesamiento regional (ESA GEP, 2021). OPS/PAHO (2019): estándar operativo para cobertura geofísica de riesgos en América Latina.",
+      "grid_projection_max_km": "CORDEX South America (CORDEX-SA) resolución estándar: 0.22° (~25km) para modelos climáticos regionales (Giorgi et al., 2009, JGR; Falco et al., 2019, ClimDyn). ERA5: grilla 0.25° (~28km ecuatorial). Este valor replica la resolución nativa de los modelos climáticos regionales usados para proyecciones en Sudamérica — interpolación por debajo de 25km no agrega información real.",
+      "observation_max_km": "WMO OSCAR (2022): red sinóptica básica requiere 1 estación por ~2,500km² → radio promedio ~28km. Red de alta densidad SENAMHI Peru en zonas críticas: 15-25km. Se usa 25km como radio de representatividad estándar para observaciones en terreno complejo.",
+
+      "enso_max_km": "null es científicamente correcto: ENSO es un fenómeno de escala de cuenca que modula la Circulación Walker y genera teleconexiones globales. El índice ONI no tiene límite de representatividad espacial local — su influencia alcanza todo el Perú y más allá (Trenberth, 1997, BAMS; Cai et al., 2023, NatRevEarthEnv)."
+    }
+  },
+  "risk_classification": {
+    "low_max": 2.0,
+    "medium_max": 4.0,
+    "high_min": 4.0,
+    "catastrophic_multiplier": 1.5,
+    "_refs": {
+      "low_max_medium_max_high_min": "Umbrales calibrados a la fórmula interna Score = (P × I) / CA donde P, I ∈ [1,5] y CA ∈ [1,5]. Con condición típica (P=3, I=3): Score = 9/CA ∈ [1.8 (CA=5) → 9 (CA=1)]. Partición: bajo (≤2) → CA≥4.5 — riesgo dentro de capacidad de absorción; medio (2-4) → CA∈[2.25,4.5] — manejable con intervención; alto (≥4) → CA≤2.25 — riesgo supera capacidad adaptativa. Equivalente operacional de los 5 niveles IPCC AR6 WGII (2022) Fig.SPM.1 colapsados en 3 categorías (ISO 31000:2018 §6.6). Nomenclatura: IPCC 'very low/low' → 'bajo'; 'medium' → 'medio'; 'high/very high' → 'alto'.",
+      "catastrophic_multiplier": "IPCC AR6 WGII (2022) §1.4.3 'Low-likelihood, high-impact events': eventos con probabilidad baja pero consecuencias no lineales (colas de distribución) requieren factor de amplificación en evaluación de riesgo. Valor 1.5 es un multiplicador conservador para eventos ≥P95 de la distribución de impactos, consistente con enfoque de 'risk aversion' en infraestructura crítica (ISO 31000:2018 §6.5.2; Weitzman, 2009, REStat). ESTADO: factor configurado pero aún no activado en Stage06Risk — pendiente implementación v2."
+    }
+  },
+  "horizon_years": {
+    "short": 5,
+    "medium": 10,
+    "long": 30,
+    "_refs": {
+      "short": "TCFD (2017) §B: horizonte corto = ciclo operativo de negocio (<5 años). CEPLAN Peru Directiva N°001-2017-CEPLAN/PCD: periodo del Plan Estratégico Institucional (PEI) = 3-5 años. MINAM: ciclos de monitoreo y actualización de alertas climáticas = quinquenales. Coincide con el horizonte near_term del pipeline (baseline + 5 años).",
+      "medium": "TCFD (2017): horizonte medio = ciclo de inversión estratégica (5-10 años). PDC Peru (Planes de Desarrollo Concertado): horizonte estándar 10 años. World Bank Operational Policy OP 4.01 (Environmental Assessment): horizonte de evaluación para proyectos de infraestructura = 10 años. Coincide con proyecciones SENAMHI 2031-2040.",
+      "long": "World Bank Infrastructure Guidelines (2017): vida útil mínima para infraestructura crítica (presas, hospitales, puentes mayores) = 25-50 años; valor representativo = 30 años. IPCC AR6 (2021): mid-century 2041-2060 (~30 años desde 2026 baseline) es el horizonte de referencia más confiable para planificación de adaptación en el largo plazo. Ciclos de concesión e hipotecarios en Peru: 20-30 años (COFIDE, 2022)."
+    }
+  },
+  "adaptive_capacity": {
+    "min_score": 1,
+    "max_score": 5,
+    "default": 3,
+    "min_indicators_required": 3,
+    "_refs": {
+      "min_score_max_score": "Escala Likert 1-5 estándar en índices de vulnerabilidad climática. ND-GAIN Country Index (Chen et al., 2015): escala interna 1-5 normalizada a 0-1. IPCC AR6 Ch.8: indicadores de capacidad adaptativa normalizados en escala ordinal 1-5. Alineado con adaptive-capacity.json (normalization.min_score=1, max_score=5) y facilita la combinación directa con P e I en la fórmula de riesgo.",
+      "default": "Punto medio de escala 1-5 — equivale a 'capacidad adaptativa media/desconocida'. Principio de máxima entropía en ausencia de información (Jaynes, 1957): si no hay evidencia de alta o baja CA, se asume posición neutral. Evita sesgo implícito hacia alta vulnerabilidad (default=1) o baja vulnerabilidad (default=5). Nota: CA=null cuando indicadores disponibles < min_indicators_required (ver Stage06Risk.js).",
+      "min_indicators_required": "ND-GAIN Index (Chen et al., 2015): requiere mínimo 3 de 6 sub-indicadores para calcular un componente dimensional. IPCC AR6: índices compuestos con <3 indicadores tienen alta incertidumbre por representatividad multidimensional insuficiente. Valor corregido de 2 a 3 para alinear con adaptive-capacity.json (_min_indicators: 3) y Stage06Risk.js (usa acConfig._min_indicators ?? 3)."
+    }
+  }
+}

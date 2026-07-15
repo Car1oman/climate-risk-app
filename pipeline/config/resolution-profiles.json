@@ -1,0 +1,149 @@
+{
+  "_version": "1.1.0",
+  "_description": "Perfiles de resolución espacial requerida por sector y modelo de decaimiento continuo para el componente Resolution de Source Quality",
+  "_rule": "coverage_resolution = exp(-alpha * max(0, ratio - 1)) donde ratio = native_m / required_m. ratio <= 1 → 1.0.",
+  "_model": "Decaimiento exponencial continuo sobre el resolution ratio. Evita umbrales discretos arbitrarios.",
+  "_status": "MVP approximation — valores globales no calibrados regionalmente",
+  "_calibration": "Pendiente: alfa podría recalibrarse con estudios de sensibilidad sectorial (CEOS WGCV recomienda alpha ~0.3 para uso operacional)",
+
+  "_methodology": {
+    "_description": "Metodología para determinar required_resolution_m por sector",
+    "principle": "required_resolution_m = smallest_distinguishable_feature_m / nyquist_factor",
+    "nyquist_factor": 3,
+    "nyquist_citation": "Lillesand, T.M., Kiefer, R.W. & Chipman, J.W. (2015). Remote Sensing and Image Interpretation, 7th ed. Wiley. §2.3: A sensor must have ≥3x finer resolution than the target feature for reliable detection (3× Nyquist criterion in spatial remote sensing).",
+    "rationale": "Usar el tamaño de la feature mínima relevante para el análisis sectorial como ancla, en lugar de citar directamente resoluciones de datasets climáticos. Los datasets climáticos tienen resoluciones muy variables; la resolución requerida debe derivarse de la necesidad analítica, no de la disponibilidad de datos."
+  },
+
+  "default_sector": "default",
+  "decay_alpha": 0.3,
+  "decay_formula": "exp(-alpha * max(0, ratio - 1))",
+  "decay_reference": {
+    "model": {
+      "citation": "CEOS WGCV (2019). 'Best Practices for Sensor Characterization.' Committee on Earth Observation Satellites, Working Group on Calibration & Validation. §4.2: Continuous degradation of data utility as native resolution exceeds application requirement.",
+      "scope": "Continuous decay function penalizing sources coarser than required resolution.",
+      "confidence": "medium"
+    },
+    "alpha_calibration": {
+      "citation": "CEOS WGCV (2019). §6.1: Validation ratio guideline 3:1 (native:reference). At alpha=0.3, ratio=3 → coverage=exp(-0.3×2)=0.55 (marginal utility), ratio=10 → coverage=0.07 (effectively unusable). This anchors 0.55 as the marginal-utility boundary at the 3:1 CEOS threshold.",
+      "derivation": "alpha = -ln(0.55) / (3-1) = 0.598/2 ≈ 0.3. Chosen so that the CEOS 3:1 validation threshold maps to coverage ≈ 0.55 (below which source quality is 'marginal').",
+      "caveat": "Alpha is a global default. Sector-specific calibration may differ. For infrastructure (30m required), even ratio=2 may be unacceptable.",
+      "confidence": "medium"
+    }
+  },
+
+  "sectors": {
+    "infrastructure": {
+      "required_resolution_meters": 30,
+      "description": "Building-level infrastructure analysis. Requires highest resolution (SRTM 30m, building footprints).",
+      "reference": {
+        "feature_type": "Manzana censal (census city block) — unidad mínima de análisis de exposición de activos en zonas urbanas",
+        "feature_size_m": 80,
+        "feature_citation": "INEI (2017). 'Censos Nacionales: Marco Geoestadístico Nacional.' Instituto Nacional de Estadística e Informática, Lima. Manzana censal mínima en área urbana: 80–150 m de lado. Disponible en: https://www.inei.gob.pe/media/MenuRecursivo/publicaciones_digitales/Est/Lib1563/",
+        "derivation": "required_m = 80 m (feature_min) / 3 (Nyquist) ≈ 27 m → 30 m (redondeado a la resolución nativa de SRTM)",
+        "dataset_anchor": "Farr, T.G. et al. (2007). 'The Shuttle Radar Topography Mission.' Reviews of Geophysics 45(2). SRTM native resolution: 1 arcsec ≈ 30 m. Es el DEM de mayor resolución globalmente disponible y estándar para análisis de exposición de infraestructura.",
+        "confidence": "high"
+      },
+      "notes": "30m es la resolución nativa de SRTM y coincide con el Nyquist de la manzana censal mínima peruana (~80m). Adecuado para análisis de exposición de activos individuales."
+    },
+    "retail": {
+      "required_resolution_meters": 100,
+      "description": "Urban commercial zone analysis. Block-level resolution sufficient for commercial catchment area delineation.",
+      "reference": {
+        "feature_type": "Zona comercial mínima distinguible (manzana comercial urbana en ciudades LATAM)",
+        "feature_size_m": 300,
+        "feature_citation": "INEI (2017). 'Marco Geoestadístico Nacional.' Manzana censal urbana típica: 80–150 m de lado (perímetro 320–600 m). Copernicus Land Monitoring Service (2018). 'Urban Atlas 2018 — Technical Specifications.' European Environment Agency. Minimum Mapping Unit para zonas comerciales/industriales: 0.25 ha = ~50 m × 50 m.",
+        "derivation": "Análisis de catchment comercial requiere distinguir zonas de al menos ~300 m de perímetro (manzana comercial típica). required_m = 300 m / 3 (Nyquist) = 100 m.",
+        "caveat": "La cita CEOS WGCV v1.0 ('Landsat 30m es 3–10× más fino que 100m → ratio≤1') era circular: justificaba la disponibilidad de fuentes, no el umbral requerido. Reemplazada por derivación desde feature size.",
+        "confidence": "medium"
+      },
+      "notes": "100m ~ manzana comercial urbana típica en Lima/LATAM. Adecuado para análisis de catchment de locales comerciales y zonas de riesgo comercial."
+    },
+    "agriculture": {
+      "required_resolution_meters": 250,
+      "description": "Regional agricultural zone analysis. Resolution sufficient for crop-type zone mapping and irrigation district delineation. NOT suitable for individual parcel analysis.",
+      "reference": {
+        "feature_type": "Zona agrícola mínima distinguible (agregado de parcelas / distrito de riego)",
+        "feature_size_m": 750,
+        "feature_citation": "Didan, K. (2021). 'MODIS/Terra Vegetation Indices 16-Day L3 Global 250m SIN Grid V061.' NASA EOSDIS Land Processes DAAC. DOI: 10.5067/MODIS/MOD13Q1.061. MODIS 250m es el estándar de facto para monitoreo agrícola a escala regional en Perú y LATAM, utilizado por MINAGRI/MIDAGRI para el sistema de alerta temprana agrícola.",
+        "derivation": "Feature mínima detectable con MODIS 250m: zonas de ~750 m de lado. required_m = 750 / 3 = 250 m. Esto corresponde a distritos de riego y agregados de minifundios (parcelas individuales ~0.5–5 ha requieren 10–30 m, fuera de scope de análisis regional).",
+        "peru_context": "CENAGRO (2012). 'IV Censo Nacional Agropecuario.' INEI/MINAG. Tamaño mediano de unidad agropecuaria en Perú: ~1.5 ha (123 × 123 m). Para análisis de riesgo regional (no parcela individual), 250 m es la resolución mínima para detectar zonas agrícolas homogéneas.",
+        "caveat": "La cita WMO No. 100 v1.0 ('densidad de estaciones 25 km → resolución efectiva 250 m') era incorrecta: 25 km / 100 = 250 m es un salto lógico sin fundamento. Eliminada.",
+        "confidence": "medium"
+      },
+      "notes": "250m = resolución nativa MODIS, estándar para monitoreo agrícola regional. No adecuado para análisis de parcelas individuales (requiere Sentinel-2 10–20m)."
+    },
+    "finance": {
+      "required_resolution_meters": 500,
+      "description": "Portfolio-level financial exposure. Asset location accuracy sufficient for TCFD/ISSB/NGFS physical risk disclosure.",
+      "reference": {
+        "feature_type": "Precisión de geolocalización de activos en portafolios financieros (geocoding a nivel de predio/lote)",
+        "feature_size_m": 1500,
+        "feature_citation": "NGFS (2022). 'NGFS Climate Scenarios for central banks and supervisors — Technical Documentation.' Network for Greening the Financial System. Physical risk scoring grid: 1 km (screening) / 500 m (detailed asset level). OS-Climate Physical Risk Tool (2022) uses 500 m resolution for individual asset exposure scoring.",
+        "derivation": "Zona de activo financiero típica para análisis de portafolio (edificio comercial + zona de influencia): ~1,500 m. required_m = 1,500 / 3 = 500 m. Consistente con estándar NGFS para scoring físico de activos individuales.",
+        "caveat": "La cita TCFD (2017) v1.0 ('scenario analysis usa 0.5° ~50 km → 500 m coincide') era incorrecta: TCFD opera a escala de portafolio con datos de 50 km, no prescribe 500 m de resolución de datos. La resolución requerida se deriva de la precisión de geolocalización de activos, no de la resolución de modelos climáticos.",
+        "confidence": "medium"
+      },
+      "notes": "500m ~ precisión de geocodificación para activos financieros. Adecuado para reportes TCFD/ISSB/NGFS donde los activos individuales se agregan a nivel portafolio."
+    },
+    "energy": {
+      "required_resolution_meters": 1000,
+      "description": "Energy infrastructure corridor regional screening. National-scale risk assessment for pipeline, grid, and generation assets.",
+      "reference": {
+        "feature_type": "Corredor de infraestructura energética (zona de influencia para screening regional)",
+        "feature_size_m": 3000,
+        "feature_citation": "World Bank (2019). 'Lifelines: The Resilient Infrastructure Opportunity.' World Bank Group, Washington DC. §3.2: National-scale infrastructure risk screening uses 1 km grid resolution. Global Exposure Database GED4GEM uses 1 km for infrastructure asset risk aggregation.",
+        "derivation": "Zona de influencia de corredor energético para análisis de riesgo regional (pipeline, línea de transmisión): ~3 km de ancho. required_m = 3,000 / 3 = 1,000 m. Coincide con World Bank Lifelines 1km grid estándar.",
+        "peru_context": "OSINERGMIN (2020). 'Plan de Transmisión.' Ministerio de Energía y Minas, Perú. Corredores de transmisión de alta tensión: zonas de servidumbre de 20–50 m, pero análisis de riesgo climático regional opera a escala de municipio/provincia.",
+        "caveat": "La cita IPCC AR6 v1.0 ('proyecciones climáticas a 1° ~100 km → 1 km es apropiado') era incorrecta: IPCC opera a 25–111 km, 100× más grueso. La resolución requerida se deriva de la escala de análisis de corredor, no de la resolución de modelos climáticos globales.",
+        "confidence": "medium"
+      },
+      "notes": "1km para screening regional de infraestructura energética. Para análisis de activo individual (predio de planta, subestación), usar sector infrastructure (30m)."
+    },
+    "default": {
+      "required_resolution_meters": 1000,
+      "description": "General-purpose climate risk assessment. Conservative default for analysis without specific sector context.",
+      "reference": {
+        "feature_type": "Resolución nativa de datasets climáticos de alta resolución globalmente disponibles",
+        "feature_size_m": null,
+        "feature_citation": "Karger, D.N. et al. (2017). 'Climatologies at high resolution for the earth's land surface areas (CHELSA).' Scientific Data 4:170122. DOI:10.1038/sdata.2017.122. Resolución nativa: 30 arcsec ≈ 927 m → redondeado a 1 km. Fick, S.E. & Hijmans, R.J. (2017). 'WorldClim 2: new 1-km spatial resolution climate surfaces for global land areas.' International Journal of Climatology 37(12). DOI:10.1002/joc.5086. Resolución nativa: 30 arcsec ≈ 1 km.",
+        "derivation": "El default de 1km NO se deriva de feature size sectorial (no hay sector definido) sino de la resolución nativa de los dos datasets climáticos de alta resolución más utilizados globalmente (CHELSA y WorldClim v2). Un ratio=1 con estas fuentes implica cobertura=1.0, sin penalización.",
+        "caveat": "La cita IPCC AR6 v1.0 ('0.25°–1° → 1km es conservador') era incorrecta: 0.25° ≈ 27 km, 100× más grueso que 1km. El default ahora se ancla en los datasets natively de 1km, no en modelos climáticos de escala regional.",
+        "confidence": "high"
+      },
+      "notes": "1km = resolución nativa de CHELSA y WorldClim v2. Fuentes con esta resolución reciben coverage=1.0 sin penalización. Ajustar sector para análisis específicos."
+    }
+  },
+
+  "native_resolution_parse": {
+    "_description": "Reglas para parsear resolution_native (string) a metros numéricos",
+    "units": {
+      "m": "metros directos",
+      "km": "kilómetros → multiplicar por 1000",
+      "°": "grados → multiplicar por 111000 (1° ≈ 111 km en el ecuador)",
+      "pixel": "píxeles → tratar como meters si hay número",
+      "cm": "centímetros ignorados (no relevantes para resolución climática)"
+    },
+    "non_spatial_keywords": ["país", "país", "trimestral", "mensual", "anual", "index"],
+    "non_spatial_variables": ["poverty_rate", "gdp_per_capita", "water_access", "urban_population", "oni_index"],
+    "degree_to_meters": 111000,
+    "degree_to_meters_citation": "WGS-84 (NIMA TR8350.2, 2000). 1° de latitud = 110,574 m en el ecuador, 111,694 m en los polos. 111,000 m es la aproximación estándar. Para Perú (~10°S): 1° lat ≈ 110,608 m, error < 0.1%.",
+    "notes": "La conversión de grados a metros es aproximada (ecuador). Para latitudes medias (~45°), 1° ≈ 78 km. Para Perú (~10°S), 1° ≈ 109 km. Se usa 111 km como estándar MVP."
+  },
+
+  "variable_overrides": {
+    "_description": "Para variables climáticas, la resolución requerida se deriva del decorrelation_length. Para no-climáticas, se usa el requerimiento del sector.",
+    "_status": "Implementado en MVP v1.0: required_m = max(sector_required_m, decorrelation_L_km * 1000 / samples_per_L)",
+    "rule": "required_m = max(sector_required_m, climatological_required_m) para variables con decorrelation_length; sector_required_m para las demás.",
+    "samples_per_decorrelation_length": 2,
+    "_rationale": "2 muestras por longitud de decorrelación (~Nyquist mínimo). Con alpha=0.3, ratio=2 → cov=0.74, ratio=4 → cov=0.41, ratio=8 → cov=0.12. Suficiente para no descartar completamente datos gruesos como NASA POWER 0.5°.",
+    "_examples": {
+      "temperature_L500_NASA055": { "L_km": 500, "samples": 2, "clim_required_km": 250, "native_km": 55, "ratio": 0.22, "coverage": 1.0 },
+      "precipitation_L30_Nasa055": { "L_km": 30, "samples": 2, "clim_required_km": 15, "native_km": 55, "ratio": 3.67, "coverage": 0.45 },
+      "precipitation_L30_OpenMeteo028": { "L_km": 30, "samples": 2, "clim_required_km": 15, "native_km": 28, "ratio": 1.87, "coverage": 0.77 }
+    },
+    "non_climate_sectors": {
+      "_description": "Para variables sin decorrelation_length (socioeconómicas, índices), se usa solo el requerimiento del sector.",
+      "notes": "El resolution_ratio en spatial-decorrelation.json maneja elevación/población/edificaciones por separado."
+    }
+  }
+}

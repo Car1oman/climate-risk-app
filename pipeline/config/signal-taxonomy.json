@@ -1,0 +1,72 @@
+{
+  "_version": "1.0.0",
+  "_description": "H-07 (documentacion-v2/stage-04, ALTO): mapeo declarativo variable canónica -> {signal_name, signal_type}, con una entrada por cada clave de CANONICAL_VARIABLES (pipeline/stages/03-normalization/canonical-schema.js). Reemplaza la heurística previa basada en substrings del nombre (varName.includes('_max') => 'projected', etc.), que clasificaba por accidente de nomenclatura en vez de por la naturaleza real del dato — 'air_temperature_max' se marcaba 'projected' por contener '_max', sin importar si el valor era una observación histórica o una proyección real.",
+
+  "_type_rationale": {
+    "anomaly": "Observación puntual/actual, o un valor definido por su propia metodología científica como una anomalía respecto a una norma (twsa: Wahr et al. 1998 'Terrestrial Water Storage ANOMALY'; oni_index: Trenberth 1997, SST anomaly en Niño 3.4). signal_strength puede o no ser calculable para estas variables (ver confidence.js AnomalyDetector/unclassified) — esa es una pregunta distinta de cuál es la NATURALEZA del dato.",
+    "projected": "Proyección CMIP6 (fuente openmeteo_cmip6) para un horizonte futuro (corto/mediano/largo) o su banda base (bare alias = corto) — 'histórico + proyección' per stage-04-signals.md ProjectionDetector.",
+    "categorical": "Estado discreto/cualitativo con un conjunto finito de valores con significado propio (el_nino/la_nina/neutral). Único caso genuino de este tipo en el esquema canónico actual — ver H-18 (documentacion-v2/stage-04, BAJO): 'trend' existe en SignalTypeEnum pero ninguna variable actual tiene la serie temporal multi-observación que ese tipo requeriría; no se fuerza su uso aquí sin datos que lo sustenten.",
+    "static": "Campo fijo no estocástico, o estadística de línea base ya agregada/promediada sobre un período de referencia (elevación SRTM, índices ETCCDI de climate_cells, banda '_historico' CMIP6 = normal OMM 1991-2020, indicadores socioeconómicos anuales del World Bank, probabilidades de línea base GRI/ISIMIP) — no representa una anomalía, tendencia, proyección ni estado discreto; es la referencia contra la que OTRAS señales se comparan (mismo concepto que el detector 'baseline_or_static' en confidence.js calculateSignalStrength). Tipo AÑADIDO a SignalTypeEnum por H-07: 'categorical' no es un ajuste correcto para un dato geofísico continuo como elevación — H-07 lo señala explícitamente como error de clasificación, no solo de cobertura."
+  },
+
+  "_special_cases": {
+    "precipitation_sum": "Único nombre canónico compartido por dos fuentes con naturaleza distinta: nasa_power lo extrae como acumulado OBSERVADO de 1 año (domain=observation_historical, dataTimeRange real de ~365 días); openmeteo_cmip6 también publica un alias sin sufijo de horizonte para su banda 'corto' (domain declarado 'observation_historical' en canonical-schema.js por una inconsistencia de esa configuración — es en realidad una PROYECCIÓN CMIP6, mismo tratamiento que air_temperature_max/min_corto). Ambas casuísticas ya se distinguen en Stage 4 por v.source (ver confidence.js CROSS_SOURCE_BASELINE / computeProjectionDetector), así que signal_type usa 'signal_type_overrides_by_source' para reflejar la fuente real en vez de fijar un solo tipo para las dos. signal_name se mantiene igual para ambas fuentes deliberadamente (no se toca el nombre consumido por PHENOMENA_MAP en Stage 05 — fuera del alcance de H-07)."
+  },
+
+  "variables": {
+    "air_temperature_current": { "signal_name": "temperatura_actual_anomaly", "signal_type": "anomaly" },
+    "air_temperature_max": { "signal_name": "temperatura_max_projection", "signal_type": "projected" },
+    "air_temperature_max_historico": { "signal_name": "temperatura_max_historico", "signal_type": "static" },
+    "air_temperature_max_corto": { "signal_name": "temperatura_max_projection_corto", "signal_type": "projected" },
+    "air_temperature_max_mediano": { "signal_name": "temperatura_max_projection_mediano", "signal_type": "projected" },
+    "air_temperature_max_largo": { "signal_name": "temperatura_max_projection_largo", "signal_type": "projected" },
+
+    "air_temperature_min": { "signal_name": "temperatura_min_projection", "signal_type": "projected" },
+    "air_temperature_min_historico": { "signal_name": "temperatura_min_historico", "signal_type": "static" },
+    "air_temperature_min_corto": { "signal_name": "temperatura_min_projection_corto", "signal_type": "projected" },
+    "air_temperature_min_mediano": { "signal_name": "temperatura_min_projection_mediano", "signal_type": "projected" },
+    "air_temperature_min_largo": { "signal_name": "temperatura_min_projection_largo", "signal_type": "projected" },
+
+    "precipitation_current": { "signal_name": "precipitacion_actual_anomaly", "signal_type": "anomaly" },
+    "precipitation_sum": {
+      "signal_name": "precipitacion_projection",
+      "signal_type": "projected",
+      "signal_type_overrides_by_source": { "nasa_power": "anomaly" }
+    },
+    "precipitation_sum_historico": { "signal_name": "precipitacion_historico", "signal_type": "static" },
+    "precipitation_sum_corto": { "signal_name": "precipitacion_projection_corto", "signal_type": "projected" },
+    "precipitation_sum_mediano": { "signal_name": "precipitacion_projection_mediano", "signal_type": "projected" },
+    "precipitation_sum_largo": { "signal_name": "precipitacion_projection_largo", "signal_type": "projected" },
+
+    "relative_humidity": { "signal_name": "humidity_anomaly", "signal_type": "anomaly" },
+    "wind_speed": { "signal_name": "wind_anomaly", "signal_type": "anomaly" },
+    "surface_pressure": { "signal_name": "pressure_anomaly", "signal_type": "anomaly" },
+    "elevation": { "signal_name": "elevation_baseline", "signal_type": "static" },
+
+    "gri_flood_occurrence": { "signal_name": "flood_occurrence_baseline", "signal_type": "static" },
+    "gri_drought_occurrence": { "signal_name": "drought_occurrence_baseline", "signal_type": "static" },
+    "gri_extreme_heat_occurrence": { "signal_name": "extreme_heat_occurrence_baseline", "signal_type": "static" },
+
+    "twsa": { "signal_name": "twsa_anomaly", "signal_type": "anomaly" },
+    "oni_index": { "signal_name": "oni_index_anomaly", "signal_type": "anomaly" },
+    "enso_phase": { "signal_name": "enso_phase_categorical", "signal_type": "categorical" },
+
+    "cc_tas": { "signal_name": "cc_tas_baseline", "signal_type": "static" },
+    "cc_tasmax": { "signal_name": "cc_tasmax_baseline", "signal_type": "static" },
+    "cc_txx": { "signal_name": "cc_txx_baseline", "signal_type": "static" },
+    "cc_tr": { "signal_name": "cc_tr_baseline", "signal_type": "static" },
+    "cc_hd30": { "signal_name": "cc_hd30_baseline", "signal_type": "static" },
+    "cc_hd35": { "signal_name": "cc_hd35_baseline", "signal_type": "static" },
+    "cc_r20mm": { "signal_name": "cc_r20mm_baseline", "signal_type": "static" },
+    "cc_r50mm": { "signal_name": "cc_r50mm_baseline", "signal_type": "static" },
+    "cc_rx1day": { "signal_name": "cc_rx1day_baseline", "signal_type": "static" },
+    "cc_rx5day": { "signal_name": "cc_rx5day_baseline", "signal_type": "static" },
+    "cc_pr": { "signal_name": "cc_pr_baseline", "signal_type": "static" },
+    "cc_prpercnt": { "signal_name": "cc_prpercnt_baseline", "signal_type": "static" },
+
+    "poverty_rate": { "signal_name": "poverty_rate_baseline", "signal_type": "static" },
+    "gdp_per_capita": { "signal_name": "gdp_per_capita_baseline", "signal_type": "static" },
+    "water_access": { "signal_name": "water_access_baseline", "signal_type": "static" },
+    "urban_population": { "signal_name": "urban_population_baseline", "signal_type": "static" }
+  }
+}

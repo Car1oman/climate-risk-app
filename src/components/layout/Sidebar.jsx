@@ -11,6 +11,7 @@ import {
   Database,
   SearchCheck,
   FolderOpen,
+  FlaskConical,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,7 @@ import {
 
 const navItems = [
   { icon: SearchCheck, label: "Consulta de Riesgos", path: "/" },
+  { icon: FlaskConical, label: "Consulta de Riesgos (v2)", path: "/v2" },
   { icon: FolderOpen, label: "Documentos", path: "/documentos" },
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: Map, label: "Mapa de Riesgos", path: "/map" },

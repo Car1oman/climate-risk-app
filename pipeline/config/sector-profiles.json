@@ -1,0 +1,136 @@
+{
+  "_version": "1.0.0",
+  "_description": "Perfiles sectoriales para riesgos de transición y sensibilidad física",
+  "sectors": {
+    "retail": {
+      "name": "Retail / Comercio",
+      "physical_sensitivity": 0.6,
+      "transition_sensitivity": 0.5,
+      "transition_risks": [
+        {
+          "type": "regulatory",
+          "description": "Regulaciones de eficiencia energética en locales comerciales",
+          "timeframe": "mediano",
+          "severity": "media"
+        },
+        {
+          "type": "market",
+          "description": "Cambio en preferencias del consumidor hacia productos sostenibles",
+          "timeframe": "corto",
+          "severity": "alta"
+        },
+        {
+          "type": "reputational",
+          "description": "Exposición por cadena de suministro con alta huella de carbono",
+          "timeframe": "corto",
+          "severity": "media"
+        }
+      ],
+      "key_indicators": ["carbon_footprint", "energy_efficiency", "supply_chain_emissions"]
+    },
+    "agriculture": {
+      "name": "Agricultura",
+      "physical_sensitivity": 0.9,
+      "transition_sensitivity": 0.4,
+      "transition_risks": [
+        {
+          "type": "regulatory",
+          "description": "Regulaciones de uso de fertilizantes y emisiones de metano",
+          "timeframe": "mediano",
+          "severity": "alta"
+        },
+        {
+          "type": "market",
+          "description": "Demanda de productos orgánicos y carbono-neutrales",
+          "timeframe": "mediano",
+          "severity": "media"
+        }
+      ],
+      "key_indicators": ["fertilizer_use", "water_usage", "land_use_change"]
+    },
+    "finance": {
+      "name": "Finanzas / Seguros",
+      "physical_sensitivity": 0.3,
+      "transition_sensitivity": 0.8,
+      "transition_risks": [
+        {
+          "type": "regulatory",
+          "description": "Requerimientos de divulgación de riesgos climáticos (TCFD/ISSB)",
+          "timeframe": "corto",
+          "severity": "alta"
+        },
+        {
+          "type": "market",
+          "description": "Revalorización de activos con alta exposición climática",
+          "timeframe": "mediano",
+          "severity": "alta"
+        },
+        {
+          "type": "technology",
+          "description": "Desplazamiento de inversiones en combustibles fósiles",
+          "timeframe": "mediano",
+          "severity": "media"
+        }
+      ],
+      "key_indicators": ["portfolio_exposure", "green_finance_ratio", "climate_disclosure"]
+    },
+    "energy": {
+      "name": "Energía",
+      "physical_sensitivity": 0.5,
+      "transition_sensitivity": 0.9,
+      "transition_risks": [
+        {
+          "type": "regulatory",
+          "description": "Impuestos al carbono y eliminación de subsidios a combustibles fósiles",
+          "timeframe": "corto",
+          "severity": "catastrofica"
+        },
+        {
+          "type": "technology",
+          "description": "Disrupción por energías renovables y almacenamiento",
+          "timeframe": "corto",
+          "severity": "alta"
+        },
+        {
+          "type": "market",
+          "description": "Reducción de demanda de hidrocarburos por electrificación",
+          "timeframe": "mediano",
+          "severity": "alta"
+        }
+      ],
+      "key_indicators": ["renewable_share", "carbon_intensity", "stranded_asset_risk"]
+    },
+    "infrastructure": {
+      "name": "Infraestructura",
+      "physical_sensitivity": 0.7,
+      "transition_sensitivity": 0.6,
+      "transition_risks": [
+        {
+          "type": "physical",
+          "description": "Daño por eventos climáticos extremos (inundaciones, sequías, olas de calor)",
+          "timeframe": "corto",
+          "severity": "alta"
+        },
+        {
+          "type": "regulatory",
+          "description": "Nuevos estándares de resiliencia climática en infraestructura crítica",
+          "timeframe": "mediano",
+          "severity": "media"
+        },
+        {
+          "type": "market",
+          "description": "Cambios en patrones de demanda por transición energética",
+          "timeframe": "largo",
+          "severity": "media"
+        }
+      ],
+      "key_indicators": ["climate_resilience", "asset_exposure", "maintenance_cost"]
+    }
+  },
+  "default": {
+    "physical_sensitivity": 0.5,
+    "transition_sensitivity": 0.5,
+    "transition_risks": [],
+    "key_indicators": []
+  }
+}

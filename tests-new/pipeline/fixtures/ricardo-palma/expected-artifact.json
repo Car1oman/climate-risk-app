@@ -1,0 +1,22 @@
+{
+  "_description": "Estructura esperada del artefacto de evidencia para Ricardo Palma (-11.8996, -76.67358)",
+  "version": "2.0",
+  "pipeline_summary": {
+    "total_stages": 7,
+    "passed": 7,
+    "partial": 0,
+    "failed": 0,
+    "overall": "success"
+  },
+  "stages": [
+    { "stage_id": 1, "stage_name": "Acquisition", "status": "success" },
+    { "stage_id": 2, "stage_name": "Validation", "status": "success" },
+    { "stage_id": 3, "stage_name": "Normalization", "status": "success" },
+    { "stage_id": 4, "stage_name": "Signals", "status": "success" },
+    { "stage_id": 5, "stage_name": "Phenomena", "status": "success" },
+    { "stage_id": 6, "stage_name": "Risk", "status": "success" },
+    { "stage_id": 7, "stage_name": "Presentation", "status": "success" }
+  ],
+  "final_result": [],
+  "rules_applied": []
+}

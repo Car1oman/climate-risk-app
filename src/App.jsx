@@ -9,6 +9,7 @@ import LoginPage from '@/pages/LoginPage';
 
 import AppLayout from './components/layout/AppLayout';
 import ClimateRiskLookup from './pages/ClimateRiskLookup';
+import ClimateRiskLookupV2 from './pages/ClimateRiskLookupV2';
 import DocumentosClimaticos from './pages/DocumentosClimaticos';
 import Dashboard from './pages/Dashboard';
 import RiskMap from './pages/RiskMap';
@@ -23,6 +24,7 @@ const AuthenticatedApp = () => {
     <Routes>
       <Route element={<AppLayout />}>
         <Route path="/" element={<ClimateRiskLookup />} />
+<Route path="/v2" element={<ClimateRiskLookupV2 />} />
 <Route path="/documentos" element={<DocumentosClimaticos />} />
 <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/map" element={<RiskMap />} />

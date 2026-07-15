@@ -1,0 +1,126 @@
+{
+  "_version": "2.1.0",
+  "_description": "Registro de fuentes autoritativas por dominio de información",
+  "_rule": "Cada dominio tiene UNA fuente autoritativa. Otras fuentes = complementarias.",
+
+  "_selection_types": {
+    "scientific_standard": "La fuente ES el estándar reconocido en literatura científica para este dominio y es accesible via REST API gratuita.",
+    "operational_proxy": "La fuente redistribuye o simplifica acceso a datos cuya fuente primaria es otra. Se elige por disponibilidad de API gratuita sin descarga manual, no por superioridad científica.",
+    "best_available_via_api": "No existe fuente científicamente superior con REST API pública gratuita equivalente. Esta es la mejor opción disponible con acceso programático.",
+    "derived_cache": "Grilla o store propio derivado de fuentes externas. No es una fuente primaria."
+  },
+
+  "_api_access_policy": "Este sistema usa exclusivamente APIs REST gratuitas sin descarga manual de archivos. Fuentes científicamente superiores existen para algunos dominios (ESGF para CMIP6, NASA Earthdata/AppEEARS para GRACE-FO, ECMWF CDS para ERA5-Land) pero requieren descarga de NetCDF de varios GB y preprocesamiento fuera del alcance de un sistema de consulta en tiempo real. La selección equilibra rigor científico con disponibilidad operacional.",
+
+  "_geographic_scope": "La plataforma cubre exclusivamente Perú. Esto es una decisión de producto permanente, no una limitación de MVP a resolver con geocoding inverso multi-país. LocationSchema (pipeline/shared/types.js, PERU_BBOX) rechaza coordenadas fuera del bbox de Perú en el punto de entrada del pipeline. Por eso el adapter world_bank (source_domain=socioeconomic) fija el país a 'PE' sin necesidad de derivarlo de las coordenadas.",
+
+  "_spatial_derivation": {
+    "_description": "Las distancias máximas se derivan del modelo de decorrelación espacial (spatial-decorrelation.json), no se configuran manualmente.",
+    "formula": "d_max = -L × ln(θ)",
+    "parameters": {
+      "L": "decorrelation_length_km por variable climática en spatial-decorrelation.json",
+      "theta": 0.5,
+      "justification": "θ=0.5 es el umbral de correlación mínimo aceptable. Distancia donde ρ(d)=0.5, estándar geoestadístico (Isaaks & Srivastava, 1989)."
+    },
+    "per_source_derivation": "Para cada fuente, se usa la variable con decorrelation_length más corta (criterio más estricto). Fuentes que solo proveen variables no estocásticas (elevación, población, ONI, país-nivel) no usan este modelo."
+  },
+
+  "sources": {
+    "observation_current": {
+      "domain": "observación actual",
+      "authoritative": "weatherapi",
+      "selection_type": "operational_proxy",
+      "selection_rationale": "WeatherAPI provee REST API gratuita con cobertura global instantánea. El estándar científico para campos de temperatura/precipitación sería ERA5-Land (ECMWF, 0.1°) o NOAA ISD, pero ERA5-Land requiere ECMWF CDS API con latencia de días y no sirve para consultas en tiempo real. WeatherAPI es la única opción con cobertura global, latencia baja y API gratuita.",
+      "complementary": [],
+      "resolution": "~2km (interpolado por vendor)",
+      "resolution_reference": "Claim de documentación WeatherAPI — no es un grid nativo de 2km. Resulta de interpolación de estaciones meteorológicas + satélite + NWP. Resolución efectiva depende de densidad local de estaciones.",
+      "coverage": "global",
+      "known_limitations": "Metodología de interpolación no documentada públicamente. Resolución efectiva en Andes peruanos depende de densidad de red SENAMHI; baja en zonas >3500m. No usar la cifra '~2km' como resolución garantizada para análisis de alta montaña.",
+      "notes": "API de weather actual. Cobertura espacial derivada del decorrelation model via spatial-decorrelation.json."
+    },
+    "observation_historical": {
+      "domain": "observación histórica (reanálisis)",
+      "authoritative": "nasa_power",
+      "selection_type": "scientific_standard",
+      "selection_rationale": "NASA POWER es la interfaz oficial de MERRA-2, reanálisis reconocido por WMO. Accesible via REST API gratuita sin descarga manual. Coincide selección científica con disponibilidad operacional.",
+      "complementary": [],
+      "resolution": "0.5° (~55km)",
+      "resolution_reference": "Gelaro, R. et al. (2017). J. Climate, 30(14), 5419-5454. doi:10.1175/JCLI-D-16-0758.1",
+      "coverage": "global",
+      "known_limitations": "0.5° (~55km) demasiado grueso para eventos localizados en Andes. Reanálisis tiene sesgos documentados en terreno complejo. Serie desde 1981.",
+      "notes": "MERRA-2 reanalysis. Serie diaria desde 1981. Cobertura espacial derivada del decorrelation model via spatial-decorrelation.json."
+    },
+    "projection_climate": {
+      "domain": "proyecciones climáticas CMIP6 (HighResMIP, ~RCP8.5)",
+      "authoritative": "openmeteo_cmip6",
+      "selection_type": "operational_proxy",
+      "selection_rationale": "La fuente primaria de CMIP6 es ESGF (Earth System Grid Federation, esgf-node.llnl.gov). Open-Meteo redistribuye y procesa estos modelos. Se usa Open-Meteo porque provee REST API gratuita sin descarga manual de NetCDF. CORRECCIÓN (HALLAZGO-8, 2026-07-14): este campo afirmaba antes 'selección de modelo y escenario SSP' — verificado en vivo que esto ya NO es cierto. La Climate API de Open-Meteo expone únicamente el ensemble HighResMIP (7 modelos, resolución decadal alta), sin parámetro de escenario. Cita textual de su documentación: 'The high resolution climate models are as close to RCP8.5 as possible within CMIP6.' No existe selección SSP1-2.6/2-4.5/3-7.0/5-8.5 en este endpoint. Open-Meteo no es más autoritativo que ESGF — es más accesible, con el alcance científico reducido descrito arriba.",
+      "complementary": ["supabase_climate_cells"],
+      "resolution": "20km–51km (varía por modelo del ensemble)",
+      "resolution_reference": "Open-Meteo Climate API, tabla de modelos HighResMIP (verificada 2026-07-14): MRI_AGCM3_2_S (Japón, MRI) 20km, HiRAM_SIT_HR (Taiwán, AS-RCEC) 25km, FGOALS_f3_H (China, CAS) 28km, EC_Earth3P_HR (Europa, SMHI) 29km, CMCC_CM2_VHR4 (Italia, CMCC) 30km, NICAM16_8S (Japón, JAMSTEC) 31km, MPI_ESM1_2_XR (Alemania, MPI) 51km.",
+      "coverage": "global",
+      "known_limitations": "HighResMIP es un experimento CMIP6 distinto de ScenarioMIP: alta resolución decadal bajo una trayectoria de emisiones única (~RCP8.5), SIN selección de escenario SSP — la afirmación previa de 'Escenarios disponibles: SSP1-2.6, SSP2-4.5, SSP3-7.0, SSP5-8.5' era falsa y fue corregida (HALLAZGO-8). Open-Meteo aplica su propio preprocesamiento; metodología no totalmente pública. El adapter inyecta media ensemble bajo clave canónica; arrays por modelo preservados para análisis de spread. Los 4 identificadores de modelo usados anteriormente (MRI_ESM2_0, CMCC_ESM2, EC_Earth3_Veg, FGOALS_g3) no existen en la API — causaban fallo 100% de las solicitudes; corregido a los 7 modelos HighResMIP válidos.",
+      "notes": "Open-Meteo Climate API. Ensemble de 7 modelos HighResMIP (CMCC_CM2_VHR4, FGOALS_f3_H, HiRAM_SIT_HR, MRI_AGCM3_2_S, EC_Earth3P_HR, MPI_ESM1_2_XR, NICAM16_8S). Media ensemble ponderada por resolución inversa (w_i=1/resolution_km_i, re-normalizada por timestep) es el esquema activo, no media aritmética simple — ver openmeteo.js (ENSEMBLE_WEIGHTING_SCHEMES/ACTIVE_ENSEMBLE_WEIGHTING_SCHEME) para la justificación completa y sus límites (no es weighting por skill; Knutti et al. 2010 GRL). H-3.5 (2026-07-15): el esquema equal-weight (Tebaldi & Knutti 2007, IPCC AR6 Ch.4 default) ya no es solo la alternativa citada en comentarios — se calcula en paralelo para cada request y Stage03 reporta el delta real por variable/horizonte en methodology.ensemble_weighting_comparison, cuantificando en vez de asumiendo que la diferencia es marginal (Knutti et al. 2010). RMSE-weighting contra observaciones SENAMHI (alternativa recomendada por el hallazgo cuando haya datos) sigue pendiente: no hay serie observacional SENAMHI conectada al pipeline. Arrays por modelo preservados para análisis de spread. Cobertura espacial derivada del decorrelation model via spatial-decorrelation.json."
+    },
+    "elevation": {
+      "domain": "elevación / topografía",
+      "authoritative": "opentopodata_srtm30m",
+      "selection_type": "best_available_via_api",
+      "selection_rationale": "SRTM es el DEM global estándar de facto (Farr et al. 2007). OpenTopoData provee REST API gratuita para SRTM30m sin descarga. Alternativas más precisas (Copernicus GLO-30, ALOS AW3D30) son superiores para Perú pero no tienen REST API pública gratuita equivalente al momento de implementación.",
+      "complementary": ["open_elevation"],
+      "resolution": "30m (~1 arc-second)",
+      "resolution_reference": "Farr, T.G. et al. (2007). Rev. Geophys., 45(2), RG2004. doi:10.1029/2005RG000183",
+      "coverage": "global",
+      "known_limitations": "Datos de 2000 (misión SRTM). Voids en zonas de sombra de radar (Andes escarpados) rellenados con interpolación. Incluye altura de vegetación (no es DTM puro). Copernicus GLO-30 sería superior en precisión para Perú. Confiabilidad de elevación: SRTM confiable hasta ~7,000m (Farr et al. 2007); valores por encima pueden tener errores sistemáticos por limitaciones del interferómetro de radar. Para Perú (máx 6,768m), esto no aplica — opera dentro del rango confiable.",
+      "notes": "SRTM 30m. Alta resolución. Variable no estocástica — cobertura por resolution_ratio, no por distancia."
+    },
+    "hazard_risk_gri": {
+      "domain": "riesgo de amenaza climática (GRI Oxford)",
+      "authoritative": "gri_oxford",
+      "selection_type": "best_available_via_api",
+      "selection_rationale": "Global Infrastructure Resilience Index (Oxford) provee REST API pública gratuita en global.infrastructureresilience.org/api/pixel-driller/point/{lon}/{lat}. Devuelve probabilidades de ocurrencia e intensidad de amenazas climáticas (inundación, sequía, calor extremo, deslizamiento) para escenarios RCP 2.6/4.5/6.0/8.5 y horizontes 2030/2050/2080. Sin autenticación requerida.",
+      "complementary": [],
+      "resolution": "~1km (varía por capa y dominio de modelo)",
+      "resolution_reference": "GRI Oxford pixel-driller API. Resolución nativa varía por dataset: ISIMIP ~0.5°, Aqueduct ~0.5km, JRC Flood ~0.1km.",
+      "coverage": "global",
+      "known_limitations": "Dominios disponibles: isimip, aqueduct, jrc_flood. Excluye: earthquake, wildfire, fire. Modelos GCM múltiples — el pipeline conserva el raw array para que Stage 03 seleccione el ensemble. Cobertura geográfica completa para Perú verificada.",
+      "notes": "GRI Oxford pixel-driller — hazard risk probabilities. Hazards: flood (fluvial/coastal/pluvial), drought, extreme_heat, landslide. Variables estocásticas por escenario/época."
+    },
+    "socioeconomic": {
+      "domain": "indicadores socioeconómicos país",
+      "authoritative": "world_bank",
+      "selection_type": "scientific_standard",
+      "selection_rationale": "World Bank Open Data es el estándar internacional para indicadores socioeconómicos país-nivel. REST API gratuita con cobertura histórica. Selección científica y operacional coinciden.",
+      "complementary": [],
+      "resolution": "país",
+      "resolution_reference": "World Bank Open Data API: data.worldbank.org/developers",
+      "coverage": "Perú (por país)",
+      "known_limitations": "Dato país-nivel oculta desigualdad sub-nacional. Actualización anual con posible rezago de 1-2 años. No captura variación provincial/distrital relevante para análisis local.",
+      "notes": "Indicadores WB: pobreza, GDP, urbanización, agua, etc. Dato país-nivel — cobertura espacial no aplica."
+    },
+    "enso": {
+      "domain": "índice ENSO (El Niño/La Niña)",
+      "authoritative": "noaa_cpc_oni",
+      "selection_type": "scientific_standard",
+      "selection_rationale": "ONI (Oceanic Niño Index) de NOAA CPC es el índice oficial para clasificación de eventos El Niño/La Niña. Accesible como archivo de texto estructurado sin necesidad de API formal. Selección científica y operacional coinciden.",
+      "complementary": ["noaa_enso_discussion"],
+      "resolution": "trimestral",
+      "resolution_reference": "Trenberth, K.E. (1997). Bull. Amer. Meteor. Soc., 78, 2771-2777. doi:10.1175/1520-0477(1997)078<2771:TDOENO>2.0.CO;2",
+      "coverage": "global (región Niño 3.4)",
+      "known_limitations": "Índice único de cuenca Niño 3.4. No captura variación espacial dentro del Pacífico tropical. Actualización quincenal.",
+      "notes": "ONI oficial de NOAA CPC. Índice de cuenca — cobertura espacial no aplica."
+    },
+    "precomputed_grid": {
+      "domain": "grid precomputada de proyecciones",
+      "authoritative": "supabase_climate_cells",
+      "selection_type": "derived_cache",
+      "selection_rationale": "Grilla propia derivada principalmente de openmeteo_cmip6. No es una fuente primaria — es una capa de caché para optimización de consultas repetidas sobre el mismo grid.",
+      "complementary": [],
+      "resolution": "0.25° (~28km)",
+      "resolution_reference": "Resolución definida por el grid propio en Supabase climate_cells.",
+      "coverage": "regional (grid definido)",
+      "known_limitations": "Solo celdas dentro del área cubierta. Latencia de actualización respecto a fuentes originales.",
+      "notes": "Grilla propia en Supabase. Solo celdas dentro del área cubierta."
+    }
+  }
+}

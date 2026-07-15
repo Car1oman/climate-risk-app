@@ -1,0 +1,372 @@
+{
+  "_version": "2.0.0",
+  "_description": "Perfiles de validación basados en evidencia científica y estándares internacionales",
+  "_rule": "Cada regla de validación tiene referencia normativa. No hay valores hardcodeados sin justificación. Warning ranges eliminados en v2.0 — no tenían respaldo documental.",
+
+  "schema": {
+    "air_temperature_current": { "unit": "°C", "description": "Temperatura del aire actual" },
+    "air_temperature_max": { "unit": "°C", "description": "Temperatura máxima diaria" },
+    "air_temperature_min": { "unit": "°C", "description": "Temperatura mínima diaria" },
+    "precipitation_current": { "unit": "mm", "description": "Precipitación actual" },
+    "precipitation_sum": { "unit": "mm", "description": "Precipitación acumulada" },
+    "relative_humidity": { "unit": "%", "description": "Humedad relativa" },
+    "wind_speed": { "unit": "km/h", "description": "Velocidad del viento" },
+    "surface_pressure": { "unit": "hPa", "description": "Presión superficial" },
+    "elevation": { "unit": "m", "description": "Elevación del terreno" },
+    "population": { "unit": "persons", "description": "Población" },
+    "buildings": { "unit": "count", "description": "Densidad de edificaciones" },
+    "land_cover": { "unit": "class", "description": "Clasificación de cobertura terrestre" },
+    "traveltime_healthcare": { "unit": "min", "description": "Tiempo de acceso a salud" },
+    "twsa": { "unit": "cm", "description": "Terrestrial Water Storage Anomaly" },
+    "oni_index": { "unit": "°C", "description": "Oceanic Niño Index" },
+    "poverty_rate": { "unit": "%", "description": "Tasa de pobreza" },
+    "gdp_per_capita": { "unit": "USD", "description": "GDP per cápita" },
+    "water_access": { "unit": "%", "description": "Acceso a agua potable" },
+    "urban_population": { "unit": "persons", "description": "Población urbana" }
+  },
+
+  "fill_values": {
+    "_description": "Fill values por fuente, no global. Cada fuente declara sus propios valores según documentación oficial.",
+    "_standard": "CF Conventions 1.12 Section 2.5.1: _FillValue y missing_value son atributos por variable, no globales.",
+    "per_source": {
+      "weatherapi": {
+        "paths": {
+          "current.temp_c": [],
+          "current.humidity": [],
+          "current.wind_kph": [],
+          "current.pressure_mb": []
+        },
+        "standard": "WeatherAPI returns numeric values only. Null/undefined on connection failure handled upstream.",
+        "notes": "No fill values documented. WeatherAPI returns 0 for missing wind/precipitation (not a fill value — 0 is a valid measurement)."
+      },
+      "nasa_power": {
+        "paths": {
+          "properties.parameter.T2M": [-999, -9999],
+          "properties.parameter.PRECTOTCORR": [-999, -9999],
+          "properties.parameter.RH2M": [-999, -9999],
+          "properties.parameter.WS2M": [-999, -9999],
+          "properties.parameter.PS": [-999, -9999]
+        },
+        "standard": "CF Conventions 1.10. NASA POWER API User Guide: '-999 indicates missing data for daily parameters.'",
+        "reference": "https://power.larc.nasa.gov/docs/services/api/temporal/daily/",
+        "notes": "Only check parameter values. Metadata fields (header, messages, type, geometry) are excluded."
+      },
+      "openmeteo_cmip6": {
+        "paths": {
+          "daily.temperature_2m_max": [null],
+          "daily.temperature_2m_min": [null],
+          "daily.precipitation_sum": [null]
+        },
+        "standard": "Open-Meteo JSON API: null in daily arrays indicates missing data for that day.",
+        "reference": "https://open-meteo.com/en/docs/climate-api",
+        "notes": "null is a native JSON value, not a magic number. Metadata fields (daily_units, daily_units_2m, elevation, generation_time_ms, etc.) are excluded."
+      },
+      "opentopodata_srtm30m": {
+        "paths": {
+          "results[*].elevation": [-9999, -32768]
+        },
+        "standard": "OpenTopoData API: -32768 is SRTM void value. -9999 is general fill.",
+        "reference": "https://www.opentopodata.org/api/",
+        "notes": "Only results[*].elevation is a data field. Status and metadata fields excluded."
+      },
+      "open_elevation": {
+        "paths": {
+          "results[*].elevation": [-9999, -32768]
+        },
+        "standard": "Open-Elevation API: uses SRTM void values.",
+        "reference": "https://open-elevation.com/",
+        "notes": "Same SRTM heritage as opentopodata."
+      },
+      "world_bank": {
+        "paths": {
+          "poverty_rate": [null],
+          "gdp_per_capita": [null],
+          "water_access": [null],
+          "urban_population": [null]
+        },
+        "standard": "World Bank API returns null for missing country-year observations. No numeric fill values.",
+        "reference": "https://datahelpdesk.worldbank.org/knowledgebase/articles/889392",
+        "notes": "The adapter already filters nulls from the raw API response. Remaining nulls indicate the indicator is not available for Peru."
+      },
+      "noaa_cpc_oni": {
+        "paths": {
+          "latest_anom": [],
+          "all_rows[*].anom": [],
+          "all_rows[*].total": []
+        },
+        "standard": "NOAA CPC ONI data includes all valid seasonal values. No fill values in ASCII format.",
+        "notes": "Parsing failures in the adapter produce NaN which is filtered by !isNaN(r.anom). Remaining data should be valid."
+      },
+      "supabase_climate_cells": {
+        "paths": {},
+        "standard": "Supabase returns database native types. Nullable columns are schema-defined.",
+        "notes": "Validation handled at database level. Schema enforces NOT NULL or nullable per column."
+      },
+      "gri_oxford": {
+        "paths": {
+          "results[layer.domain=population].value": [-999, -9999, null],
+          "results[layer.domain=buildings][layer.keys.subtype=all].value": [-999, -9999, null],
+          "results[layer.domain=land_cover].value": [-999, -9999, null],
+          "results[layer.domain=traveltime_to_healthcare][layer.keys.subtype=motorized].value": [-999, -9999, null]
+        },
+        "standard": "GRI Oxford API uses -999 for missing grid cells.",
+        "reference": "https://api.gri.oxford.edu/docs",
+        "notes": "Verified 2026-07-14 against the live pixel-driller API: response is a flat results[] array of { value, layer: { domain, keys } } entries, not per-domain nested objects. Each domain has different data types (continuous, categorical, accessibility). Fill values are standardized across domains."
+      }
+    }
+  },
+
+  "physical_ranges": {
+    "_description": "Rangos físicamente plausibles por variable climática. Basados en WMO CIMO Guide y literatura observacional.",
+    "_standard": "WMO No. 8 (2018) Guide to Instruments and Methods of Observation, Chapter 3; IPCC AR6 WG1 Chapter 2",
+    "_warning_ranges_removed": "v2.0: Se eliminaron todos los warning_ranges genéricos (valores redondos elegidos manualmente, sin respaldo en WMO No. 8, GCOS, ni literatura revisada por pares). El plan original era reemplazarlos por percentiles climatológicos (P5/P95) vía climatological_limit_test, pero esa feature fue removida en v2.1 por ser código muerto: ningún adapter provee percentiles de referencia y la NASA POWER Climatology API solo expone medias mensuales, no percentiles — verificado 2026-07-14 contra la API en vivo. peru_range (abajo, en cada variable) NO es una reintroducción de ese mismo warning_ranges sin respaldo: activado como warning-tier real en H-35 (2026-07-15) precisamente porque, a diferencia de los rangos removidos en v2.0, cada peru_range cita estación(es) SENAMHI y período de observación específicos (ver reference.peru_range por variable) — el mismo estándar de evidencia que exige _rule arriba, solo que a nivel subnacional en vez de global.",
+
+    "air_temperature_current": {
+      "valid_range": { "min": -90, "max": 60 },
+      "unit": "°C",
+      "global_record_range": { "min": -89.2, "max": 56.7 },
+      "peru_range": { "min": -25, "max": 45 },
+      "reference": {
+        "global_range": "WMO CIMO Guide Table 3.1; IPCC AR6 WG1 Chapter 2 (Vostok -89.2°C, Death Valley 56.7°C)",
+        "wmo_extreme_limits": "-90°C to +60°C for meteorological observations (WMO No. 8, Ch. 3, §3.2.1)",
+        "peru_range": "SENAMHI Perú: Estación Antacolpa (Moquegua) -24.5°C; Estación Chachapoyas 42.8°C. Based on observed extremes 1961-2020.",
+        "doi_peru": "SENAMHI (2021). 'Climas del Perú: Mapa de Clasificación Climática Nacional.'"
+      }
+    },
+    "air_temperature_max": {
+      "extends": "air_temperature_current",
+      "valid_range": { "min": -90, "max": 60 },
+      "peru_range": { "min": -15, "max": 48 },
+      "reference": {
+        "global_range": "Same WMO No. 8 limits. Daily max extremes: Death Valley 56.7°C (10 Jul 1913).",
+        "peru_range": "SENAMHI: Selva alta hasta ~45°C en Pucallpa."
+      }
+    },
+    "air_temperature_min": {
+      "extends": "air_temperature_current",
+      "valid_range": { "min": -90, "max": 60 },
+      "peru_range": { "min": -25, "max": 30 },
+      "reference": {
+        "global_range": "Vostok -89.2°C (21 Jul 1983). WMO No. 8 global limits."
+      }
+    },
+    "precipitation_current": {
+      "valid_range": { "min": 0, "max": 2000 },
+      "unit": "mm",
+      "peru_range": { "min": 0, "max": 1500 },
+      "reference": {
+        "physical_limit": "Precipitation cannot be negative. WMO No. 8 §3.4: 'Negative precipitation indicates instrument or data error.'",
+        "max_observed": "Global record: 1825mm in 24h (La Réunion, Jan 1966). Peru: ~750mm/24h (San Ramón, Jun 2018). WMO limits: 0 to 2000 mm/day.",
+        "peru_range": "SENAMHI: Estación Quincemil (Cusco) máximas diarias hasta ~700mm. Costa: máximo histórico ~150mm."
+      }
+    },
+    "precipitation_sum": {
+      "extends": "precipitation_current",
+      "valid_range": { "min": 0, "max": 2000 },
+      "unit": "mm",
+      "_scope_note": "v2.1, HALLAZGO-11: the previous [0, 50000] range was a no-op — the WMO 24h world record is 1825mm, so nothing real could ever exceed it, and its own reference text (5000mm 'monthly max') didn't even support 50000. It also misdescribed what this rule checks: SOURCE_FIELD_MAP resolves precipitation_sum to properties.parameter.PRECTOTCORR (nasa_power) and daily.precipitation_sum (openmeteo_cmip6), and both are per-day arrays — verified live 2026-07-14 (curl against power.larc.nasa.gov/api/temporal/daily/point: PRECTOTCORR values for consecutive days, non-cumulative, units 'mm/day'; openmeteo.js requests Open-Meteo's `daily=precipitation_sum`, whose values are one per calendar day, not a running total). validatePhysicalRanges checks each raw element individually, so it is validating daily totals here — the same physical quantity as precipitation_current, hence the same bound. Stage03's canonical precipitation_sum (a completeness-weighted SUM across the whole requested period — a year for nasa_power, a multi-year horizon band for openmeteo_cmip6) is a genuinely different, larger quantity, but Stage02 runs before that aggregation exists and never validates it; no range is defined for it here because doing so without knowing the real per-source accumulation window would be an unsupported guess, not a documented bound.",
+      "reference": {
+        "physical_limit": "Precipitation cannot be negative. WMO No. 8 §3.4: 'Negative precipitation indicates instrument or data error.'",
+        "max_observed": "Global record: 1825mm in 24h (Foc-Foc, La Réunion, 7-8 Jan 1966, Cyclone Denise — WMO World Weather & Climate Extremes Archive). Same record cited by precipitation_current above, since both validate daily totals."
+      }
+    },
+    "relative_humidity": {
+      "valid_range": { "min": 0, "max": 100 },
+      "unit": "%",
+      "reference": {
+        "physical_limit": "Relative humidity is defined as 0–100% by Clausius-Clapeyron equation. WMO No. 8 §3.5: 'Values outside [0, 100] indicate instrument error or data corruption.'",
+        "wmo_reference": "WMO CIMO Guide (2018), Table 3.5: RH sensor valid range [0, 100]%, accuracy ±3% for <90%, ±5% for ≥90%."
+      }
+    },
+    "wind_speed": {
+      "valid_range": { "min": 0, "max": 500 },
+      "unit": "km/h",
+      "conversion_note": "Adaptee reporta km/h internamente. 500 km/h ≈ 139 m/s (tornado EF5 máximo registrado ~135 m/s).",
+      "reference": {
+        "physical_limit": "Wind speed cannot be negative. WMO No. 8 §3.6: 'Negative wind speed indicates data error.'",
+        "max_observed": "Global surface gust record: 407 km/h (Barrov Island, Australia, 1996). Tornado maximum: ~485 km/h (Bridge Creek, OK, 1999). 500 km/h is absolute WMO extreme limit.",
+        "wmo_reference": "WMO CIMO Guide (2018), Table 3.6: anemometer range 0-75 m/s (0-270 km/h) for operational use; 0-500 km/h for extreme event recording."
+      }
+    },
+    "surface_pressure": {
+      "valid_range": { "min": 870, "max": 1085 },
+      "unit": "hPa",
+      "peru_range": { "min": 950, "max": 1030 },
+      "conversion_note": "H-30: weatherapi reports current.pressure_mb (millibars). No conversion is applied when mapping it to this hPa range because none is needed — 1 mbar = 1 hPa = 100 Pa by unit definition (both derive from the same 100 Pa base independently: 'hecto-' = 100, and the millibar was historically defined as 1/1000 bar = 100 Pa). Numerically identical, not an approximation.",
+      "reference": {
+        "physical_limit": "WMO No. 8 §3.3: 'Sea-level pressure range [870, 1085] hPa covers all known global extremes.'",
+        "global_record": "Minimum: 870 hPa (Tip typhoon, 1979). Maximum: 1084.8 hPa (Tosontsengel, Mongolia, 2001).",
+        "peru_range": "SENAMHI: Costa ~1010-1020 hPa, Sierra ~950-1000 hPa (altitude-adjusted). Standard: reduce to sea level for comparison."
+      }
+    },
+    "elevation": {
+      "valid_range": { "min": -500, "max": 9000 },
+      "unit": "m",
+      "peru_range": { "min": 0, "max": 6768 },
+      "reference": {
+        "physical_limit": "WGS84 ellipsoid: deepest point -11,034m (Mariana Trench), but most DEM products use MSL. SRTM range: -500m (below MSL in depressions) to ~7000m.",
+        "global_max": "Mount Everest 8,848m (Nepal/China border). Maximum SRTM reliable elevation: ~7,000m.",
+        "peru_max": "Huascarán Sur 6,768m — max elevation in Peru. SRTM 30m should capture this.",
+        "range_justification": "max=9000m is the physical plausibility ceiling (Everest + margin), NOT the SRTM sensor reliability ceiling (~7000m per Farr et al. 2007). These are orthogonal concerns: valid_range rejects physically impossible values; SRTM quality degradation above 7000m is a data-quality concern documented in authoritative-sources.json known_limitations. For Peru (max 6,768m), SRTM operates well within its reliable range."
+      }
+    },
+    "twsa": {
+      "_status": "H-24 (2026-07-14): verified unused — no adapter for GRACE-FO/TWSA exists in pipeline/stages/01-acquisition/adapters/, no SOURCE_FIELD_MAP entry maps any source's fields to variable 'twsa' (pipeline/stages/02-validation/index.js), and authoritative-sources.json has no domain registered for it (unlike observation_current, observation_historical, projection_climate, elevation, hazard_risk_gri, socioeconomic, enso, precomputed_grid, which all have entries). validatePhysicalRanges only ever looks up a variable that appears in some source's SOURCE_FIELD_MAP paths, so this range is unreachable at runtime — not a bug, a deliberate placeholder: this range, canonical-schema.js's twsa entry (domain: 'groundwater', GRACE-FO methodology/citations already written), and spatial-decorrelation.json's twsa decorrelation_length_km=300 were pre-registered together so a future GRACE-FO integration (JPL TELLUS GRACEFO_L3_CSR_RL06.1, per canonical-schema.js) only needs an adapter + a SOURCE_FIELD_MAP entry + an authoritative-sources.json domain registration to activate — the physical range itself doesn't need to be re-derived at that point. Legacy V1 server/services/graceFoService.js implements GRACE-FO acquisition but was not migrated into this pipeline; it is not wired to Stage01-03 and should not be treated as if it were.",
+      "valid_range": { "min": -100, "max": 100 },
+      "unit": "cm",
+      "reference": {
+        "physical_limit": "GRACE TWSA equivalent water thickness anomaly. Global range typically [-50, 50] cm. Extreme events (Amazon drought/flood): [-80, 80] cm.",
+        "grace_smoothing": "GRACE post-processing applies 300 km Gaussian smoothing which reduces extremes by ~30%. Raw values beyond ±100 cm are implausible.",
+        "reference_paper": "Wahr, J. et al. (1998). J. Geophys. Res., 103(B12), 30205–30229. DOI: 10.1029/98JB02844"
+      }
+    },
+    "oni_index": {
+      "valid_range": { "min": -4, "max": 4 },
+      "unit": "°C",
+      "reference": {
+        "physical_limit": "ONI is 3-month running mean SST anomaly in Niño 3.4 region. Historical range [-2.5, +3.0]°C since 1950.",
+        "extremes": "Strongest El Niño: 1997-98 DJF at +2.4°C. Strongest La Niña: 1973-74 DJF at -1.8°C (based on ONI v5).",
+        "noaa_reference": "NOAA CPC: ONI defined at https://www.cpc.ncep.noaa.gov/data/indices/",
+        "trenberth_reference": "Trenberth, K.E. (1997). Bull. Amer. Meteor. Soc., 78, 2771–2777."
+      }
+    },
+    "poverty_rate": {
+      "valid_range": { "min": 0, "max": 100 },
+      "unit": "%",
+      "reference": {
+        "world_bank_definition": "Poverty rate is a percentage. Values outside [0, 100] are impossible by definition.",
+        "peru_range": "INEI: Peru national poverty rate has ranged from ~58.7% (2004) to ~20.2% (2019)."
+      }
+    },
+    "gdp_per_capita": {
+      "_status": "H-25 (2026-07-14): the observation that this was 'too generous' cited a ~$130,000 global max, but that's below the real record — verified live against api.worldbank.org/v2/country/MC/indicator/NY.GDP.PCAP.CD (the exact indicator/API worldbank.js already queries for this pipeline): Monaco was $288,001.57 in 2024, up from $176,891.81 in 2020 (+63% in 4 years). 500000 already has real headroom above that (~1.74x) given Monaco's growth trend, and unlike a physical quantity (temperature, pressure) GDP has no instrument/thermodynamic ceiling to cite instead. What was actually missing, and what makes this check meaningfully tight rather than a no-op for THIS pipeline specifically, is a peru_range — every other variable in this file already pairs a loose global valid_range with a tight peru_range (e.g. air_temperature_current), but gdp_per_capita had none even though worldbank.js hardcodes country='PE' (see authoritative-sources.json '_geographic_scope'), so gdp_per_capita will only ever be Peru's own value here. Added below, using the same live-verified Peru figures already cited in completeness.thresholds.socioeconomic's HALLAZGO-16 evaluation ($6,217-$9,684, 2016-2025, no gaps).",
+      "valid_range": { "min": 0, "max": 500000 },
+      "peru_range": { "min": 1500, "max": 20000 },
+      "unit": "USD",
+      "reference": {
+        "world_bank_definition": "GDP per capita (current US$), World Bank indicator NY.GDP.PCAP.CD. Cannot be negative.",
+        "global_max_observed": "Monaco: $288,001.57 (2024), $176,891.81 (2020) — verified live against the same World Bank API this pipeline queries. 500000 is a corruption/sanity ceiling with margin above that trend, not a claim that no real economy could plausibly approach it.",
+        "peru_range": "World Bank NY.GDP.PCAP.CD for Peru (current US$, not PPP — matches what worldbank.js actually returns): $6,217 (2016) to $9,684 (2025), verified live, no gaps in the last 10 years. peru_range widened beyond this observed span (1500-20000) to tolerate a recession or continued growth without needing frequent recalibration, while still catching a genuine order-of-magnitude data error (e.g. unit/decimal mixup) that valid_range's global ceiling is too loose to catch for a country whose real value never approaches $500,000."
+      }
+    }
+  },
+
+  "completeness": {
+    "_description": "Umbrales de completitud basados en estándares GCOS y WMO.",
+    "_standard": "GCOS-200 (2022) Climate Monitoring Principles, Principle 10; WMO No. 100 (2018) Guide to Climatological Practices, Ch. 2; GCOS-245 ECV Requirements (2022/2025) three-tier system (Threshold/Breakthrough/Goal).",
+    "_rule": "Completitud = (campos de datos no-nulos) / (total campos de datos esperados) * 100. Si no se alcanza el threshold mínimo, la fuente se marca con warning.",
+    "_degraded_thresholds": "Los umbrales 'degraded' corresponden al 'Threshold (T)' de GCOS-245: 'the minimum requirement to be met to ensure that data are useful'. No son arbitrarios — están respaldados por: (1) GCOS-245 sistema de tres niveles, (2) evidencia científica de que below 50% completitud, análisis estadísticos pierden significancia (Carro-Calvo et al. 2020, Kim & Cho 2019), (3) datos geoespaciales estáticos requieren >80% para interpolación espacial aceptable (Shabalala et al. 2019).",
+
+    "thresholds": {
+      "climate": {
+        "_description": "Para variables climáticas con series temporales (temperatura, precipitación, etc.)",
+        "_degraded_reference": "GCOS-245 Threshold: minimum for data utility. Carro-Calvo et al. (2020): clustering works with 45% completeness. Below 50%, basic statistical analyses lose significance.",
+        "good": 0.95,
+        "acceptable": 0.80,
+        "degraded": 0.50
+      },
+      "geophysical": {
+        "_description": "Para variables geoespaciales no estocásticas (elevación, población, edificaciones)",
+        "_degraded_reference": "Static spatial data cannot be temporally interpolated. Shabalala et al. (2019): spatial interpolation requires >80% coverage for acceptable RMSE. Gaps represent permanent information loss.",
+        "good": 0.99,
+        "acceptable": 0.95,
+        "degraded": 0.80
+      },
+      "socioeconomic": {
+        "_description": "Para indicadores país-nivel con valores agregados (pobreza, GDP)",
+        "_degraded_reference": "Country-level indicators are aggregated and stable. World Bank accepts 75% as 'acceptable' for annual series. 50% = minimum for aggregated value to be meaningful.",
+        "_good_threshold_evaluated": "HALLAZGO-16: evaluado y mantenido en 1.0 tras verificación — no bajado a 0.90/0.95 porque el premise del hallazgo (el rezago de 1-2 años de World Bank documentado en authoritative-sources.json '.socioeconomic.known_limitations' hace que el año más reciente sea null y por eso 'good' sea inalcanzable) no se sostiene contra el adapter real. worldbank.js consulta mrv=10 (10 valores más recientes) y toma el primer valor no-null (`data[1].filter(e => e.value != null); valid[0].value`), por lo que el rezago anual YA queda absorbido antes de que Stage02 vea el dato: un null que llega hasta aquí significa que el indicador no se publicó NINGÚN año en la última década para Perú, no que 'el año actual aún no salió'. Verificado en vivo 2026-07-14 contra api.worldbank.org/v2/country/PE/indicator/{SI.POV.NAHC,NY.GDP.PCAP.CD,SH.H2O.BASW.ZS,SP.URB.TOTL}?mrv=10: los 4 indicadores de Perú tienen dato no-null en cada uno de los últimos 10 años (sin huecos), por lo que world_bank alcanza 4/4=100% hoy. Con solo 4 campos declarados (SOURCE_FIELD_MAP en Stage02), completeness_pct únicamente puede tomar los valores {0, 0.25, 0.5, 0.75, 1.0} — cualquier threshold 'good' entre 0.76 y 1.0 exigiría igualmente 4/4, así que 0.90/0.95 serían operacionalmente idénticos a 1.0 para esta fuente y no cambiarían nada en la práctica. Mantener 1.0 es correcto: un indicador ausente por una década completa sí amerita no calificar como 'good'.",
+        "good": 1.0,
+        "acceptable": 0.75,
+        "degraded": 0.50
+      },
+      "index": {
+        "_description": "Para índices climáticos unimodales (ONI)",
+        "_degraded_reference": "Climate indices (ONI) require continuous series for El Niño/La Niña classification. 50% = minimum for statistically valid classification per Trenberth (1997) 5-consecutive-season rule.",
+        "good": 1.0,
+        "acceptable": 0.90,
+        "degraded": 0.50
+      }
+    },
+    "reference": {
+      "gcos_200": "GCOS-200 (2022). 'The Global Observing System for Climate: Implementation Needs.' WMO/TD-No. 1538. Principle 10: 'Data completeness should be monitored and reported with each dataset.'",
+      "gcos_245": "GCOS-245 (2022/2025). ECV Requirements. Three-tier system: Threshold (T) = minimum for data utility; Breakthrough (B) = intermediate improvement; Goal (G) = ideal requirement.",
+      "wmo_100": "WMO No. 100 (2018). 'Guide to Climatological Practices.' Ch. 2, §2.3.2: 'Monthly climate data should have ≥80% daily observations. Annual should have ≥90% monthly.'",
+      "wmo_extreme_recommendation": "WMO CCl (2020): 'Extreme event analysis requires ≥95% completeness for reliable percentile calculations.'",
+      "carro_calvo_2020": "Carro-Calvo et al. (2020). 'k-Gaps: a novel technique for clustering incomplete climatological time series.' Theoretical and Applied Climatology. Algorithm works with 55% missing data (45% completeness).",
+      "kim_cho_2019": "Kim & Cho (2019). 'Development of a Gap Filling Technique for Statistical Downscaling.' Journal of Climate Change Research. Monthly climatology affected by missing rates >5%.",
+      "shabalala_2019": "Shabalala et al. (2019). 'Evaluation of Infilling Methods for Time Series of Daily Temperature Data.' Climate. Stations selected had <40% missing data (>60% completeness) for reliable interpolation.",
+      "anderson_2018": "Anderson (2018). 'Accounting for missing data in monthly temperature series.' Intl. J. Climatology. '3/5 rule' and '4/10 rule' for monthly normals."
+    }
+  },
+
+  "data_quality_metrics": {
+    "_description": "Métricas de calidad de datos según ISO 19157:2013 y WMO quality control procedures.",
+    "_standard": "ISO 19157:2013 Geographic Information — Data Quality; WMO No. 8 Chapter 7 (Quality Control Procedures); GCOS-244 (GSN Manual).",
+
+    "qc_tests": {
+      "step_test": {
+        "_description": "Detecta cambios abruptos entre observaciones consecutivas que exceden límites físicos.",
+        "_standard": "GCOS-244 §4.3.2: 'Step test — flag values where |x(t) - x(t-1)| exceeds climatological threshold.'",
+        "_status": "Umbrales no definidos por WMO/GCOS. Son valores técnicos preliminares — calibrar con climatología local cuando esté disponible.",
+        "thresholds_per_variable": {
+          "air_temperature_current": { "max_step_hourly": 10, "max_step_daily": 20, "unit": "°C" },
+          "air_temperature_max": { "max_step_daily": 25, "unit": "°C" },
+          "air_temperature_min": { "max_step_daily": 25, "unit": "°C" },
+          "precipitation_sum": { "max_step_daily": 500, "unit": "mm" },
+          "relative_humidity": { "max_step_hourly": 30, "unit": "%" },
+          "surface_pressure": { "max_step_hourly": 10, "max_step_daily": 30, "unit": "hPa" }
+        },
+        "reference": {
+          "wmo_8_ch7": "WMO No. 8 (2018). Chapter 7: 'Quality Control Procedures for Climatological Data.' §7.3.2: Step test thresholds vary by climate regime.",
+          "gcos_244": "GCOS-244 (2020). 'Global Surface Network Manual.' §4.3: QC procedures including step test."
+        }
+      },
+      "persistence_test": {
+        "_description": "Detecta valores repetidos idénticos por períodos anormales (sensor congelado).",
+        "_standard": "GCOS-244 §4.3.3: 'Persistence test — flag if >N consecutive identical values observed.'",
+        "_status": "N no definido por GCOS. 5 es valor técnico preliminar común en sistemas de control de calidad (Durre et al., 2010, J. Atmos. Oceanic Technol.). Precipitación usa 20 porque 0mm consecutivos es físicamente posible en regiones áridas.",
+        "max_consecutive_identical": {
+          "default": 5,
+          "precipitation_sum": 20
+        }
+      },
+      "_climatological_limit_test_removed": "v2.1 (2026-07-14): Se removió climatological_limit_test (~120 líneas en Stage02Validation.validateClimatologicalLimit) por ser código muerto — ningún adapter de pipeline/stages/01-acquisition/adapters/ pobló nunca source.climatology, y RawSourceResponseSchema (pipeline/shared/types.js) nunca declaró ese campo, así que el test SIEMPRE retornaba 'not_available' pese a estar listado en rulesApplied. Se evaluó implementarlo de verdad: verificado en vivo que la NASA POWER Climatology API (power.larc.nasa.gov/api/temporal/climatology/point) solo expone medias mensuales/anuales (JAN..DEC, ANN), no percentiles P1/P5/P95/P99 — no hay fuente de datos real para los percentiles que este test requeriría, y calcularlos exigiría descargar y almacenar 30 años de datos diarios por ubicación, una pieza de infraestructura nueva (almacenamiento, recomputo periódico, decisión de resolución espacial) fuera del alcance de un fix puntual. Reimplementar requiere antes resolver esa fuente de datos."
+    },
+    "reference": "ISO 19157:2013 Quality measures for geographic data; GCOS-244 GSN Manual; WMO No. 8 Ch. 7"
+  },
+
+  "spatial_coverage": {
+    "_description": "Validación de cobertura espacial usando distancias máximas derivadas del modelo de decorrelación espacial en spatial-decorrelation.json.",
+    "_standard": "d_max = -L × ln(θ) donde L = decorrelation_length_km (spatial-decorrelation.json) y θ = 0.5 (umbral de correlación mínima aceptable).",
+    "_rule": "Consultar spatial-decorrelation.json → variables[].max_distance_km. Se evalúa por variable individualmente (no se combina el max_distance_km de las variables de una fuente en un solo valor por fuente — v2.1, HALLAZGO-7): cada variable de una fuente multivariable se compara contra su propio d_max, así una fuente puede estar 'partial' (algunas variables dentro de rango, otras no) en vez de admitir o rechazar todas sus variables según la más — o menos — estricta. Fuentes no estocásticas (DEM, población, ONI, país-nivel) no usan distancia — spatial_distance_km null es la respuesta legítima y esperada para ellas.",
+    "_null_distance_policy": "v2.1, HALLAZGO-8: spatial_distance_km null se trata distinto según si la fuente tiene o no variables con modelo de decorrelación (variableDistances.length en config-loader.js). Si NO tiene ninguna (fuentes no-espaciales: world_bank, noaa_cpc_oni, gri_oxford, supabase_climate_cells) → 'available', fail-open correcto porque la distancia genuinamente no aplica. Si SÍ tiene variables con modelo de decorrelación (weatherapi, nasa_power, openmeteo_cmip6) y aun así llega null → 'unknown', fail-closed: significa que el adapter no calculó la distancia (bug), no que no aplique. Antes de esta versión ambos casos devolvían 'available' con la misma severidad, por lo que un adapter roto pasaba la validación de cobertura sin ser detectado.",
+    "reference": {
+      "isaaks_srivastava_1989": "Isaaks, E.H. & Srivastava, R.M. (1989). 'An Introduction to Applied Geostatistics.' Oxford University Press. Chapter 5: 'The variogram — range, sill, nugget.' θ=0.5 as reference correlation threshold.",
+      "journel_huijbregts_1978": "Journel, A.G. & Huijbregts, C.J. (1978). 'Mining Geostatistics.' Academic Press. Spatial correlation decay models.",
+      "wmo_station_density": "WMO No. 100 §2.2: 'Station density guidelines: plain regions ~250 km spacing, mountain regions ~25 km spacing.'"
+    }
+  },
+
+  "temporal_consistency": {
+    "_description": "Validación de consistencia temporal para series climáticas.",
+    "_standard": "WMO No. 100 Chapter 5 §5.3: 'Temporal consistency checks'; ISO 19157:2013 Temporal Accuracy.",
+    "tests": {
+      "chronological_order": {
+        "_description": "Verificar que los timestamps de la serie están en orden cronológico.",
+        "_rule": "Si source.response contiene arrays temporales, cada elemento debe tener timestamp >= anterior."
+      },
+      "expected_range_of_dates": {
+        "_description": "Verificar que las fechas están dentro del rango esperado para la fuente.",
+        "weatherapi": { "max_age_minutes": 60, "notes": "H-34 (2026-07-15): checked WeatherAPI's own docs (weatherapi.com/docs — 'Realtime API' section, fetched live) for a published update-interval SLA to cite; there isn't one — they only state current.json returns 'up to date' conditions plus a last_updated/last_updated_epoch field per response for the caller to judge freshness itself. So 60 minutes is NOT a normative or vendor-documented figure — it's this pipeline's own operational threshold: this platform assesses multi-year climate risk (see canonical-schema.js air_temperature_current), where data up to an hour old is still unambiguously 'current' for that purpose; it is not a claim about how often WeatherAPI refreshes. Not currently consumed by any Stage code (grep confirms — same as openmeteo_cmip6's entry below), so it has no runtime effect today; documented as a placeholder default for if/when a staleness check is implemented, at which point last_updated_epoch (not this fixed threshold) should be the primary signal." },
+        "nasa_power": { "expected_start": "1981-01-01", "expected_end": "2024-12-31", "notes": "NASA POWER daily data 1981-present" },
+        "openmeteo_cmip6": { "expected_start": "1950-01-01", "expected_end": "2050-01-01", "notes": "Proyecciones CMIP6 — rango completo del archivo Open-Meteo Climate API (docs: 'Data is available from 1950-01-01 until 2050-01-01'). No consumido por ningún código de Stage actualmente (campo documentado pero sin lector) — actualizado por consistencia con openmeteo.js." }
+      },
+      "no_gaps_detection": {
+        "_description": "Detectar saltos temporales en series continuas esperadas.",
+        "_notes": "MVP: solo registrar. Implementar interpolación en Stage 03 si es necesario."
+      }
+    },
+    "reference": "ISO 19157:2013 §6.1.3 Temporal Accuracy; WMO No. 100 Ch. 5"
+  }
+}
