@@ -5,6 +5,27 @@ import {
   EvidenceArtifactSchema,
 } from "../shared/types.js";
 
+// @deprecated (G8, documentacion-v2/AUDITORIA-E2E-PIPELINE-V2.md, MEDIA):
+// esta clase NUNCA se instancia en ningún punto de producción del
+// repositorio (verificado por grep exhaustivo de "new PipelineOrchestrator"
+// — cero resultados). El orquestador real, usado por server/climate-v2.js
+// (mountV2 → /api/v2/climate-risk), es PipelineEngine
+// (pipeline/orchestration/engine.js). Ya lo confirmó explícitamente el
+// propio código de Stage 07 (07-presentation/index.js, comentarios H-7.8/
+// H-7.9) al tener que verificar por grep cuál de los dos archivos era "el
+// motor real" antes de documentar su comportamiento.
+//
+// Esta clase difiere de PipelineEngine de forma no trivial — no es una
+// copia idéntica: usa una fusión de estado distinta (namespacing
+// `stage_0N_output` del stage inmediatamente anterior, además del aplanado
+// plano), exige `stage instanceof StageInterface` al registrar, y
+// reconstruye su propio `buildEvidenceArtifact()` en vez de reusar
+// EvidenceArtifactBuilder (pipeline/artifact/builder.js). Si esta clase se
+// reactiva alguna vez sin auditar esas diferencias, el pipeline resultante
+// se comportaría de forma sutilmente distinta al camino de producción
+// verificado — no reactivar sin revisar primero engine.js como referencia
+// y decidir explícitamente cuál de las dos implementaciones es la correcta
+// antes de mantener ambas.
 export class PipelineOrchestrator {
   constructor({ stages = [], config = {} } = {}) {
     this.stages = new Map();

@@ -68,6 +68,13 @@ export const ExposureLevelEnum = z.enum(["baja", "media", "alta", "sin_datos"]);
 export const MeasureTypeEnum = z.enum(["estructural", "naturaleza", "gestion", "financiera"]);
 export const StageStatusEnum = z.enum(["success", "partial", "failed"]);
 
+// Fenómenos climáticos válidos del sistema — fuente única de verdad:
+// pipeline/config/phenomenon-definitions.json
+export const PhenomenonNameEnum = z.enum([
+  "ola_de_calor", "ola_de_frio", "sequia", "inundacion",
+  "el_nino", "la_nina", "vientos_fuertes", "deslizamiento", "huayco",
+]);
+
 // spatial_distance_km: distance in km between the queried point and the
 // effective spatial support (station / grid node / pixel) that produced the
 // returned value. It is the physical `d` consumed by this project's
@@ -327,7 +334,7 @@ export const SignalDiscardedSchema = z.object({
 
 export const ClimatePhenomenonSchema = z.object({
   phenomenon_id: z.string().uuid(),
-  name: z.string(),
+  name: PhenomenonNameEnum,
   status: PhenomStatusEnum,
   confidence: z.object({
     source_quality: z.number(),
@@ -454,3 +461,54 @@ export const BusinessImpactSchema = z.object({
   description: z.string(),
   financial_impact_estimate: z.string().optional(),
 });
+
+// H-7.9 (documentacion-v2/stage-07, MEDIO): Stage07Presentation.execute() no
+// validaba la forma de su input — `location.location_name` o
+// `assessments.length` lanzaban TypeError genéricos no controlados si
+// location/assessments faltaban, en vez de un PresentationError tipado
+// (pipeline/shared/errors.js, ya existía pero no se usaba en ningún stage).
+//
+// Decisiones de alcance deliberadas, no una validación exhaustiva de cada
+// campo de cada assessment/phenomenon (eso duplicaría RiskAssessmentSchema/
+// ClimatePhenomenonSchema — responsabilidad de contrato de Stage 6/Stage 5,
+// no de Stage 7 re-verificando su propio upstream campo por campo):
+// - `location`: REQUERIDO y validado con el MISMO LocationSchema que
+//   pipeline/orchestration/engine.js (PipelineEngine.run(), el motor real
+//   usado por server/climate-v2.js) ya usa en la entrada del pipeline
+//   (single source of verdad de "qué es una ubicación válida", no una
+//   versión más laxa duplicada aquí) — es el único campo sin el cual
+//   Stage 7 literalmente no puede renderizar nada (ni siquiera el nombre
+//   de la ubicación).
+// - `sector`: NO se fuerza a SectorEnum ni se exige presencia. H-7.2 ya
+//   implementó un fallback explícito y probado ("no especificado") para
+//   sector ausente/vacío — forzar aquí un fallo duro regresionaría esa
+//   degradación elegante a un error. Queda como string opcional.
+// - `assessments`/`phenomena`: arrays con default [] (no rechazan el
+//   request si faltan) — un pipeline real siempre los provee como arrays
+//   (posiblemente vacíos) desde Stage 5/6, y Stage 7 YA tiene manejo
+//   explícito y testeado para el caso vacío (H-7.3: "no se identificaron
+//   fenómenos evaluables"; H-7.4: "confianza no evaluable") — rechazar con
+//   error en vez de degradar sería PEOR experiencia que la ya construida
+//   para ese caso. Cada elemento solo exige `phenomenon_id` (string) — el
+//   campo mínimo que todo el código de Stage 7 usa para cruzar
+//   assessments↔phenomena (H-7.2 driverPhenomenon, H-7.4 confidence
+//   cross-reference, H-7.7 getRiskContribution, H-7.8 contributing_to) — no
+//   se re-exige risk_level/risk_score_raw/etc. aquí porque son opcionales
+//   en la práctica de cada método consumidor (`?? `/`||` ya los tratan como
+//   posiblemente ausentes).
+// - `.passthrough()` a nivel raíz: el orchestrator (H-7.8) reenvía el
+//   pipelineState COMPLETO a Stage 7 (canonical_variables, source_decisions,
+//   exposure, etc. de stages anteriores) — un schema .strict() rechazaría
+//   una llamada real del orchestrator por campos que Stage 7 simplemente
+//   ignora, no por datos inválidos.
+export const PresentationInputSchema = z.object({
+  location: LocationSchema,
+  sector: z.string().optional(),
+  assessments: z.array(z.object({ phenomenon_id: z.string() }).passthrough()).optional().default([]),
+  phenomena: z.array(z.object({ phenomenon_id: z.string() }).passthrough()).optional().default([]),
+  transition_risks: z.array(z.object({}).passthrough()).optional().default([]),
+  view: z.enum(["executive", "analyst"]).optional().default("executive"),
+  execution_id: z.string().optional(),
+  sources_consulted: z.array(z.object({}).passthrough()).optional().default([]),
+  signals: z.array(z.object({}).passthrough()).optional().default([]),
+}).passthrough();

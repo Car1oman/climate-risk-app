@@ -1,10 +1,16 @@
 import * as React from "react";
 
+// H-7.5 (documentacion-v2/stage-07, BAJO): catastrofico usa morado (purple),
+// no un rojo más oscuro que alto — mismo matiz que
+// src/features/climate-lookup-v2/components/riskLevelStyles.js (la UI real
+// de /v2) y que Stage07Presentation.RISK_COLORS. Un cambio de matiz es más
+// distinguible que un cambio de luminosidad para deficiencias de visión de
+// color rojo-verde (WCAG 1.4.1).
 const LEVEL_STYLES = {
   bajo: { icon: "🟢", label: "Bajo", color: "text-green-600 bg-green-50 border-green-200" },
   medio: { icon: "🟡", label: "Medio", color: "text-yellow-600 bg-yellow-50 border-yellow-200" },
   alto: { icon: "🔴", label: "Alto", color: "text-red-600 bg-red-50 border-red-200" },
-  catastrofico: { icon: "⛔", label: "Catastrófico", color: "text-red-700 bg-red-100 border-red-300" },
+  catastrofico: { icon: "⛔", label: "Catastrófico", color: "text-purple-700 bg-purple-100 border-purple-300" },
 };
 
 const STATUS_LABELS = {

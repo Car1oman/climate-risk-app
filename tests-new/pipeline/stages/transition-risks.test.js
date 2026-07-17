@@ -38,7 +38,7 @@ describe("Transition Risks", () => {
   it("Stage06Risk should include transition risks in output", async () => {
     const { Stage06Risk } = await import("../../../pipeline/stages/06-risk/index.js");
     const stage = new Stage06Risk();
-    const result = stage.execute({
+    const result = await stage.execute({
       phenomena: [],
       sector: "retail",
       config: {},
@@ -52,7 +52,7 @@ describe("Transition Risks", () => {
   it("H-16: Stage06Risk flags transition_risk_profile_source='default' for a sector with no dedicated profile", async () => {
     const { Stage06Risk } = await import("../../../pipeline/stages/06-risk/index.js");
     const stage = new Stage06Risk();
-    const result = stage.execute({
+    const result = await stage.execute({
       phenomena: [],
       sector: "unknown_sector",
       config: {},
@@ -64,7 +64,7 @@ describe("Transition Risks", () => {
   it("Stage07Presentation analyst view should include transition risks", async () => {
     const { Stage07Presentation } = await import("../../../pipeline/stages/07-presentation/index.js");
     const stage = new Stage07Presentation();
-    const result = stage.execute({
+    const result = await stage.execute({
       location: { lat: -11.8996, lon: -76.67358 },
       sector: "retail",
       phenomena: [],
@@ -83,7 +83,7 @@ describe("Transition Risks", () => {
   it("Stage07Presentation executive view should mention transition risks in summary", async () => {
     const { Stage07Presentation } = await import("../../../pipeline/stages/07-presentation/index.js");
     const stage = new Stage07Presentation();
-    const result = stage.execute({
+    const result = await stage.execute({
       location: { lat: -11.8996, lon: -76.67358, location_name: "Test" },
       sector: "finance",
       phenomena: [],

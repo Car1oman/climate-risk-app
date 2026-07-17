@@ -54,9 +54,13 @@ export function createClimateRouter(engine) {
     }
   });
 
-  router.get("/climate-risk/:traceId/trace", (req, res) => {
+  // G6 (documentacion-v2/AUDITORIA-E2E-PIPELINE-V2.md, MEDIA-ALTA): getTrace()
+  // ahora es async — cae a disco (pipeline/artifact/persistence.js) cuando el
+  // artefacto ya no está en el cache en memoria de engine.js (evictado por
+  // tamaño, o de una ejecución anterior a un reinicio del proceso).
+  router.get("/climate-risk/:traceId/trace", async (req, res) => {
     const { traceId } = req.params;
-    const artifact = engine.getTrace(traceId);
+    const artifact = await engine.getTrace(traceId);
     if (!artifact) {
       return res.status(404).json({ error: "TRACE_NOT_FOUND", message: `No artifact found for trace: ${traceId}` });
     }

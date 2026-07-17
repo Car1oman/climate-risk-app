@@ -5,6 +5,7 @@ const INDICATORS = {
   "NY.GDP.PCAP.CD": "gdp_per_capita",
   "SH.H2O.BASW.ZS": "water_access",
   "SP.URB.TOTL": "urban_population",
+  "SE.ADT.LITR.ZS": "education_literacy",
 };
 
 export async function worldbankAdapter(location, config) {

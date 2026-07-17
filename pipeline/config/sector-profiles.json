@@ -1,10 +1,19 @@
 {
   "_version": "1.0.0",
   "_description": "Perfiles sectoriales para riesgos de transición y sensibilidad física",
+  "_refs": {
+    "_methodology": "H-6.4 (documentacion-v2/stage-06, MEDIO): physical_sensitivity (0-1) es un ranking ordinal de juicio experto, NO una cifra derivada de un índice sectorial publicado. No existe un índice publicado de 'sensibilidad física climática' aplicable transversalmente a estos 5 sectores con esta granularidad — IPCC AR6 WGII evalúa vulnerabilidad sectorial cualitativamente por región/sistema (Cap.3-6), no como un score 0-1 comparable entre sectores; ND-GAIN Country Index mide vulnerabilidad de PAÍSES, no de sectores económicos, por lo que no es una fuente válida para estos valores pese a haberse citado antes por error en thresholds.json (corregido, ver impact_calculation._refs._sensitivity_scaling). Este es el mismo tipo de vacío de calibración que source_quality_weights._gap y confidence_weights._gap ya documentan explícitamente en thresholds.json — se opta por declarar el vacío en vez de fabricar una cita que no sustenta el valor específico.",
+    "_ranking_rationale": "El ORDEN relativo (agriculture 0.9 > infrastructure 0.7 > retail 0.6 > energy 0.5 > finance 0.3) es defendible cualitativamente por exposición física directa a variables climáticas: agriculture depende directamente de temperatura/precipitación/sequía para el rendimiento de cultivos (exposición física máxima, sin mediación); infrastructure sufre daño físico directo por eventos extremos (inundación, calor) sobre activos fijos; retail tiene exposición física indirecta (cadena de suministro, tráfico de clientes) más que daño directo a sus propios activos; energy tiene exposición física mixta — generación térmica y red son vulnerables, pero la demanda persiste independientemente del clima, y buena parte de su riesgo climático es de transición (ver transition_sensitivity=0.9, el más alto de los 5), no físico; finance tiene la menor exposición física directa (oficinas, centros de datos) — su riesgo climático dominante es de transición y de balance (revalorización de activos), capturado aparte en transition_sensitivity=0.8. Los ESPACIADOS numéricos exactos entre estos rankings (0.9, 0.7, 0.6, 0.5, 0.3) no tienen una derivación independiente (AHP, encuesta de expertos, regresión) más allá de preservar el orden cualitativo — mismo vacío que _methodology declara. Pendiente de revisión metodológica con un panel de expertos sectoriales o una fuente publicada específica antes de tratar estos decimales como precisos.",
+    "_gap": "Vacío de calibración pendiente: los valores decimales de physical_sensitivity no están anclados a una fuente externa verificable. Evidencia que debería incorporarse en una revisión futura: (a) encuesta AHP con expertos en riesgo climático sectorial, o (b) un índice publicado que cubra estos 5 sectores con metodología comparable (ninguno identificado a 2026-07-17). Hasta entonces, estos valores deben tratarse como un ranking ordinal razonado, no como mediciones cuantitativas precisas — el sistema de riesgo aguas abajo (calculateImpact, H-6.3, H-6.4) ya trata physical_sensitivity como entrada ordinal escalada a Likert 1-5, por lo que la imprecisión decimal tiene impacto acotado (redondeo a 5 niveles).",
+    "_sensitivity_analysis": "H-6.12 (documentacion-v2/stage-06, MEDIO): análisis de sensibilidad ±0.2 sobre physical_sensitivity. Fórmula downstream: Likert = round(value × 4) + 1, clamped [1,5]. Resultados por sector:\n- agriculture (0.9): ±0.2 → [0.7,1.1] → Likert [4,5]. Cambio máximo ±1 punto. Ranking estable.\n- infrastructure (0.7): ±0.2 → [0.5,0.9] → Likert [3,5]. Cambio máximo ±1 punto. Ranking estable.\n- retail (0.6): ±0.2 → [0.4,0.8] → Likert [3,4]. Cambio máximo ±1 punto. Ranking estable.\n- energy (0.5): ±0.2 → [0.3,0.7] → Likert [2,4]. Cambio máximo ±1 punto. Riesgo de cambio de categoría: 0.3→Likert 2 (baja sensibilidad).\n- finance (0.3): ±0.2 → [0.1,0.5] → Likert [1,3]. Cambio máximo ±2 puntos. Mayor volatilidad: 0.1→Likert 1, 0.2→Likert 2, 0.4→Likert 3.\n\nHallazgo clave: el redondeo de la fórmula round(value×4)+1 produce saltos de 2 puntos en los bordes de cada categoría Likert cuando value×4 cae exactamente en un punto medio (x.5). Ejemplo: value=0.375 → round(1.5)+1=0+1=1, value=0.376 → round(1.504)+1=2+1=3 (salto de 2). Esto afecta principalmente a finance (valor más bajo, más cerca de los bordes). El ORDEN ranking (agriculture > infrastructure > retail > energy > finance) es ESTABLE con ±0.2 — ningún par de sectores adyacentes intercambia posición. La incertidumbre está en la magnitud absoluta, no en el ranking relativo.",
+    "_ranking_stability": "H-6.12: verificación de estabilidad del ranking con ±0.2. Pares adyacentes:\n- agriculture (0.9) vs infrastructure (0.7): gap mínimo 0.2 (en peor caso agriculture=0.7, infrastructure=0.9). Gap se invierte si ambos se mueven en dirección opuesta — agriculture baja 0.2, infrastructure sube 0.2. RANGO de seguridad: gap actual=0.2, umbral de inversión=±0.1 por sector. CONclusión: ranking agriculture>infrastructure es FRÁGIL — una revisión de ±0.1 podría invertirlo.\n- infrastructure (0.7) vs retail (0.6): gap=0.1. FRÁGIL — inversión con ±0.05 por sector.\n- retail (0.6) vs energy (0.5): gap=0.1. FRÁGIL — inversión con ±0.05 por sector.\n- energy (0.5) vs finance (0.3): gap=0.2. ESTABLE — requiere ±0.1 por sector para invertir.\n\nNota: estos gaps se refieren a los valores raw (0-1), no a los Likert resultantes. Los Likert tienen más resolución (5 niveles) y los gaps Likert son más grandes, haciendo el ranking más estable en la escala de output que en la escala de input."
+  },
   "sectors": {
     "retail": {
       "name": "Retail / Comercio",
       "physical_sensitivity": 0.6,
+      "_source": "Ranking ordinal de juicio experto (ver _refs._ranking_rationale en la raíz del archivo) — no derivado de índice publicado",
+      "_confidence": "MEDIO — orden defendible por exposición física indirecta (cadena de suministro, tráfico), pero decimales exactos sin calibración AHP. ±0.2 no cambia Likert (round(0.6×4)+1=3, rango [0.4,0.8]→[3,4]).",
       "transition_sensitivity": 0.5,
       "transition_risks": [
         {
@@ -31,6 +40,8 @@
     "agriculture": {
       "name": "Agricultura",
       "physical_sensitivity": 0.9,
+      "_source": "Ranking ordinal de juicio experto (ver _refs._ranking_rationale en la raíz del archivo) — no derivado de índice publicado",
+      "_confidence": "ALTO — mayor exposición física directa de los 5 sectores (dependencia climática sin mediación). Valor más alto y más estable: ±0.2 produce Likert 4-5, nunca cambia de categoría máxima.",
       "transition_sensitivity": 0.4,
       "transition_risks": [
         {
@@ -51,6 +62,8 @@
     "finance": {
       "name": "Finanzas / Seguros",
       "physical_sensitivity": 0.3,
+      "_source": "Ranking ordinal de juicio experto (ver _refs._ranking_rationale en la raíz del archivo) — no derivado de índice publicado",
+      "_confidence": "BAJO — mayor volatilidad de los 5 sectores. ±0.2 produce Likert [1,3] (rango de 3 niveles). Valor más cercano a bordes de redondeo (×4=1.2, borde en 1.5). Riesgo de salto de 2 puntos Likert en ±0.075. Ranking vs energy (gap=0.2) estable con ±0.1.",
       "transition_sensitivity": 0.8,
       "transition_risks": [
         {
@@ -77,6 +90,8 @@
     "energy": {
       "name": "Energía",
       "physical_sensitivity": 0.5,
+      "_source": "Ranking ordinal de juicio experto (ver _refs._ranking_rationale en la raíz del archivo) — no derivado de índice publicado",
+      "_confidence": "MEDIO — exposición física mixta (generación vulnerable, demanda persistente). ±0.2 produce Likert [2,4]. Riesgo de cambio de categoría: 0.3→Likert 2. Ranking vs finance (gap=0.2) estable; vs retail (gap=0.1) frágil.",
       "transition_sensitivity": 0.9,
       "transition_risks": [
         {
@@ -103,6 +118,8 @@
     "infrastructure": {
       "name": "Infraestructura",
       "physical_sensitivity": 0.7,
+      "_source": "Ranking ordinal de juicio experto (ver _refs._ranking_rationale en la raíz del archivo) — no derivado de índice publicado",
+      "_confidence": "MEDIO-ALTO — daño físico directo bien documentado (eventos extremos sobre activos fijos). ±0.2 produce Likert [3,5]. Ranking vs agriculture (gap=0.2) frágil — inversión posible si agriculture baja 0.2 e infrastructure sube 0.2.",
       "transition_sensitivity": 0.6,
       "transition_risks": [
         {
@@ -129,6 +146,7 @@
   },
   "default": {
     "physical_sensitivity": 0.5,
+    "_source": "Punto medio de escala 0-1 para sector sin perfil propio — Principio de máxima entropía (Jaynes, 1957), misma justificación que adaptive_capacity.default en thresholds.json: sin evidencia de sensibilidad alta o baja, se asume posición neutral en vez de sesgar hacia un extremo.",
     "transition_sensitivity": 0.5,
     "transition_risks": [],
     "key_indicators": []

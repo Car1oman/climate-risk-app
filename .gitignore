@@ -16,6 +16,12 @@ dist
 dist-ssr
 *.local
 
+# G6 (documentacion-v2/AUDITORIA-E2E-PIPELINE-V2.md): artefactos de evidencia
+# del pipeline V2 persistidos a disco (pipeline/artifact/persistence.js) —
+# datos de ejecución runtime, no código fuente; pueden contener respuestas
+# crudas de APIs externas.
+pipeline/artifact/storage/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -40,6 +46,7 @@ dist-ssr
 !specs/**/*.md
 !server/**/*.md
 !scripts/README.md
+!documentacion-v2/**/*.md
 codegraph/*
 server/_audit_schema.mjs
 build_phase*.txt

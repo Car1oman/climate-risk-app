@@ -1,0 +1,234 @@
+GIRO DE NEGOCIO POR EMPRESA
+Base de referencia para aplicación de riesgos climáticos
+Fecha de elaboración: julio 2026
+================================================================================
+
+PROPÓSITO DE ESTE DOCUMENTO
+--------------------------------------------------------------------------------
+Este documento describe el giro de negocio de cada una de las empresas listadas,
+agrupadas por plataforma de negocio. Sirve como base para una aplicación de
+riesgos climáticos que busca identificar impactos alineados a la actividad
+específica de cada empresa (p. ej. exposición de tiendas físicas, plantas
+industriales, cadenas de frío, cultivos/insumos agrícolas, infraestructura
+hotelera, centros de datos, etc.).
+
+Para cada empresa se detalla: grupo/holding al que pertenece, marcas o unidades
+de negocio, descripción del giro, sector económico y los activos/operaciones
+físicas clave que son relevantes para evaluar exposición climática.
+
+================================================================================
+1. PLATAFORMA FINANCIERA (Intercorp Financial Services - IFS)
+================================================================================
+
+INTERBANK
+Grupo/Holding: Intercorp Financial Services (IFS)
+Giro de negocio: Banco comercial que ofrece banca personal, empresarial y
+corporativa: cuentas, préstamos, tarjetas de crédito, financiamiento
+hipotecario, banca de PYMEs y banca digital.
+Sector económico: Servicios financieros - Banca múltiple
+Activos y operaciones físicas clave: Red nacional de agencias/sucursales,
+cajeros automáticos (ATMs), centros de datos y plataformas de banca
+digital/móvil, oficinas corporativas.
+
+INTELIGO
+Grupo/Holding: Intercorp Financial Services (IFS)
+Marcas/Unidades: Inteligo Bank, Inteligo SAB, Interfondos
+Giro de negocio: Grupo de banca privada y gestión de patrimonios (wealth
+management) para clientes de alto patrimonio: banca privada internacional,
+sociedad agente de bolsa y administradora de fondos de inversión.
+Sector económico: Servicios financieros - Banca privada y gestión de activos
+Activos y operaciones físicas clave: Oficinas de atención al cliente,
+plataformas digitales de inversión, centros de datos.
+
+IZIPAY
+Grupo/Holding: Intercorp Financial Services (IFS)
+Giro de negocio: Empresa fintech de medios de pago y procesamiento de
+transacciones (adquirencia): soluciones de cobro con tarjeta (POS físicos y
+virtuales), pagos digitales y códigos QR para comercios de todos los tamaños.
+Sector económico: Servicios financieros - Fintech / procesamiento de pagos
+Activos y operaciones físicas clave: Red de terminales POS distribuidos en
+comercios a nivel nacional, infraestructura tecnológica y centros de datos,
+plataforma de pagos digital.
+
+INTERSEGURO
+Grupo/Holding: Intercorp Financial Services (IFS)
+Giro de negocio: Compañía aseguradora que ofrece seguros de vida, rentas
+vitalicias, seguros generales (vehicular, hogar) y productos previsionales.
+Sector económico: Servicios financieros - Seguros
+Activos y operaciones físicas clave: Oficinas administrativas, plataformas
+digitales, red de agentes y corredores de seguros.
+
+================================================================================
+2. PLATAFORMA RETAIL (InRetail Perú Corp.)
+================================================================================
+
+SUPERMERCADOS PERUANOS
+Grupo/Holding: InRetail Perú Corp.
+Marcas/Unidades: Plaza Vea, Vivanda, Mass, Makro
+Giro de negocio: Operador de cadenas de supermercados e hipermercados en
+distintos formatos y segmentos socioeconómicos, comercializando alimentos,
+abarrotes, productos frescos y de consumo masivo.
+Sector económico: Comercio minorista - Supermercados
+Activos y operaciones físicas clave: Red nacional de tiendas físicas, centros
+de distribución, cadena de frío para productos perecibles, flota de
+transporte logístico.
+
+FARMACIAS PERUANAS
+Grupo/Holding: InRetail Pharma / InRetail Perú Corp.
+Marcas/Unidades: Inkafarma, Mifarma, Química Suiza (distribución), Jorsa de
+la Selva
+Giro de negocio: Operador de cadenas de farmacias y droguerías:
+comercialización minorista de medicamentos y productos de cuidado
+personal/salud, más distribución farmacéutica mayorista.
+Sector económico: Comercio minorista - Farmacias y distribución de salud
+Activos y operaciones físicas clave: Red nacional de locales/farmacias,
+centros de distribución, cadena de frío para medicamentos que requieren
+refrigeración.
+
+OECHSLE
+Grupo/Holding: InRetail Perú Corp.
+Giro de negocio: Cadena de tiendas por departamento que comercializa ropa,
+calzado, accesorios, artículos para el hogar y línea blanca.
+Sector económico: Comercio minorista - Tiendas por departamento
+Activos y operaciones físicas clave: Red de tiendas físicas ubicadas
+principalmente dentro de centros comerciales, centros de distribución,
+plataforma de e-commerce.
+
+REAL PLAZA
+Grupo/Holding: InRetail Shopping Malls / InRetail Perú Corp.
+Giro de negocio: Desarrollador y operador de centros comerciales (malls) a
+nivel nacional; arrienda espacios comerciales a terceros (tiendas,
+restaurantes, cines, entretenimiento).
+Sector económico: Bienes raíces - Centros comerciales
+Activos y operaciones físicas clave: Red de centros comerciales
+(edificaciones, estacionamientos, infraestructura eléctrica y de
+climatización de gran escala).
+
+INFINANCE XP
+Grupo/Holding: Joint venture entre Intercorp Financial Services (IFS) e
+InRetail Perú Corp. (antes Financiera Oh!, cambió de nombre en febrero 2026 y
+fue adquirida conjuntamente por IFS e InRetail en abril 2026)
+Marcas/Unidades: InFinance XP, app Sip
+Giro de negocio: Financiera de consumo especializada en tarjetas de crédito y
+créditos de consumo, principalmente para financiar compras en tiendas del
+Grupo Intercorp y comercios aliados, además de créditos en efectivo. Lanzó
+la app Sip, que integra pagos, crédito y programa de lealtad.
+Sector económico: Servicios financieros - Financiamiento de consumo
+Activos y operaciones físicas clave: Módulos/puntos de atención dentro de
+tiendas retail, plataforma digital (app Sip), centro de datos.
+
+PROMART
+Grupo/Holding: InRetail Perú Corp.
+Marcas/Unidades: Promart Homecenter
+Giro de negocio: Cadena de tiendas de mejoramiento del hogar (home
+improvement) que comercializa materiales de construcción, herramientas,
+acabados y artículos para el hogar.
+Sector económico: Comercio minorista - Mejoramiento del hogar
+Activos y operaciones físicas clave: Red de tiendas de gran formato, centros
+de distribución, patios de almacenamiento de materiales de construcción
+(algunos a la intemperie).
+
+================================================================================
+3. PLATAFORMA EDUCACIÓN (Grupo Intercorp)
+================================================================================
+
+INNOVA SCHOOLS
+Giro de negocio: Red de colegios privados de educación básica regular
+(inicial, primaria y secundaria) con modelo educativo estandarizado y
+tecnológico, orientada a familias de clase media.
+Sector económico: Educación - Educación básica regular (K-12)
+Activos y operaciones físicas clave: Red de colegios/campus a nivel nacional
+(y en México y Colombia), infraestructura educativa, transporte escolar.
+
+UTP (Universidad Tecnológica del Perú)
+Giro de negocio: Universidad privada que ofrece educación superior
+universitaria de pregrado y posgrado en diversas carreras profesionales, con
+múltiples sedes a nivel nacional y modalidad presencial/virtual.
+Sector económico: Educación - Educación superior universitaria
+Activos y operaciones físicas clave: Campus universitarios, laboratorios,
+bibliotecas, infraestructura tecnológica para educación virtual.
+
+INLEARNING
+Marcas/Unidades: IDAT, Zegel, Corriente Alterna, Centro de la Imagen
+Giro de negocio: Grupo educativo de institutos de educación superior técnica
+y tecnológica que forma profesionales técnicos en negocios, tecnología,
+diseño, arte y educación.
+Sector económico: Educación - Educación superior técnica
+Activos y operaciones físicas clave: Red de sedes/institutos a nivel
+nacional, infraestructura educativa y talleres.
+
+================================================================================
+4. PLATAFORMA ENTRETENIMIENTO Y HOSPITALIDAD (Grupo Intercorp)
+================================================================================
+
+LA TINKA
+Grupo/Holding: Nexus Group / Grupo Intercorp
+Marcas/Unidades: La Tinka, Kábala, Ganagol, Gana Diario, Kinelo, Te Apuesto,
+Olimpo.bet
+Giro de negocio: Operador de juegos de lotería y apuestas deportivas, con
+sorteos televisados y plataforma digital de apuestas.
+Sector económico: Entretenimiento - Juegos de azar y apuestas
+Activos y operaciones físicas clave: Red nacional de puntos de venta/módulos,
+plataforma digital de apuestas, infraestructura de sorteos (transmisión
+televisiva).
+
+NGR (Nexus Group Restaurant)
+Grupo/Holding: Nexus Group Restaurant / Grupo Intercorp
+Marcas/Unidades: Bembos, Chinawok, Dunkin, Don Belisario, Papa John's,
+Popeyes
+Giro de negocio: Holding gastronómico que opera múltiples cadenas de comida
+rápida y restaurantes bajo franquicias y marcas propias, en más de 400
+locales a nivel nacional.
+Sector económico: Entretenimiento / Hospitalidad - Restaurantes y comida
+rápida
+Activos y operaciones físicas clave: Red nacional de locales/restaurantes,
+cocinas centrales, cadena de suministro de alimentos (insumos agrícolas y
+proteínas), flota de delivery.
+
+CASA ANDINA
+Marcas/Unidades: Casa Andina Premium, Select, Standard
+Giro de negocio: Cadena hotelera peruana con hoteles en distintas
+categorías, ubicados en destinos turísticos y ciudades principales del país.
+Sector económico: Hospitalidad - Hotelería
+Activos y operaciones físicas clave: Red de hoteles a nivel nacional,
+incluyendo destinos en zona andina, selva y costa; infraestructura turística.
+
+CINEPLANET
+Giro de negocio: Cadena de salas de cine que ofrece exhibición de películas
+y experiencias de entretenimiento, incluyendo formatos premium.
+Sector económico: Entretenimiento - Exhibición cinematográfica
+Activos y operaciones físicas clave: Red de complejos de cine ubicados
+principalmente dentro de centros comerciales, infraestructura de
+climatización y proyección.
+
+================================================================================
+5. SALUD
+================================================================================
+
+CLÍNICA AVIVA
+Grupo/Holding: Grupo Intercorp
+Giro de negocio: Red de clínicas privadas de salud enfocada en atención
+médica accesible para la clase media emergente, con servicios ambulatorios,
+hospitalarios, maternidad y especialidades médicas.
+Sector económico: Salud - Servicios de salud privados
+Activos y operaciones físicas clave: Red de clínicas y centros ambulatorios
+(medicentros), salas de hospitalización, equipos médicos (imágenes,
+laboratorio), cadena de frío para medicamentos/vacunas.
+
+================================================================================
+6. SMI
+================================================================================
+
+SMI
+Grupo/Holding: Grupo Intercorp
+Marcas/Unidades: SMI - Sustainable Materials & Innovation
+Giro de negocio: Empresa manufacturera de envases rígidos de plástico (PET):
+botellas, tapas, preformas y soluciones de empaque sostenible, incluyendo
+reciclaje de plástico (producción de resina reciclada). Es la empresa más
+internacionalizada del Grupo Intercorp, con presencia en 14 países de
+América.
+Sector económico: Industria manufacturera - Envases y empaques plásticos
+Activos y operaciones físicas clave: Plantas de manufactura y reciclaje en
+Perú, Colombia, Ecuador, Guatemala, México y otros países; consumo intensivo
+de agua y energía; cadena de suministro de resina PET.
+

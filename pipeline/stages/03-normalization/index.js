@@ -583,6 +583,30 @@ export class Stage03Normalization extends StageInterface {
           { method: "direct_read", completeness: 1.0 }, coverageDecision
         ));
       }
+      if (r.education_literacy != null) {
+        extracted.push(this._buildVariable(
+          "education_literacy", r.education_literacy, source, dataTimeRange,
+          { method: "direct_read", completeness: 1.0 }, coverageDecision
+        ));
+      }
+    }
+
+    if (name === "gri_oxford" && source.response?.results) {
+      const results = source.response.results;
+      const dataTimeRange = { start: source.request?.timestamp || "unknown", end: source.request?.timestamp || "unknown" };
+      // GRI Oxford response is a flat array of { value, layer: { domain, keys } } pairs.
+      // Extract traveltime_healthcare (motorized subtype) for adaptive capacity.
+      // Weiss et al. (2020): motorized travel time fits the 0-120 min normalization
+      // range in adaptive-capacity.json healthcare_access indicator.
+      const traveltimeEntry = results.find(
+        r => r.layer?.domain === "traveltime_to_healthcare" && r.layer?.keys?.subtype === "motorized"
+      );
+      if (traveltimeEntry?.value != null) {
+        extracted.push(this._buildVariable(
+          "traveltime_healthcare", traveltimeEntry.value, source, dataTimeRange,
+          { method: "direct_read", completeness: 1.0 }, coverageDecision
+        ));
+      }
     }
 
     if (name === "noaa_cpc_oni" && source.response?.latest_anom != null) {

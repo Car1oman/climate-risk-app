@@ -3,7 +3,7 @@
   "_description": "Indicadores para el cálculo de Capacidad Adaptativa (CA)",
   "_methodology": {
     "framework": "IPCC AR6 Chapter 8 + ND-GAIN Country Index (Chen et al., 2015)",
-    "weighting": "equal — 1/N sobre indicadores con datos disponibles. Pesos diferenciales requieren AHP con panel experto o PCA sobre datos históricos subnacionales; pendiente para v3.",
+    "weighting": "H-6.16 (documentacion-v2/stage-06, BAJO): equal — 1/N sobre indicadores con datos disponibles. Es el default de máxima entropía / Principio de indiferencia de Laplace (Jaynes, 1957) para N cantidades sin evidencia que justifique ponderarlas de forma distinta — un placeholder deliberado, no una calibración empírica. Pesos diferenciales requerirían AHP con panel experto o PCA sobre datos históricos subnacionales; pendiente para v3, sin fecha comprometida. Ver thresholds.json adaptive_capacity._refs._h6_16_sensitivity_analysis para cuánto importa esta elección en la práctica.",
     "normalization": "Min-max a escala 1-5. Rangos calibrados en P5-P95 de datos subnacionales Peru (INEI ENAHO 2023 / Censo 2017).",
     "score_rule": "CA = promedio(scores normalizados) sobre indicadores con datos. Si disponibles < _min_indicators → CA = null."
   },

@@ -124,6 +124,10 @@ export function getPhenomenonDefinitions() {
   return loadConfig("phenomenon-definitions.json");
 }
 
+export function getAdaptationMeasures() {
+  return loadConfig("adaptation-measures.json");
+}
+
 export function getAllConfig() {
   return {
     authoritativeSources: getAuthoritativeSources(),

@@ -402,6 +402,40 @@ export const CANONICAL_VARIABLES = {
       ],
     },
   },
+  education_literacy: {
+    unit: "%",
+    description: "Tasa de alfabetismo adulto (World Bank, SE.ADT.LITR.ZS)",
+    domain: "socioeconomic",
+    methodology: {
+      default_method: "direct_read",
+      references: [
+        "World Bank: Adult literacy rate, population 15+ years (UNESCO Institute for Statistics)",
+        "Brooks et al. (2005): literacy rate as highest-ranked determinant of adaptive capacity",
+      ],
+      scientific_rationale: "Indicador país-nivel. Porcentaje de población ≥15 años que puede leer y escribir una corta declaración sobre su vida diaria. Proxy de capital humano para capacidad adaptativa.",
+      assumptions: [
+        "Valor nacional. No captura variación subnacional de alfabetismo.",
+        "La definición de alfabetismo varía entre fuentes — UNESCO usa la definición de la ley nacional.",
+      ],
+    },
+  },
+  traveltime_healthcare: {
+    unit: "min",
+    description: "Tiempo de viaje motorizado a establecimiento de salud (GRI Oxford, Weiss et al. 2020)",
+    domain: "hazard_risk_gri",
+    methodology: {
+      default_method: "direct_read",
+      references: [
+        "Weiss et al. (2020) 'Global maps of travel time to healthcare facilities' Nature Medicine",
+        "GRI Oxford friction surface v2.0",
+      ],
+      scientific_rationale: "Tiempo de viaje motorizado al centro de salud más cercano. Subtipo 'motorized' seleccionado porque Weiss et al. 2020 calibra contra el estándar OMS de acceso de 2 horas en vehículo.",
+      assumptions: [
+        "Resolución ~1km. El valor esrepresentativo del píxel, no de un punto exacto.",
+        "Se usa subtype=motorized (no walking) porque los tiempos motorizados encajan con el rango de normalización 0-120 min del indicador healthcare_access en adaptive-capacity.json.",
+      ],
+    },
+  },
 };
 
 // Horizon-sliced variants of the openmeteo_cmip6 daily series: instead of one

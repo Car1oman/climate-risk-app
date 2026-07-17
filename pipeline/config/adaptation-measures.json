@@ -1,0 +1,213 @@
+{
+  "_version": "1.0.0",
+  "_description": "H-7.3 (documentacion-v2/stage-07, MEDIO): catálogo de medidas de adaptación usado por Stage07Presentation.buildRecommendations() para personalizar recomendaciones por fenómeno×sector y por tipo de riesgo de transición×sector, en vez de los 2 textos estáticos hardcodeados que existían antes.",
+  "_methodology": {
+    "primary_source": "Anexo 10.2 Catálogo de Riesgos y Medidas de Adaptación (Grupo Intercorp, jul 2026) — documento interno de la empresa, secciones 'Cat. Riesgos' (columna final = recomendación por tipo de riesgo de transición×sector) y 'Cat. Medidas' (medidas físicas de adaptación por sector).",
+    "secondary_reference": "IPCC AR6 WGII (2022) Ch.8 'Poverty, Livelihoods and Sustainable Development', Table 8.5, categoriza opciones de adaptación en structural/physical, social e institutional — usada como marco de referencia general para clasificar measure_type, no como fuente de texto específico (el catálogo interno ya provee texto específico y auditable).",
+    "coverage_gap": "El Anexo 10.2 cubre las plataformas de negocio de Intercorp (Retail, Financiero, Salud, Educación, Entretenimiento/Hospitalidad, SMI), que NO mapean 1:1 con los 5 sectores genéricos de este pipeline (retail, agriculture, finance, energy, infrastructure — pipeline/config/sector-profiles.json). Cobertura sector-específica VERIFICADA solo para 'retail' y 'finance' (equivalentes directos: Retail→retail, Financiero→finance). Para agriculture/energy/infrastructure NO existe una fila de 'Cat. Medidas' o 'Cat. Riesgos' en el Anexo — fabricar medidas etiquetadas como 'específicas de agriculture' sin esa fuente sería la misma clase de precisión inexistente que H-6.4/H-6.5/H-6.9/H-6.10/H-6.16/H-7.1 ya rechazaron en Stages 6 y 7. En su lugar, esos 3 sectores (y cualquier combinación fenómeno×sector sin fila específica) reciben measures de generic_measures, filas del Anexo explícitamente etiquetadas 'Todas las plataformas' — genuinamente sector-agnósticas por diseño del documento fuente, no una generalización fabricada por este sistema.",
+    "phenomenon_coverage_gap": "vientos_fuertes está en excluded_phenomena de phenomenon-definitions.json (Stage 5 nunca lo emite — sin línea base de viento en Stage 04) y no tiene entrada en este catálogo por la misma razón: no hay fenómeno real que cubrir todavía. la_nina y ola_de_frio SÍ son fenómenos activos (phenomenon-definitions.json) pero el Anexo 10.2 no menciona 'La Niña' en ningún renglón, y 'heladas/friaje/nevadas' solo aparece en filas del sector Salud (Cat. Riesgos, no está en Cat. Medidas, y Salud no es un sector de este pipeline) — ambos fenómenos caen a generic_measures, declarado explícitamente en measures_by_hazard_sector con sector_specific:{} vacío en vez de omitir el fenómeno silenciosamente."
+  },
+  "measures_by_hazard_sector": {
+    "ola_de_calor": {
+      "sector_specific": {
+        "retail": [
+          {
+            "measure": "Techos fríos, sombreados y recubrimientos reflectivos",
+            "description": "Membranas reflectivas o pinturas de alta reflectancia en techos de locales comerciales para reducir la ganancia de calor solar.",
+            "horizon": "Mediano plazo (2-5 años)",
+            "co_benefits": "Reducción del consumo energético en climatización (10-30%); mejora del confort térmico de clientes y colaboradores.",
+            "source": "Anexo 10.2 Cat. Medidas — Retail / Techos fríos, sombreados y recubrimientos reflectivos"
+          },
+          {
+            "measure": "Ajustes operativos en atención presencial ante calor extremo",
+            "description": "Refuerzo de climatización en zonas de mayor concentración de personas, pausas obligatorias para personal de carga, comunicación proactiva a clientes.",
+            "horizon": "Corto plazo (0-2 años)",
+            "co_benefits": "Reducción del riesgo de golpe de calor en personal; cumplimiento de SUNAFIL; reducción de ausentismo.",
+            "source": "Anexo 10.2 Cat. Medidas — Retail / Ajustes operativos en atención presencial"
+          }
+        ]
+      }
+    },
+    "inundacion": {
+      "sector_specific": {
+        "retail": [
+          {
+            "measure": "Sistemas de drenaje pluvial reforzados",
+            "description": "Captación y drenaje de aguas pluviales en estacionamientos, accesos y áreas de descarga para prevenir anegamientos durante lluvias intensas.",
+            "horizon": "Corto plazo (0-2 años)",
+            "co_benefits": "Continuidad operativa durante lluvias; reducción de daños a inventarios y activos.",
+            "source": "Anexo 10.2 Cat. Medidas — Retail / Sistemas de drenaje pluvial reforzados"
+          },
+          {
+            "measure": "Elevación o protección de equipos críticos",
+            "description": "Elevación de equipos eléctricos, POS, servidores y cámaras frigoríficas en locales con historial de inundaciones.",
+            "horizon": "Corto plazo (0-2 años)",
+            "co_benefits": "Protección de activos críticos; continuidad de ventas.",
+            "source": "Anexo 10.2 Cat. Medidas — Retail / Elevación o protección de equipos críticos"
+          },
+          {
+            "measure": "Seguros ante eventos extremos (incl. paramétricos)",
+            "description": "Pólizas de daños materiales, pérdida de beneficios e interrupción de negocio dimensionadas para eventos de El Niño e inundaciones.",
+            "horizon": "Corto plazo (0-2 años)",
+            "co_benefits": "Protección financiera ante pérdidas; acceso a capital de recuperación ágil.",
+            "source": "Anexo 10.2 Cat. Medidas — Retail / Seguros ante eventos extremos"
+          }
+        ],
+        "finance": [
+          {
+            "measure": "Elevación o protección de equipos críticos",
+            "description": "Reubicación o elevación de servidores, equipos eléctricos, UPS y archivos físicos críticos en agencias y centros de procesamiento de pagos ubicados en zonas inundables.",
+            "horizon": "Corto plazo (0-2 años)",
+            "co_benefits": "Continuidad de operaciones financieras; protección de datos y activos digitales.",
+            "source": "Anexo 10.2 Cat. Medidas — Financiero / Elevación o protección de equipos críticos"
+          },
+          {
+            "measure": "Infraestructura de conectividad redundante",
+            "description": "Enlaces de telecomunicaciones redundantes (fibra + LTE/satelital) en agencias, switches de pagos y data centers.",
+            "horizon": "Corto plazo (0-2 años)",
+            "co_benefits": "Continuidad de ingresos transaccionales; cumplimiento de exigencias regulatorias de resiliencia operacional.",
+            "source": "Anexo 10.2 Cat. Medidas — Financiero / Infraestructura de conectividad redundante"
+          },
+          {
+            "measure": "Gestión de riesgo climático en portafolio crediticio",
+            "description": "Evaluación de riesgo climático físico en originación, monitoreo y pricing de créditos, con georreferenciación de cartera y garantías en zonas inundables.",
+            "horizon": "Mediano plazo (2-5 años)",
+            "co_benefits": "Reducción de pérdidas esperadas por eventos climáticos; insumo para stress testing climático.",
+            "source": "Anexo 10.2 Cat. Medidas — Financiero / Gestión de riesgo climático en portafolio crediticio"
+          }
+        ]
+      }
+    },
+    "sequia": {
+      "sector_specific": {
+        "retail": [
+          {
+            "measure": "Sistemas de captación y eficiencia hídrica",
+            "description": "Recirculación de agua, grifería de bajo consumo y captación de agua pluvial para reducir la dependencia del suministro urbano en zonas con estrés hídrico.",
+            "horizon": "Mediano plazo (2-5 años)",
+            "co_benefits": "Reducción de costos del agua; continuidad operativa ante restricciones de suministro.",
+            "source": "Anexo 10.2 Cat. Medidas — Retail / Sistemas de captación y eficiencia hídrica"
+          }
+        ]
+      }
+    },
+    "el_nino": {
+      "sector_specific": {
+        "retail": [
+          {
+            "measure": "Protocolos de emergencia climática para eventos de El Niño",
+            "description": "Cadenas de mando, cierre seguro de locales y protección de inventarios críticos ante inundaciones y olas de calor asociadas a El Niño.",
+            "horizon": "Corto plazo (0-2 años)",
+            "co_benefits": "Reducción de pérdidas de inventario y activos; seguridad del personal.",
+            "source": "Anexo 10.2 Cat. Medidas — Retail / Protocolos de emergencia climática"
+          }
+        ],
+        "finance": [
+          {
+            "measure": "Protocolos de emergencia climática para agencias y medios de pago",
+            "description": "Procedimientos de cierre seguro, protección de efectivo y datos, y activación de canales digitales alternativos ante eventos de El Niño.",
+            "horizon": "Corto plazo (0-2 años)",
+            "co_benefits": "Continuidad de servicios financieros; protección de activos y datos.",
+            "source": "Anexo 10.2 Cat. Medidas — Financiero / Protocolos de emergencia climática"
+          }
+        ]
+      },
+      "_note": "El Anexo 10.2 no tiene una categoría de riesgo físico separada para 'El Niño' — sus manifestaciones catalogadas son inundaciones/lluvias intensas (Cat. Riesgos fila Financiero/Físico/Agudo y Retail/Costa norte y central/Físico/Agudo mencionan explícitamente 'eventos de El Niño'). Las medidas listadas aquí son las que el catálogo cita explícitamente para El Niño, no una copia genérica de las de inundacion."
+    },
+    "la_nina": {
+      "sector_specific": {},
+      "_note": "Ningún renglón del Anexo 10.2 ni 10.1 menciona 'La Niña' explícitamente — vacío de cobertura declarado (no fabricado). Cae a generic_measures."
+    },
+    "ola_de_frio": {
+      "sector_specific": {},
+      "_note": "El Anexo 10.2 solo cubre heladas/friajes/nevadas para el sector Salud (Cat. Riesgos, fila Salud/Sierra/Físico/Agudo) — Salud no es un sector de este pipeline (sector-profiles.json: retail, agriculture, finance, energy, infrastructure). Sin cobertura sector-específica real disponible. Cae a generic_measures."
+    }
+  },
+  "generic_measures": [
+    {
+      "measure": "Plan de continuidad operativa (BCP) con escenarios climáticos",
+      "description": "Actualización del BCP corporativo con escenarios climáticos específicos (El Niño, huaicos, olas de calor), RTO/RPO diferenciados por proceso crítico y pruebas anuales de activación.",
+      "horizon": "Corto plazo (0-2 años)",
+      "applicable_hazards": "any",
+      "source": "Anexo 10.2 Cat. Medidas — Todas las plataformas / Planes de continuidad operativa (BCP)"
+    },
+    {
+      "measure": "Fondo de contingencia climática",
+      "description": "Reservas líquidas equivalentes a 2-3 meses de costos operativos fijos para cubrir gastos de respuesta y recuperación ante eventos climáticos extremos.",
+      "horizon": "Corto plazo (0-2 años)",
+      "applicable_hazards": "any",
+      "source": "Anexo 10.2 Cat. Medidas — Todas las plataformas / Fondos de contingencia climática"
+    },
+    {
+      "measure": "Ajustes operativos ante calor extremo (horarios, teletrabajo)",
+      "description": "Horario flexible, teletrabajo y pausas térmicas obligatorias para colaboradores en días de alerta de calor extremo.",
+      "horizon": "Corto plazo (0-2 años)",
+      "applicable_hazards": ["ola_de_calor"],
+      "source": "Anexo 10.2 Cat. Medidas — Todas las plataformas / Ajustes operativos (horarios, teletrabajo)"
+    }
+  ],
+  "transition_measures_by_type_sector": {
+    "regulatory": {
+      "sector_specific": {
+        "finance": {
+          "text": "Crear hoja de ruta de datos climáticos, asignar responsabilidades de gobierno y asegurar trazabilidad de métricas (financed emissions, exposición física).",
+          "source": "Anexo 10.2 Cat. Riesgos — Financiero / Transición / Regulatorio"
+        },
+        "retail": {
+          "text": "Mapear cadena de valor en emisiones y materiales; anticipar cambios regulatorios con planes de transición de empaques.",
+          "source": "Anexo 10.2 Cat. Riesgos — Retail / Transición / Regulatorio"
+        }
+      }
+    },
+    "market": {
+      "sector_specific": {
+        "finance": {
+          "text": "Fortalecer estrategia de finanzas sostenibles, comunicación transparente y verificación externa para evitar percepciones de greenwashing.",
+          "source": "Anexo 10.2 Cat. Riesgos — Financiero / Transición / Mercado"
+        },
+        "retail": {
+          "text": "Diseñar roadmap de sostenibilidad de portafolio; incorporar criterios ambientales en selección de proveedores.",
+          "source": "Anexo 10.2 Cat. Riesgos — Retail / Transición / Mercado"
+        }
+      }
+    },
+    "technology": {
+      "sector_specific": {
+        "finance": {
+          "text": "Usar análisis de escenarios y señales tempranas (capex, intensidad de carbono, planes de transición) para ajustar límites y condiciones crediticias.",
+          "source": "Anexo 10.2 Cat. Riesgos — Financiero / Transición / Tecnológico"
+        }
+      }
+    },
+    "reputational": {
+      "sector_specific": {
+        "finance": {
+          "text": "Asegurar consistencia entre discurso y cartera, validar claims con evidencia, y establecer políticas sectoriales claras (carbón, deforestación).",
+          "source": "Anexo 10.2 Cat. Riesgos — Financiero / Transición / Reputacional"
+        },
+        "retail": {
+          "text": "Establecer política de proveedores sostenibles con auditorías y mecanismos de denuncia; comunicar avances verificables.",
+          "source": "Anexo 10.2 Cat. Riesgos — Retail / Transición / Reputacional"
+        }
+      }
+    },
+    "physical": {
+      "sector_specific": {},
+      "_note": "sector-profiles.json usa type='physical' solo para 'infrastructure' — un caso atípico donde un riesgo físico está listado dentro de transition_risks (ver sector-profiles.json infrastructure.transition_risks[0]). Sin equivalente en Anexo 10.2 (que no cubre 'infrastructure' como sector). Cae a generic_transition_measures."
+    }
+  },
+  "generic_transition_measures": [
+    {
+      "text": "Incorporar formalmente el riesgo climático físico y de transición en el marco de gestión de riesgos corporativo, con apetito de riesgo, KRIs climáticos y reporte periódico a directorio.",
+      "source": "Anexo 10.2 Cat. Medidas — Todas las plataformas / Integración del riesgo climático en estrategia corporativa"
+    },
+    {
+      "text": "Implementar una plataforma de medición y reporte de emisiones GEI (Scope 1, 2 y 3 parcial) para cumplimiento anticipado de exigencias regulatorias y reporting ESG.",
+      "source": "Anexo 10.2 Cat. Medidas — Todas las plataformas / Sistemas de medición de huella de carbono"
+    },
+    {
+      "text": "Incorporar análisis de riesgo climático físico y de transición en la evaluación de proyectos de inversión y adquisición de activos, usando herramientas de mapeo de riesgo geoespacial.",
+      "source": "Anexo 10.2 Cat. Medidas — Todas las plataformas / Evaluación de riesgo climático en inversiones y activos"
+    }
+  ]
+}

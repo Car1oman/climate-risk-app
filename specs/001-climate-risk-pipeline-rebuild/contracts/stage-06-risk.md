@@ -51,7 +51,7 @@
    Si no, calcular desde signal_strength usando tabla de conversión configurable.
 3. **Impact**: calcular desde sensibilidad del sector (profile) × nivel de exposición
    × capacidad adaptativa.
-4. **Risk Score**: (P × I) / CA, clasificado según umbrales.
+4. **Risk Score**: (P × I) / CA — convención de ingeniería de riesgos basada en ISO 31000:2018 §6.6. La fórmula NO es una derivación del marco IPCC AR6 WGII (que define riesgo cualitativamente, §1.4). Ver `thresholds.json` `formula_source` para la referencia completa y análisis comparativo con alternativas.
 5. **Clasificación**: operativo si se materializa en ≤10 años, estratégico si >10 años.
 
 ## Rules Applied
@@ -62,6 +62,20 @@
 4. Riesgo catastrófico señalado independientemente del score si cumple criterios
    (vida, legal, continuidad, reputación irreversible).
 5. Cada riesgo se evalúa en al menos 2 escenarios (≤2°C y >2°C) y 3 horizontes.
+   **H-6.10 (documentacion-v2/stage-06, ALTO): NO implementado — brecha estructural, no un descuido de Stage 6.**
+   Stage06Risk produce 1 evaluación por fenómeno recibido (su loop escala correctamente a N si Stage 05
+   emitiera N fenómenos distintos por hazard). El bloqueo real está aguas arriba: (a) ninguna fuente de
+   datos del pipeline tiene dimensión de escenario SSP — Open-Meteo CMIP6, única fuente de proyecciones,
+   expone solo el ensemble HighResMIP (~RCP8.5) sin parámetro de escenario (HALLAZGO-8,
+   `authoritative-sources.json` `projection_climate`); (b) Stage 05 colapsa deliberadamente los horizontes
+   corto/mediano/largo de un fenómeno en uno solo por prioridad (H-5.9), no emite 3 fenómenos independientes.
+   Fabricar 6 assessments por fenómeno duplicando el mismo P/I/CA con solo la etiqueta de
+   escenario/horizonte distinta simularía una granularidad de análisis que no existe en los datos. En su
+   lugar, cada assessment declara explícitamente su cobertura real vs. la exigida aquí en el campo
+   `evaluation_coverage` (`meets_contract: false` hoy) — ver `thresholds.json`
+   `evaluation_coverage_requirements` y Stage06Risk `rulesApplied` H-6.10. Cerrar esta brecha requiere
+   trabajo en Stage 03 (ingesta de SSPs) y Stage 05 (dejar de colapsar horizontes), fuera del alcance de
+   Stage 6.
 
 ## Traceability
 
