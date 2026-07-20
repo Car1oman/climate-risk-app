@@ -1,0 +1,174 @@
+@startuml Pipeline_V2_Flujo_Datos
+!theme plain
+title Climate Risk Pipeline V2 — Flujo End-to-End de Datos\n(basado en código verificado, documentacion-v2/AUDITORIA-E2E-PIPELINE-V2.md)
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 160
+skinparam BoxPadding 10
+autonumber "<b>0."
+
+actor "Usuario" as User
+
+box "FRONTEND (React)" #E8F0FE
+  participant "ClimateRiskLookupV2.jsx" as PAGE
+  participant "useClimateAnalysisV2()\n(hook)" as HOOK
+  participant "apiV2.js" as APICLIENT
+  participant "RiskSummaryV2 /\nPhenomenaGridV2 /\nRecommendationsListV2 /\nTracePanelV2" as VIEW
+end box
+
+box "API / ORQUESTACIÓN" #FFF3E0
+  participant "climate-v2 Router\n(server-new/routes/climate-v2.js)" as ROUTER
+  participant "PipelineEngine\n(pipeline/orchestration/engine.js)" as ENGINE
+  participant "EvidenceArtifactBuilder\n(pipeline/artifact/builder.js)" as BUILDER
+end box
+
+box "PIPELINE V2 — 7 STAGES (StageInterface, async execute())" #E8F5E9
+  participant "01 Acquisition" as S1
+  participant "02 Validation" as S2
+  participant "03 Normalization" as S3
+  participant "04 Signals" as S4
+  participant "05 Phenomena" as S5
+  participant "06 Risk" as S6
+  participant "07 Presentation" as S7
+end box
+
+participant "SourceRegistry\n(pipeline/stages/01-acquisition/registry.js)" as REG
+database "Fuentes externas\n(WeatherAPI, NASA POWER, Open-Meteo CMIP6,\nGRI Oxford, World Bank, NOAA CPC/ENSO,\nSupabase climate_cells, OpenTopoData...)" as EXT
+
+box "PERSISTENCIA" #F3E5F5
+  participant "engine.artifacts\n(Map en memoria, LRU acotado)" as MEM
+  participant "persistence.js\n(JSON en disco)" as DISK
+end box
+
+== 1. Solicitud del usuario ==
+
+User -> PAGE : Selecciona ubicación (lat/lon) + sector + vista
+PAGE -> HOOK : run(lat, lon, sector, view)
+HOOK -> APICLIENT : runClimateRiskV2({lat, lon, sector, view})
+APICLIENT -> ROUTER : **POST /api/v2/climate-risk**\n{ lat, lon, sector, view }
+
+== 2. Validación de entrada y arranque del pipeline ==
+
+ROUTER -> ENGINE : run({ coordinates:{lat,lon}, sector, view })
+ENGINE -> ENGINE : LocationSchema.parse()\n(rechaza fuera de PERU_BBOX)\nSectorEnum.parse()
+note right of ENGINE
+  execution_id = uuid()
+  pipelineState = { location, sector, view, execution_id }
+  **Mecanismo clave**: cada stage recibe el objeto
+  acumulado COMPLETO de todos los stages previos
+  (Object.assign plano) — no solo su input declarado
+  en el contrato. Ver Hallazgo Transversal, §1.3 de
+  AUDITORIA-E2E-PIPELINE-V2.md.
+end note
+ENGINE -> BUILDER : init(execution_id, location, sector)
+
+== 3. Stage 01 — Acquisition ==
+
+ENGINE -> S1 : execute(pipelineState)
+S1 -> REG : executeAll(location)
+REG -> EXT : fetch paralelo (Promise.allSettled,\ndedupe in-flight por source_name)
+EXT --> REG : respuestas crudas (o error por fuente)
+REG --> S1 : sources_consulted[]\n{source_name, response, coverage_status,\nspatial_distance_km, authority_level...}
+S1 --> ENGINE : { sources_consulted }
+ENGINE -> BUILDER : addStage(artifact_01)
+
+== 4. Stage 02 — Validation ==
+
+ENGINE -> S2 : execute(pipelineState + sources_consulted)
+note right of S2 : Schema, fill values, rangos físicos (WMO),\ncompletitud, consistencia temporal, cobertura espacial
+S2 --> ENGINE : { validated_sources, coverage_decisions }
+ENGINE -> BUILDER : addStage(artifact_02)
+
+== 5. Stage 03 — Normalization ==
+
+ENGINE -> S3 : execute(...)
+note right of S3
+  _scoreSources(): 1 fuente ganadora por variable×dominio
+  (completeness + proximity + resolution dinámica,
+  authority gate explícito, desempate determinista)
+end note
+S3 --> ENGINE : { canonical_variables, source_decisions,\nexcluded_variables }
+ENGINE -> BUILDER : addStage(artifact_03)
+
+== 6. Stage 04 — Signals ==
+
+ENGINE -> S4 : execute(...)
+note right of S4
+  calculateSourceQuality() — 5 componentes (30/20/20/20/10)
+  calculateSignalStrength() — detector por tipo de variable
+  (anomaly / projection / categorical / baseline_or_static)
+  Filtra por min_signal_strength (OECD/JRC §5.2)
+end note
+S4 --> ENGINE : { signals, signals_discarded,\nsource_quality_summary }
+ENGINE -> BUILDER : addStage(artifact_04)
+
+== 7. Stage 05 — Phenomena ==
+
+ENGINE -> S5 : execute(...)
+note right of S5
+  aggregate-signals.js: combina SQ/SS de señales→fenómeno
+  combine-confidence.js: confidence.combined = √(SQ×SS)
+  signal-metadata.js: infiere status/horizon/scenario
+end note
+S5 --> ENGINE : { phenomena, phenomena_not_detected }
+ENGINE -> BUILDER : addStage(artifact_05)
+
+== 8. Stage 06 — Risk ==
+
+ENGINE -> S6 : execute(...)
+note right of S6
+  probability (interno o externo GRI Oxford) × impact
+  (sensibilidad sectorial) / adaptive_capacity
+  risk_score_raw, ISO 31000 §6.6 — clasifica bajo/medio/alto/catastrófico
+  evaluation_coverage: declara honestamente si cumple
+  el contrato de 2 escenarios × 3 horizontes (hoy: no)
+end note
+S6 --> ENGINE : { assessments, exposure,\nadaptive_capacity, transition_risks }
+ENGINE -> BUILDER : addStage(artifact_06)
+
+== 9. Stage 07 — Presentation ==
+
+ENGINE -> S7 : execute(...)
+note right of S7
+  calculateOverallRisk(): max-risk + risk_composite + risk_count
+  buildExecutiveSummary(): narrativa con trace_id + phenomenon_id
+  buildRecommendations(): adaptation-measures.json (fenómeno×sector)
+  buildConfidenceNote(): confidence.combined (no probability)
+end note
+S7 --> ENGINE : { view, response }\n(response = payload final para UI)
+ENGINE -> BUILDER : addStage(artifact_07)
+
+== 10. Ensamblaje del artefacto y persistencia ==
+
+ENGINE -> BUILDER : setFinalResult(assessments)\nsetNarratives(executive, analyst)
+BUILDER --> ENGINE : EvidenceArtifact completo\n{ artifact_id, execution_id, pipeline_summary,\n  stages[7], final_result, narratives, rules_applied }
+ENGINE -> MEM : cachea (execution_id + artifact_id,\nLRU acotado a 200 ejecuciones)
+ENGINE -> DISK : saveArtifact() [best-effort,\nsobrevive a reinicios]
+
+== 11. Respuesta HTTP y render en el usuario ==
+
+ENGINE --> ROUTER : { success: true, artifact }
+ROUTER --> APICLIENT : **200 OK**\n{ success, view, location, artifact_id,\n  execution_id, summary, data: <EvidenceArtifact> }
+APICLIENT --> HOOK : result
+HOOK -> HOOK : response = result.data.stages\n  .find(s => s.stage_name === 'Presentation')\n  .output.response
+HOOK --> PAGE : { response, phenomena, recommendations,\n  overall_risk, executive_summary, trace_id }
+PAGE -> VIEW : <<props>>
+VIEW --> User : **Semáforo de riesgo, narrativa ejecutiva,\ntarjetas de fenómenos, recomendaciones\npriorizadas, nota de confianza**
+
+== 12. (Opcional) Consulta de trazabilidad ==
+
+User -> PAGE : Abre panel de trazabilidad
+PAGE -> APICLIENT : getTrace(trace_id)
+APICLIENT -> ROUTER : **GET /climate-risk/:traceId/trace**
+ROUTER -> ENGINE : await getTrace(traceId)
+ENGINE -> MEM : ¿en cache?
+alt cache hit
+  MEM --> ENGINE : artifact
+else cache miss (evictado o de un reinicio previo)
+  ENGINE -> DISK : loadArtifact(traceId)
+  DISK --> ENGINE : artifact
+end
+ENGINE --> ROUTER : artifact (o null → 404)
+ROUTER --> APICLIENT : trace resumido por stage\n(status, duration_ms, rules_applied, error)
+APICLIENT --> VIEW : TracePanelV2
+
+@enduml

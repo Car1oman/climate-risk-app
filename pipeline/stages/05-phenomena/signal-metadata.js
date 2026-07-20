@@ -115,33 +115,40 @@ export function inferStatus(signalNames) {
 }
 
 /**
- * H-5.11: Infer phenomenon scenario from the scenarios of its contributing signals.
+ * H-5.11 (revisado — auditoría de transformación de datos, hallazgo P2):
+ * infiere el escenario del fenómeno leyendo directamente signal.scenario de
+ * cada señal contribuyente, en vez de una tabla estática por nombre.
  *
- * Current implementation returns null for all signals because:
- * - Anomaly signals are present observations — no scenario applies.
- * - Projected signals come from Open-Meteo CMIP6 HighResMIP ensemble, which
- *   is a single high-emissions-like pathway with NO SSP scenario selection
- *   parameter (HALLAZGO-8, authoritative-sources.json).
- * - Categorical signals (ENSO) are discrete states — no scenario applies.
+ * Por qué el cambio: SIGNAL_METADATA es una tabla declarativa por NOMBRE de
+ * señal, pero desde que Stage 03 extrae cc_tasmax_corto/mediano y
+ * cc_pr_corto/mediano (climate_cells, con escenario real — ver
+ * 03-normalization/index.js), el MISMO nombre de señal
+ * ("temperatura_max_projection_corto") puede producirse desde dos fuentes
+ * distintas: openmeteo_cmip6 (sin escenario, siempre null) o
+ * supabase_climate_cells (con escenario real, ssp245/ssp585 según lo
+ * solicitado). Una tabla keyed-by-nombre no puede representar eso — leer
+ * `signal.scenario` directamente (ya propagado por Stage 04 desde la
+ * variable canónica, sin inferencia) sí puede, y es la fuente de verdad más
+ * directa posible: cero pasos entre "lo que la fuente declaró" y "lo que
+ * esta función retorna".
  *
- * Stage 6 uses fallback "not_scenario_specific" (stage-06-risk.js:36-37),
- * which is correct and consistent with HALLAZGO-8.
+ * Se mantiene SIGNAL_METADATA[name]?.scenario como fallback defensivo por si
+ * una señal llega sin el campo `scenario` propagado (ej. artefactos
+ * persistidos antes de este cambio, o un caller de test que construye
+ * señales a mano) — nunca inventa un escenario, solo evita un `undefined`
+ * no manejado.
  *
- * If any signal has a non-null scenario in the future (e.g. from a data source
- * that provides SSP labels), this function will return the first non-null
- * scenario found. If signals have conflicting scenarios, the first one wins
- * (no conflict resolution needed today since all are null).
+ * Si las señales contribuyentes declaran escenarios distintos entre sí (no
+ * debería ocurrir hoy: todas las señales de una misma ejecución comparten el
+ * mismo parámetro `scenario` de la consulta), gana la primera no-null
+ * encontrada — mismo comportamiento que la versión anterior.
  *
- * Extension path: add scenario to ClimateSignalSchema (types.js), extract SSP
- * labels from sources that provide them (Supabase climate_cells with
- * ensemble-all-sspXXX), and update SIGNAL_METADATA above.
- *
- * @param {string[]} signalNames - names of signals contributing to the phenomenon
+ * @param {Array<{name: string, scenario?: string|null}>} signals - señales contribuyentes (objetos completos, no solo nombres)
  * @returns {string | null}
  */
-export function inferScenario(signalNames) {
-  for (const name of signalNames) {
-    const scenario = SIGNAL_METADATA[name]?.scenario;
+export function inferScenario(signals) {
+  for (const s of signals) {
+    const scenario = s?.scenario ?? SIGNAL_METADATA[s?.name]?.scenario;
     if (scenario != null) return scenario;
   }
   return null;

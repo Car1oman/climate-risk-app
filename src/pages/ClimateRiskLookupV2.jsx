@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertTriangle, FlaskConical, Loader2, MapPin, Search } from "lucide-react";
 import { toast } from "sonner";
 
-import { SECTORS, BUSINESS_UNITS } from "@/features/climate-lookup/constants";
+import { SECTORS_V2, SCENARIOS_V2 } from "@/features/climate-lookup-v2/constants";
 import SearchPanel     from "@/features/climate-lookup/components/SearchPanel";
 import AnalysisLoading from "@/features/climate-lookup/components/AnalysisLoading";
 
@@ -17,6 +17,7 @@ import { useClimateAnalysisV2 } from "@/features/climate-lookup-v2/hooks/useClim
 import RiskSummaryV2        from "@/features/climate-lookup-v2/components/RiskSummaryV2";
 import PhenomenaGridV2      from "@/features/climate-lookup-v2/components/PhenomenaGridV2";
 import RecommendationsListV2 from "@/features/climate-lookup-v2/components/RecommendationsListV2";
+import AIRecommendationsPanelV2 from "@/features/climate-lookup-v2/components/AIRecommendationsPanelV2";
 import TracePanelV2         from "@/features/climate-lookup-v2/components/TracePanelV2";
 
 const MapView = lazy(() => import("@/features/climate-lookup/components/MapView"));
@@ -36,15 +37,23 @@ function EmptyInitial() {
 /**
  * ClimateRiskLookupV2 — mismo flujo de búsqueda que ClimateRiskLookup.jsx,
  * pero consumiendo el pipeline nuevo (/api/v2/climate-risk) en vez del
- * sistema actual. El pipeline v2 aún no modela horizontes temporales,
- * escenarios ni acciones de adaptación — por eso no hay tabs de período ni
- * panel de adaptación: esa ausencia es en sí misma parte de la comparación.
+ * sistema actual.
+ *
+ * Escenario y periodos: el backend distingue escenario (ssp245/ssp585) y
+ * horizonte (corto/mediano) SOLO para las señales que provienen de
+ * supabase_climate_cells (temperatura máxima y precipitación proyectadas —
+ * ver 03-normalization/index.js) — las proyecciones de openmeteo_cmip6 no
+ * tienen dimensión de escenario en su fuente y siguen sin ella aquí (no se
+ * fabrica). Por eso alternar el toggle cambia resultados reales para
+ * ola_de_calor/ola_de_frio/sequia/inundacion, pero no para fenómenos cuya
+ * única evidencia disponible en esta ejecución venga de openmeteo_cmip6 —
+ * esa limitación se declara en la tarjeta correspondiente, no se oculta.
  */
 export default function ClimateRiskLookupV2() {
   const [lat,          setLat]          = useState("");
   const [lng,          setLng]          = useState("");
   const [sector,       setSector]       = useState("retail");
-  const [businessUnit, setBusinessUnit] = useState("none");
+  const [scenario,     setScenario]     = useState("ssp245");
   const [tileLayer,    setTileLayer]    = useState("osm");
   const [markerPos,    setMarkerPos]    = useState(null);
   const [flyTarget,    setFlyTarget]    = useState(null);
@@ -54,15 +63,6 @@ export default function ClimateRiskLookupV2() {
     trace, traceLoading, traceError,
     analyze, switchView, fetchTrace, reset,
   } = useClimateAnalysisV2();
-
-  const handleBusinessUnitChange = useCallback((value) => {
-    setBusinessUnit(value);
-    if (value === "none") return;
-    const found = BUSINESS_UNITS.find(bu => bu.id === value);
-    if (found && found.sectorSugerido) {
-      setSector(found.sectorSugerido);
-    }
-  }, []);
 
   const handleMapClick = useCallback((clickLat, clickLng) => {
     setLat(String(clickLat));
@@ -80,6 +80,20 @@ export default function ClimateRiskLookupV2() {
     reset();
   }, [reset]);
 
+  const runAnalysis = useCallback(async (overrides = {}) => {
+    const latNum = parseFloat(overrides.lat ?? lat);
+    const lngNum = parseFloat(overrides.lng ?? lng);
+    if (isNaN(latNum) || latNum < -90  || latNum > 90)  { toast.error("Latitud inválida");  return; }
+    if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) { toast.error("Longitud inválida"); return; }
+    await analyze({
+      lat: latNum,
+      lon: lngNum,
+      sector: overrides.sector ?? sector,
+      scenario: overrides.scenario ?? scenario,
+      view: "executive",
+    });
+  }, [lat, lng, sector, scenario, analyze]);
+
   const handleSearch = useCallback(async () => {
     const latNum = parseFloat(lat);
     const lngNum = parseFloat(lng);
@@ -87,8 +101,20 @@ export default function ClimateRiskLookupV2() {
     if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) { toast.error("Longitud inválida"); return; }
     setMarkerPos([latNum, lngNum]);
     setFlyTarget({ pos: [latNum, lngNum], zoom: 14 });
-    await analyze({ lat: latNum, lon: lngNum, sector, view: "executive" });
-  }, [lat, lng, sector, analyze]);
+    await runAnalysis();
+  }, [lat, lng, runAnalysis]);
+
+  // Cambiar el escenario debe actualizar realmente los datos mostrados, no
+  // solo una etiqueta — se re-ejecuta la consulta completa contra el
+  // backend (mismo lat/lon/sector, nuevo scenario) en vez de transformar la
+  // respuesta anterior en el cliente. Solo si ya hay una ubicación
+  // consultada — cambiar el toggle antes de buscar no dispara nada.
+  const handleScenarioChange = useCallback((nextScenario) => {
+    setScenario(nextScenario);
+    if (hasResults && lat && lng) {
+      runAnalysis({ scenario: nextScenario });
+    }
+  }, [hasResults, lat, lng, runAnalysis]);
 
   return (
     <div className="p-6 max-w-[1400px] mx-auto space-y-6">
@@ -145,13 +171,15 @@ export default function ClimateRiskLookupV2() {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Sector operacional</Label>
+                <Label className="text-xs text-muted-foreground">
+                  Sector operacional <span className="text-[10px] text-muted-foreground/60">(determina medidas de adaptación y sensibilidad)</span>
+                </Label>
                 <Select value={sector} onValueChange={setSector}>
                   <SelectTrigger className="h-9 text-sm">
                     <SelectValue placeholder="Seleccionar sector..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {SECTORS.map(s => (
+                    {SECTORS_V2.map(s => (
                       <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                     ))}
                   </SelectContent>
@@ -159,25 +187,22 @@ export default function ClimateRiskLookupV2() {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">
-                  Unidad de negocio <span className="text-[10px] text-muted-foreground/60">(opcional — solo ajusta el sector sugerido)</span>
-                </Label>
-                <Select value={businessUnit} onValueChange={handleBusinessUnitChange}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="Ninguna (sector genérico)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Ninguna (sector genérico)</SelectItem>
-                    {BUSINESS_UNITS.map(bu => (
-                      <SelectItem key={bu.id} value={bu.id}>
-                        <span className="flex items-center gap-2">
-                          <span className="text-[10px] text-muted-foreground">{bu.plataforma}</span>
-                          <span>{bu.label}</span>
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label className="text-xs text-muted-foreground">Escenario climático</Label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {SCENARIOS_V2.map(s => (
+                    <Button
+                      key={s.value}
+                      type="button"
+                      size="sm"
+                      variant={scenario === s.value ? "default" : "outline"}
+                      className="h-9 text-xs"
+                      onClick={() => handleScenarioChange(s.value)}
+                      disabled={loading}
+                    >
+                      {s.label}
+                    </Button>
+                  ))}
+                </div>
               </div>
 
               <Button
@@ -223,8 +248,9 @@ export default function ClimateRiskLookupV2() {
               </div>
 
               <RiskSummaryV2 response={response} />
-              <PhenomenaGridV2 phenomena={response?.phenomena} />
+              <PhenomenaGridV2 phenomena={response?.phenomena} phenomenaNotDetected={response?.phenomena_not_detected} />
               <RecommendationsListV2 recommendations={response?.recommendations} />
+              <AIRecommendationsPanelV2 response={response} sector={sector} />
 
               <TracePanelV2
                 traceId={response?.trace_id}

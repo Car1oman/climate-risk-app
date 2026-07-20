@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { v4 as uuid } from "uuid";
-import { LocationSchema, SectorEnum } from "../shared/types.js";
+import { LocationSchema, SectorEnum, ScenarioEnum } from "../shared/types.js";
 import { EvidenceArtifactBuilder } from "../artifact/builder.js";
 import { saveArtifact, loadArtifact } from "../artifact/persistence.js";
 
@@ -47,13 +47,14 @@ export class PipelineEngine {
     if (input == null || typeof input !== "object") {
       throw Object.assign(new Error("engine: input must be a non-null object"), { code: "INVALID_INPUT" });
     }
-    const { coordinates, sector, view = "executive" } = input;
+    const { coordinates, sector, view = "executive", scenario = "ssp245" } = input;
     const validatedSector = SectorEnum.parse(sector);
+    const validatedScenario = ScenarioEnum.parse(scenario);
     const location = LocationSchema.parse(coordinates);
     const executionId = uuid();
     const startTime = Date.now();
     const builder = new EvidenceArtifactBuilder().init(executionId, location, validatedSector);
-    const pipelineState = { location, sector: validatedSector, view, execution_id: executionId };
+    const pipelineState = { location, sector: validatedSector, scenario: validatedScenario, view, execution_id: executionId };
     const sortedStages = [...this.stages.entries()].sort(([a], [b]) => a - b);
 
     for (const [id, stage] of sortedStages) {

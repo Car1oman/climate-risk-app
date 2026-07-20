@@ -113,6 +113,13 @@ export class Stage04Signals extends StageInterface {
         anomaly_value: signalStrength.anomaly_value,
         anomaly_value_reason: signalStrength.anomaly_value_reason,
         anomaly_unit: v.unit,
+        // Auditoría de transformación de datos, hallazgo P2: se propaga el
+        // escenario tal cual lo declaró la variable canónica en Stage 03
+        // (ver 03-normalization/index.js) — nunca inferido aquí. null para
+        // toda variable sin dimensión de escenario en su fuente (la mayoría
+        // hoy; ver signal-metadata.js para por qué eso es correcto, no un
+        // hueco).
+        scenario: v.scenario ?? null,
         rules_applied: this.rulesApplied,
       };
       signals.push(signal);

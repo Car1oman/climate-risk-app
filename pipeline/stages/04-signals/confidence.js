@@ -537,10 +537,32 @@ function isBaselineOrStaticVariable(variable) {
   // themselves". elevation is a fixed, non-stochastic geophysical field (same
   // reasoning already applied to it in coverage_spatial's non_stochastic
   // rules) with no anomaly/trend/projection concept at all.
-  if (variable.source === "supabase_climate_cells") return true;
+  //
+  // Auditoría de transformación de datos, hallazgo P2: desde que Stage 03
+  // extrae cc_tasmax_corto/mediano y cc_pr_corto/mediano (bloques
+  // ensemble-all-sspXXX reales, con escenario), esas variables SÍ son
+  // proyecciones — no líneas base. Solo la forma bare (cc_tasmax, cc_pr, y
+  // los demás índices ETCCDI sin sufijo) y la forma explícita _historico
+  // siguen siendo la referencia climatológica fija. isProjectionVariable()
+  // abajo es la fuente única de verdad para esta distinción — reutilizada
+  // también en el dispatch de calculateSignalStrength.
+  if (variable.source === "supabase_climate_cells") {
+    return !isProjectionVariable(variable);
+  }
   if (variable.name === "elevation") return true;
   if (stripHorizonSuffix(variable.name) === "historico") return true;
   return false;
+}
+
+// Auditoría de transformación de datos, hallazgo P2: una variable
+// climate_cells es una proyección real (no una línea base) solo si tiene
+// sufijo de horizonte corto/mediano/largo (nunca "historico", que ES la
+// línea base) — mismo criterio que ya distingue las variables de
+// openmeteo_cmip6, generalizado a la segunda fuente que ahora también
+// produce proyecciones con esa forma de nombre.
+function isProjectionVariable(variable) {
+  const suffix = stripHorizonSuffix(variable.name);
+  return suffix != null && suffix !== "historico";
 }
 
 // Signal Strength = fuerza de la señal detectada, calculada por el detector
@@ -587,7 +609,13 @@ export function calculateSignalStrength(variable, allVariables = []) {
       cross_period_consistency: { value: null, reason },
     };
     anomalyValueReason = reason;
-  } else if (variable.source === "openmeteo_cmip6") {
+  } else if (variable.source === "openmeteo_cmip6" || (variable.source === "supabase_climate_cells" && isProjectionVariable(variable))) {
+    // Auditoría de transformación de datos, hallazgo P2: cc_tasmax_corto/
+    // mediano y cc_pr_corto/mediano (climate_cells, con escenario real) pasan
+    // por el MISMO ProjectionDetector genérico que ya usa openmeteo_cmip6 —
+    // sin duplicar lógica. computeProjectionDetector busca `${base}_historico`
+    // con el mismo `variable.source`, que Stage 03 ya provee para ambas
+    // variables (ver 03-normalization/index.js, extracción SSP_PROJECTION_VARS).
     detector = "projection";
     ({ components, anomalyValue, anomalyValueReason } = computeProjectionDetector(variable, allVariables, thresholdsAnomaly));
   } else if (CROSS_SOURCE_BASELINE[`${variable.source}:${variable.name}`]) {

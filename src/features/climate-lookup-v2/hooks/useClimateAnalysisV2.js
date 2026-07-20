@@ -22,14 +22,14 @@ export function useClimateAnalysisV2() {
 
   const lastParamsRef = useRef(null);
 
-  const analyze = useCallback(async ({ lat, lon, sector, view: requestedView }) => {
+  const analyze = useCallback(async ({ lat, lon, sector, scenario, view: requestedView }) => {
     const nextView = requestedView || view;
-    lastParamsRef.current = { lat, lon, sector, view: nextView };
+    lastParamsRef.current = { lat, lon, sector, scenario, view: nextView };
     setLoading(true);
     setError(null);
     setTrace(null);
     try {
-      const body = await analyzeClimateRiskV2({ lat, lon, sector, view: nextView });
+      const body = await analyzeClimateRiskV2({ lat, lon, sector, scenario, view: nextView });
       setResult(body);
       setView(nextView);
     } catch (err) {

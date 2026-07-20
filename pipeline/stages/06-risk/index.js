@@ -154,11 +154,17 @@ export class Stage06Risk extends StageInterface {
         // sectorial se usó para calcular physical_sensitivity y la
         // correspondiente sensibilidad escalada a Likert 1-5.
         sector,
-        // "ssp370" was never a real fallback: no source in this pipeline
-        // selects or labels an SSP scenario (HALLAZGO-8 — openmeteo_cmip6 is
-        // a HighResMIP ensemble with no scenario parameter at all). Using
-        // "not_scenario_specific" instead of a fabricated SSP label avoids
-        // implying a scenario selection that doesn't exist anywhere upstream.
+        // Revisado — auditoría de transformación de datos, hallazgo P2:
+        // phenomenon.scenario ya no es siempre null. Cuando el fenómeno
+        // recibió evidencia de supabase_climate_cells (cc_tasmax_corto/
+        // mediano, cc_pr_corto/mediano — bloques ensemble-all-sspXXX reales,
+        // ver 03-normalization/index.js), lleva el escenario real solicitado
+        // (ssp245/ssp585). El fallback "not_scenario_specific" se mantiene
+        // — sin cambios, sin fabricar un valor — para fenómenos cuya
+        // evidencia proviene únicamente de openmeteo_cmip6 (HALLAZGO-8: esa
+        // fuente no tiene parámetro SSP) o de detectores sin escenario
+        // (anomaly, categorical): "ssp370" nunca fue un fallback real, y
+        // sigue sin serlo.
         scenario: phenomenon.scenario || "not_scenario_specific",
         horizon: phenomenon.horizon || "mediano",
         evaluation_coverage: this.computeEvaluationCoverage(thresholds),

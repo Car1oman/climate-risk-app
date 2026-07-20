@@ -1,7 +1,21 @@
 import { StageInterface } from "../../shared/stage-interface.js";
 import { getThresholds, getAdaptationMeasures, getPhenomenonDefinitions } from "../../orchestration/config-loader.js";
-import { PresentationInputSchema } from "../../shared/types.js";
+import { PresentationInputSchema, SCENARIO_LABELS } from "../../shared/types.js";
 import { PresentationError } from "../../shared/errors.js";
+
+// Auditoría de brecha funcional (deliverable D1 §3) + auditoría de
+// transformación de datos (P2): etiquetas de negocio para los horizontes
+// temporales que Stage 05 ya calcula (pipeline/shared/horizons.js) — nunca
+// se mostraban en la UI porque Stage 07 no las proyectaba. Los rangos de año
+// citados aquí son nominales (coinciden con getHorizons() en el momento de
+// escribir esto, TCFD 2017 + CEPLAN Peru + World Bank Infrastructure
+// Guidelines, thresholds.json horizon_years) — no recalculados aquí por
+// fecha para evitar una segunda fuente de verdad del calendario de bandas.
+const HORIZON_LABELS = {
+  corto: "Corto plazo",
+  mediano: "Mediano plazo",
+  largo: "Largo plazo",
+};
 
 const RISK_LABELS = { bajo: "Bajo", medio: "Medio", alto: "Alto", catastrofico: "Catastrófico" };
 // H-7.5 (documentacion-v2/stage-07, BAJO): catastrofico colapsaba a "rojo",
@@ -127,14 +141,22 @@ export class Stage07Presentation extends StageInterface {
   // cacheada en memoria), así que solo esta firma necesitaba el ajuste.
   async execute(rawInput) {
     const input = this.validateInput(rawInput);
-    const { location, sector, assessments, phenomena, transition_risks, view } = input;
+    const { location, sector, assessments, phenomena, transition_risks, view, phenomena_not_detected: phenomenaNotDetected, scenario } = input;
     const overallRisk = this.calculateOverallRisk(assessments);
+    const catalogForCards = getAdaptationMeasures();
 
     const base = {
       location: {
         name: location.location_name || `${location.lat}, ${location.lon}`,
         coordinates: { lat: location.lat, lon: location.lon },
       },
+      // Auditoría de transformación de datos, hallazgo P2: eco del escenario
+      // realmente usado por esta ejecución (default "ssp245" si el request no
+      // lo especificó — mismo default que engine.js). Permite al frontend
+      // etiquetar la respuesta sin adivinar, y confirma que un toggle de
+      // escenario en la UI de verdad viajó hasta el resultado.
+      scenario_requested: scenario || "ssp245",
+      scenario_requested_label: SCENARIO_LABELS[scenario] || SCENARIO_LABELS.ssp245,
       overall_risk: {
         level: overallRisk.level,
         label: RISK_LABELS[overallRisk.level] || "Desconocido",
@@ -154,11 +176,43 @@ export class Stage07Presentation extends StageInterface {
         // de cada assessment (ver evaluation_coverage en risk_calculation).
         evaluation_coverage_summary: overallRisk.evaluationCoverageSummary,
       },
-      phenomena: (phenomena || []).map(p => ({
-        name: this.formatPhenomenonName(p.name),
-        status: this.formatStatus(p.status),
-        risk_contribution: this.getRiskContribution(p, assessments),
-      })),
+      // Auditoría de brecha funcional (D1 §3-4): cada fenómeno ahora expone
+      // horizon/scenario (calculados en Stage 05/06, antes descartados aquí
+      // — el gap más citado de esa auditoría) y una recomendación propia
+      // (reusa lookupPhysicalMeasure(), el mismo catálogo fenómeno×sector
+      // que ya alimenta `recommendations` abajo — no se fabrica una segunda
+      // fuente de texto). Ningún campo se fabrica cuando falta evidencia:
+      // horizon/scenario quedan null si Stage 05/06 no los determinó,
+      // recommendation queda null con reason si no hay fila de catálogo
+      // aplicable ni siquiera genérica.
+      phenomena: (phenomena || []).map(p => {
+        const assessment = (assessments || []).find(a => a.phenomenon_id === p.phenomenon_id);
+        return {
+          name: this.formatPhenomenonName(p.name),
+          status: this.formatStatus(p.status),
+          horizon: p.horizon || null,
+          horizon_label: p.horizon ? (HORIZON_LABELS[p.horizon] || p.horizon) : null,
+          scenario: p.scenario || null,
+          scenario_label: p.scenario ? (SCENARIO_LABELS[p.scenario] || p.scenario) : null,
+          confidence_label: this.formatConfidenceLabel(p.confidence?.combined),
+          risk_contribution: this.getRiskContribution(p, assessments),
+          recommendation: this.getPhenomenonRecommendation(catalogForCards, p, assessment, sector),
+        };
+      }),
+      // Auditoría de brecha funcional (D1 §1): fenómenos evaluados pero sin
+      // evidencia suficiente para activarse — Stage 05 ya los calcula con
+      // razón + evidencia cuantitativa (phenomena_not_detected), pero Stage
+      // 07 nunca los proyectaba, así que un usuario solo veía "lo que sí se
+      // detectó" sin poder distinguir "no se evaluó" de "se evaluó y no hay
+      // evidencia". Resumen compacto para ambas vistas (nombre + razón en
+      // lenguaje llano); la evidencia cuantitativa completa queda solo en
+      // analyst (ver risk_calculation / signal_detail, ya expuestos ahí).
+      phenomena_not_detected: (phenomenaNotDetected || [])
+        .filter(pnd => pnd.name !== "señal_malformada")
+        .map(pnd => ({
+          name: this.formatPhenomenonName(pnd.name),
+          reason: this.formatNotDetectedReason(pnd.reason),
+        })),
       // H-7.2: recommendations se calcula ANTES que executive_summary
       // (invirtiendo el orden anterior) porque recommendation_intro reusa
       // este mismo array — evita una segunda narrativa de recomendación
@@ -556,6 +610,80 @@ export class Stage07Presentation extends StageInterface {
     if (hazardTagged) return { ...hazardTagged, measure_source: "generic_hazard_tagged" };
     const anyGeneric = (catalog.generic_measures || []).find(m => m.applicable_hazards === "any");
     return anyGeneric ? { ...anyGeneric, measure_source: "generic_any" } : null;
+  }
+
+  // Auditoría de brecha funcional (D1 §4): antes, la recomendación por
+  // fenómeno×sector solo aparecía en la lista global `recommendations`
+  // (capada a MAX_PHYSICAL_RECOMMENDATIONS=3), desacoplada de la tarjeta del
+  // fenómeno al que corresponde — un usuario tenía que correlacionar "Sequía"
+  // en la grilla con "[Alto] Sequía: ..." en una lista aparte. Este método
+  // reusa exactamente lookupPhysicalMeasure() (mismo catálogo, misma
+  // prioridad sector_catalog > generic_hazard_tagged > generic_any) para
+  // TODOS los fenómenos con assessment, no solo los top-N priorizados — no
+  // es una segunda fuente de texto, es la misma consulta aplicada por
+  // fenómeno en vez de solo a los primeros N. Retorna null (con reason
+  // explícita, nunca fabricando un texto) si el fenómeno no tiene
+  // assessment (nunca se evaluó su riesgo) o si el catálogo genuinamente no
+  // tiene ninguna fila aplicable.
+  getPhenomenonRecommendation(catalog, phenomenon, assessment, sector) {
+    if (!assessment) {
+      return { text: null, reason: "Sin evaluación de riesgo para este fenómeno — no hay base para recomendar una acción." };
+    }
+    const measure = this.lookupPhysicalMeasure(catalog, phenomenon.name, sector);
+    if (!measure) {
+      return { text: null, reason: "Sin medida aplicable en el catálogo de adaptación para este fenómeno." };
+    }
+    return {
+      text: `${measure.measure}${measure.description ? ` — ${measure.description}` : ""}`,
+      source: measure.source,
+      measure_source: measure.measure_source,
+      is_sector_specific: measure.measure_source === "sector_catalog",
+    };
+  }
+
+  // Auditoría de brecha funcional: traduce confidence.combined (0-1) a una
+  // etiqueta de 3 niveles para mostrar directamente en la tarjeta del
+  // fenómeno — reusa la MISMA tabla confidence_to_probability.mapping y las
+  // MISMAS 3 bandas que buildConfidenceNote() ya usa para el mensaje
+  // agregado (ver ese método más abajo), aplicada a un solo fenómeno en vez
+  // de al promedio de todos. null si combined no es un número finito (nunca
+  // se fabrica una etiqueta sin el dato).
+  formatConfidenceLabel(combined) {
+    if (!Number.isFinite(combined)) return null;
+    const thresholds = getThresholds();
+    const mapping = thresholds.confidence_to_probability?.mapping ?? DEFAULT_CONFIDENCE_TO_PROBABILITY_MAPPING;
+    let ordinal = 1;
+    for (const [threshold, value] of mapping) {
+      if (combined >= threshold) ordinal = value;
+    }
+    if (ordinal >= 4) return "Alta";
+    if (ordinal >= 3) return "Media";
+    return "Baja";
+  }
+
+  // Auditoría de brecha funcional (D1 §1): traduce las razones técnicas de
+  // phenomena_not_detected (Stage 05) a una frase legible para la vista
+  // ejecutiva, sin perder honestidad — nunca colapsa "sin datos" en "riesgo
+  // bajo" (esa es exactamente la confusión que el usuario pidió evitar
+  // explícitamente: datos faltantes tratados como ausencia de riesgo). El
+  // texto original completo (con evidencia cuantitativa) sigue disponible
+  // sin traducir en la vista analyst si se necesita — este método solo
+  // afecta la capa de presentación ejecutiva.
+  formatNotDetectedReason(reason) {
+    if (!reason) return "Sin evidencia suficiente para evaluar este fenómeno en esta ubicación.";
+    if (reason.startsWith("Sin señales requeridas")) {
+      return "No se recibieron datos climáticos relevantes para este fenómeno en esta consulta.";
+    }
+    if (reason.startsWith("Ninguna señal requerida")) {
+      return "Los datos disponibles no cubren la señal específica que este fenómeno requiere.";
+    }
+    if (reason.startsWith("Calidad de fuente insuficiente")) {
+      return `Los datos disponibles no alcanzan el umbral mínimo de calidad para evaluar este fenómeno (${reason}).`;
+    }
+    if (reason.startsWith("Señales presentes pero sin evidencia")) {
+      return "Hay datos disponibles para esta ubicación, pero no muestran evidencia suficiente de este fenómeno — esto NO significa riesgo bajo confirmado, significa evidencia insuficiente.";
+    }
+    return reason;
   }
 
   // H-7.3: mismo orden de prioridad que lookupPhysicalMeasure —

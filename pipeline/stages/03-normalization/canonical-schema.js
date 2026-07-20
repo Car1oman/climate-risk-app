@@ -200,12 +200,16 @@ export const CANONICAL_VARIABLES = {
   // Each source value is a {p10, p90, median} distribution; only the median
   // is propagated as the canonical scalar. Full percentiles remain available
   // in sources_consulted[].response.historical.<index> in the raw artifact.
-  // NOTE: the source table also carries "ensemble-all-sspXXX_YYYY-YYYY"
-  // projection blocks (SSP2-4.5 / SSP5-8.5, 2020-2039 / 2040-2059) that are
-  // NOT extracted here — there is no scenario/horizon selection mechanism
-  // yet in this pipeline (Stage05/06 phenomenon.scenario/horizon are still
-  // stubs, always null/defaulted) to decide which one a request should
-  // surface. See HALLAZGO-6 follow-up.
+  // HALLAZGO-6 follow-up (auditoría de transformación de datos, hallazgo
+  // P2): el bloque "ensemble-all-sspXXX_YYYY-YYYY" SÍ se extrae ahora, pero
+  // solo para tasmax y pr (ver cc_tasmax_corto/cc_tasmax_mediano/
+  // cc_pr_corto/cc_pr_mediano más abajo) — los únicos 2 índices con un
+  // detector/fenómeno real que los consuma (ola_de_calor/ola_de_frio,
+  // sequia/inundacion). El resto de los 12 índices climate_cells permanece
+  // solo en su forma histórica (bare, sin escenario) — extraerlos por
+  // escenario sin un consumidor downstream repetiría el mismo patrón de
+  // "dato extraído pero nunca usado" que esa auditoría señaló para NASA
+  // POWER T2M.
   cc_tas: {
     unit: "°C",
     description: "Temperatura media del aire (grid climate_cells, baseline histórico)",
@@ -226,6 +230,50 @@ export const CANONICAL_VARIABLES = {
       references: ["CMIP6 'tasmax' (daily maximum near-surface air temperature)"],
       scientific_rationale: "Mediana (p50) de la distribución histórica del grid.",
       assumptions: ["Ver cc_tas."],
+    },
+  },
+  // cc_tasmax_historico/_corto/_mediano: mismo índice que cc_tasmax, pero
+  // expuesto con sufijo de horizonte para que ProjectionDetector
+  // (04-signals/confidence.js) pueda emparejar cada banda de proyección con
+  // su línea base vía `${base}_historico`, exactamente el mismo contrato que
+  // ya usan las variables horizonte-sufijadas de openmeteo_cmip6. _corto y
+  // _mediano provienen de los bloques ensemble-all-{scenario}_2020-2039 /
+  // _2040-2059 de la MISMA fuente (climate_cells) — el escenario (ssp245 por
+  // defecto, ssp585 si se solicita) se resuelve en Stage 03 a partir del
+  // parámetro de ejecución `scenario`. No existe banda "largo": climate_cells
+  // no publica un bloque 2060-2079, y no se fabrica una extrapolación para
+  // esa banda inexistente.
+  cc_tasmax_historico: {
+    unit: "°C",
+    description: "Temperatura máxima media diaria — línea base histórica (climate_cells, 1991-2020), alias de cc_tasmax con sufijo de horizonte",
+    domain: "precomputed_grid",
+    methodology: {
+      default_method: "direct_read",
+      references: ["CMIP6 'tasmax'"],
+      scientific_rationale: "Mediana (p50) de la distribución histórica del grid — idéntico valor que cc_tasmax, re-expuesto con sufijo _historico para el contrato de ProjectionDetector.",
+      assumptions: ["Ver cc_tas."],
+    },
+  },
+  cc_tasmax_corto: {
+    unit: "°C",
+    description: "Temperatura máxima media diaria proyectada, 2020-2039, bajo el escenario climático solicitado (climate_cells, ensemble CMIP6)",
+    domain: "precomputed_grid",
+    methodology: {
+      default_method: "direct_read",
+      references: ["CMIP6 'tasmax' bajo SSP2-4.5/SSP5-8.5, ensemble-all"],
+      scientific_rationale: "Mediana (p50) del ensemble de proyección para el bloque 2020-2039 del escenario solicitado. Único índice climate_cells con dimensión de escenario real extraída — ver auditoría de transformación de datos, hallazgo P2.",
+      assumptions: ["Escenario resuelto por el parámetro `scenario` de la consulta (default ssp245) — no un valor fijo ni inferido."],
+    },
+  },
+  cc_tasmax_mediano: {
+    unit: "°C",
+    description: "Temperatura máxima media diaria proyectada, 2040-2059, bajo el escenario climático solicitado (climate_cells, ensemble CMIP6)",
+    domain: "precomputed_grid",
+    methodology: {
+      default_method: "direct_read",
+      references: ["CMIP6 'tasmax' bajo SSP2-4.5/SSP5-8.5, ensemble-all"],
+      scientific_rationale: "Mediana (p50) del ensemble de proyección para el bloque 2040-2059 del escenario solicitado.",
+      assumptions: ["Ver cc_tasmax_corto."],
     },
   },
   cc_txx: {
@@ -325,6 +373,42 @@ export const CANONICAL_VARIABLES = {
       references: ["CMIP6 'pr' (precipitation)"],
       scientific_rationale: "Mediana (p50) de la distribución histórica del grid.",
       assumptions: ["Período de acumulación (mensual/estacional/anual) no está documentado en el payload de origen — no asumir directamente comparable con precipitation_sum (que sí tiene período explícito vía data_time_range)."],
+    },
+  },
+  // cc_pr_historico/_corto/_mediano: mismo criterio que cc_tasmax_* arriba —
+  // ver esas entradas para el razonamiento completo del sufijo de horizonte
+  // y la resolución de escenario.
+  cc_pr_historico: {
+    unit: "mm",
+    description: "Precipitación acumulada — línea base histórica (climate_cells, 1991-2020), alias de cc_pr con sufijo de horizonte",
+    domain: "precomputed_grid",
+    methodology: {
+      default_method: "direct_read",
+      references: ["CMIP6 'pr'"],
+      scientific_rationale: "Mediana (p50) de la distribución histórica del grid — idéntico valor que cc_pr, re-expuesto con sufijo _historico para el contrato de ProjectionDetector.",
+      assumptions: ["Período de acumulación no documentado en el payload de origen — ver cc_pr."],
+    },
+  },
+  cc_pr_corto: {
+    unit: "mm",
+    description: "Precipitación acumulada proyectada, 2020-2039, bajo el escenario climático solicitado (climate_cells, ensemble CMIP6)",
+    domain: "precomputed_grid",
+    methodology: {
+      default_method: "direct_read",
+      references: ["CMIP6 'pr' bajo SSP2-4.5/SSP5-8.5, ensemble-all"],
+      scientific_rationale: "Mediana (p50) del ensemble de proyección para el bloque 2020-2039 del escenario solicitado. Ver auditoría de transformación de datos, hallazgo P2.",
+      assumptions: ["Escenario resuelto por el parámetro `scenario` de la consulta (default ssp245).", "Período de acumulación no documentado en el payload de origen — ver cc_pr."],
+    },
+  },
+  cc_pr_mediano: {
+    unit: "mm",
+    description: "Precipitación acumulada proyectada, 2040-2059, bajo el escenario climático solicitado (climate_cells, ensemble CMIP6)",
+    domain: "precomputed_grid",
+    methodology: {
+      default_method: "direct_read",
+      references: ["CMIP6 'pr' bajo SSP2-4.5/SSP5-8.5, ensemble-all"],
+      scientific_rationale: "Mediana (p50) del ensemble de proyección para el bloque 2040-2059 del escenario solicitado.",
+      assumptions: ["Ver cc_pr_corto."],
     },
   },
   cc_prpercnt: {

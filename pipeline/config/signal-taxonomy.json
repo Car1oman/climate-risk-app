@@ -53,6 +53,12 @@
 
     "cc_tas": { "signal_name": "cc_tas_baseline", "signal_type": "static" },
     "cc_tasmax": { "signal_name": "cc_tasmax_baseline", "signal_type": "static" },
+    "cc_tasmax_historico": { "signal_name": "temperatura_max_historico", "signal_type": "static" },
+    "cc_tasmax_corto": { "signal_name": "temperatura_max_projection_corto", "signal_type": "projected" },
+    "cc_tasmax_mediano": { "signal_name": "temperatura_max_projection_mediano", "signal_type": "projected" },
+    "cc_pr_historico": { "signal_name": "precipitacion_historico", "signal_type": "static" },
+    "cc_pr_corto": { "signal_name": "precipitacion_projection_corto", "signal_type": "projected" },
+    "cc_pr_mediano": { "signal_name": "precipitacion_projection_mediano", "signal_type": "projected" },
     "cc_txx": { "signal_name": "cc_txx_baseline", "signal_type": "static" },
     "cc_tr": { "signal_name": "cc_tr_baseline", "signal_type": "static" },
     "cc_hd30": { "signal_name": "cc_hd30_baseline", "signal_type": "static" },

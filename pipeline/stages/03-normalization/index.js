@@ -84,7 +84,8 @@ export class Stage03Normalization extends StageInterface {
   }
 
   execute(input) {
-    const { location, config } = input;
+    const { location, config, scenario = "ssp245" } = input;
+    this._scenario = scenario;
     const sourcesConsulted = input.sources_consulted || [];
     const validatedSources = input.validated_sources || [];
     const coverageDecisions = input.coverage_decisions || [];
@@ -559,34 +560,42 @@ export class Stage03Normalization extends StageInterface {
     if (name === "world_bank" && source.response) {
       const r = source.response;
       const dataTimeRange = { start: source.request?.timestamp || "unknown", end: source.request?.timestamp || "unknown" };
+      // Auditoría de transformación de datos, hallazgo P4: estos 5
+      // indicadores se consultan por país (country=PE), no por
+      // región/distrito — todo punto consultado en Perú recibe el mismo
+      // valor. No es fabricación (es un proxy nacional legítimo cuando no
+      // existe dato subnacional), pero el output debe declararlo, no
+      // presentarlo con la misma confianza espacial que una variable
+      // realmente puntual (ej. air_temperature_current).
+      const nationalExtra = { spatial_granularity: "national" };
       if (r.poverty_rate != null) {
         extracted.push(this._buildVariable(
           "poverty_rate", r.poverty_rate, source, dataTimeRange,
-          { method: "direct_read", completeness: 1.0 }, coverageDecision
+          { method: "direct_read", completeness: 1.0 }, coverageDecision, nationalExtra
         ));
       }
       if (r.gdp_per_capita != null) {
         extracted.push(this._buildVariable(
           "gdp_per_capita", r.gdp_per_capita, source, dataTimeRange,
-          { method: "direct_read", completeness: 1.0 }, coverageDecision
+          { method: "direct_read", completeness: 1.0 }, coverageDecision, nationalExtra
         ));
       }
       if (r.water_access != null) {
         extracted.push(this._buildVariable(
           "water_access", r.water_access, source, dataTimeRange,
-          { method: "direct_read", completeness: 1.0 }, coverageDecision
+          { method: "direct_read", completeness: 1.0 }, coverageDecision, nationalExtra
         ));
       }
       if (r.urban_population != null) {
         extracted.push(this._buildVariable(
           "urban_population", r.urban_population, source, dataTimeRange,
-          { method: "direct_read", completeness: 1.0 }, coverageDecision
+          { method: "direct_read", completeness: 1.0 }, coverageDecision, nationalExtra
         ));
       }
       if (r.education_literacy != null) {
         extracted.push(this._buildVariable(
           "education_literacy", r.education_literacy, source, dataTimeRange,
-          { method: "direct_read", completeness: 1.0 }, coverageDecision
+          { method: "direct_read", completeness: 1.0 }, coverageDecision, nationalExtra
         ));
       }
     }
@@ -634,21 +643,86 @@ export class Stage03Normalization extends StageInterface {
       // Maps this source's raw index names to their cc_* canonical variables
       // (see canonical-schema.js for scientific rationale / caveats per
       // index). "tx84rr" is deliberately excluded — its definition could not
-      // be confirmed. The "ensemble-all-sspXXX_YYYY-YYYY" projection blocks
-      // are also not extracted (no scenario/horizon selection exists yet).
+      // be confirmed.
       const CC_INDEX_TO_CANONICAL = {
         tas: "cc_tas", tasmax: "cc_tasmax", txx: "cc_txx", tr: "cc_tr",
         hd30: "cc_hd30", hd35: "cc_hd35", r20mm: "cc_r20mm", r50mm: "cc_r50mm",
         rx1day: "cc_rx1day", rx5day: "cc_rx5day", pr: "cc_pr", prpercnt: "cc_prpercnt",
       };
+      const histDataTimeRange = { start: source.request?.timestamp || "unknown", end: source.request?.timestamp || "unknown" };
       for (const [rawKey, canonicalName] of Object.entries(CC_INDEX_TO_CANONICAL)) {
         const stat = source.response.historical[rawKey];
         if (stat && typeof stat.median === "number") {
+          // Auditoría de transformación de datos, hallazgo P6: p10/p90 del
+          // ensemble vienen en la misma respuesta y antes se descartaban —
+          // se exponen ahora como uncertainty_range en vez de tirarse, sin
+          // ningún costo de fuente adicional.
+          const uncertaintyExtra = {
+            uncertainty_range: {
+              p10: typeof stat.p10 === "number" ? stat.p10 : null,
+              p90: typeof stat.p90 === "number" ? stat.p90 : null,
+            },
+          };
           extracted.push(this._buildVariable(
-            canonicalName, stat.median, source,
-            { start: source.request?.timestamp || "unknown", end: source.request?.timestamp || "unknown" },
+            canonicalName, stat.median, source, histDataTimeRange,
             { method: "direct_read", completeness: 1.0 },
-            coverageDecision
+            coverageDecision, uncertaintyExtra
+          ));
+        }
+      }
+
+      // Auditoría de transformación de datos, hallazgo P2 (el más importante
+      // de esa auditoría): los bloques "ensemble-all-sspXXX_YYYY-YYYY" traen
+      // proyecciones reales, diferenciadas por escenario, y hasta ahora
+      // nunca se leían (ver canonical-schema.js:203-208, "HALLAZGO-6 follow-
+      // up"). Solo se extraen aquí los 2 índices para los que el pipeline ya
+      // tiene un detector/fenómeno real que los consuma — tasmax (alimenta
+      // ola_de_calor/ola_de_frio vía el mismo signal_name que
+      // openmeteo_cmip6 ya usa) y pr (alimenta sequia/inundacion, mismo
+      // criterio) — no los 12 índices completos: extraer los otros 10 sin
+      // que ningún detector los use repetiría exactamente el patrón "dato
+      // extraído pero nunca consumido" que esta misma auditoría señaló para
+      // NASA POWER T2M. La banda "historico" (comparación) es la misma
+      // mediana ya extraída arriba (cc_tasmax/cc_pr) — se re-expone aquí con
+      // sufijo _historico porque ProjectionDetector (confidence.js) busca
+      // específicamente `${base}_historico`, el mismo contrato que
+      // openmeteo_cmip6 ya satisface para sus propias variables.
+      // Solo hay bandas corto (2020-2039) y mediano (2040-2059) — Supabase
+      // no publica un bloque 2060-2079 ("largo"): no se fabrica esa banda.
+      const SSP_PROJECTION_VARS = { tasmax: "cc_tasmax", pr: "cc_pr" };
+      const SSP_PERIOD_TO_HORIZON = { "2020-2039": "corto", "2040-2059": "mediano" };
+      const scenario = this._scenario || "ssp245";
+
+      for (const [rawKey, canonicalBase] of Object.entries(SSP_PROJECTION_VARS)) {
+        const histStat = source.response.historical[rawKey];
+        if (histStat && typeof histStat.median === "number") {
+          extracted.push(this._buildVariable(
+            `${canonicalBase}_historico`, histStat.median, source, histDataTimeRange,
+            { method: "direct_read", completeness: 1.0 },
+            coverageDecision,
+            { scenario: null } // la línea base histórica no depende de escenario
+          ));
+        }
+
+        for (const [period, horizon] of Object.entries(SSP_PERIOD_TO_HORIZON)) {
+          const blockKey = `ensemble-all-${scenario}_${period}`;
+          const block = source.response[blockKey];
+          const stat = block?.[rawKey];
+          if (!stat || typeof stat.median !== "number") continue;
+
+          const [startYear, endYear] = period.split("-");
+          extracted.push(this._buildVariable(
+            `${canonicalBase}_${horizon}`, stat.median, source,
+            { start: `${startYear}-01-01`, end: `${endYear}-12-31` },
+            { method: "direct_read", completeness: 1.0 },
+            coverageDecision,
+            {
+              scenario,
+              uncertainty_range: {
+                p10: typeof stat.p10 === "number" ? stat.p10 : null,
+                p90: typeof stat.p90 === "number" ? stat.p90 : null,
+              },
+            }
           ));
         }
       }
@@ -942,7 +1016,12 @@ export class Stage03Normalization extends StageInterface {
     return { action: "nearest_neighbor", reason: "no_decorrelation_model_assumed_nearest_neighbor" };
   }
 
-  _buildVariable(canonicalName, value, source, dataTimeRange, aggregationInfo, coverageDecision) {
+  // `extra` transporta campos opcionales que no todas las fuentes producen
+  // (scenario, uncertainty_range, spatial_granularity) — se mezclan tal cual
+  // en el objeto final en vez de forzar un shape único para todas las
+  // variables canónicas; los llamadores que no los necesitan simplemente no
+  // los pasan y el campo queda ausente (no `null` fabricado donde no aplica).
+  _buildVariable(canonicalName, value, source, dataTimeRange, aggregationInfo, coverageDecision, extra = {}) {
     const info = getCanonicalInfo(canonicalName);
     const { action: coverageAction, reason: coverageReason } = this._deriveCoverageAction(source, coverageDecision, canonicalName);
     const now = new Date();
@@ -966,6 +1045,7 @@ export class Stage03Normalization extends StageInterface {
         aggregationInfo.method,
         aggregationInfo
       ),
+      ...extra,
     };
   }
 

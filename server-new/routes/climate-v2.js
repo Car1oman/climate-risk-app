@@ -7,7 +7,7 @@ export function createClimateRouter(engine) {
 
   router.post("/climate-risk", async (req, res) => {
     try {
-      const { lat, lon, sector = "retail", view = "executive" } = req.body;
+      const { lat, lon, sector = "retail", view = "executive", scenario = "ssp245" } = req.body;
 
       if (lat == null || lon == null) {
         return res.status(400).json({
@@ -20,6 +20,7 @@ export function createClimateRouter(engine) {
         coordinates: { lat: Number(lat), lon: Number(lon) },
         sector,
         view,
+        scenario,
       });
 
       if (!result.success) {
@@ -33,6 +34,7 @@ export function createClimateRouter(engine) {
       return res.json({
         success: true,
         view,
+        scenario,
         location: { lat: Number(lat), lon: Number(lon) },
         artifact_id: result.artifact.artifact_id,
         execution_id: result.artifact.execution_id,

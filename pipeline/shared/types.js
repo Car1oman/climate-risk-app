@@ -32,6 +32,27 @@ export const AuthoritativeSourcesSchema = z.object({
 export const SUPPORTED_SECTORS = ["retail", "agriculture", "finance", "energy", "infrastructure", "default"];
 export const SectorEnum = z.enum(SUPPORTED_SECTORS);
 
+// Escenarios climáticos soportados. Solo 2: los únicos 2 que
+// supabase_climate_cells expone como bloques de proyección explícitos
+// (ensemble-all-ssp245_*, ensemble-all-ssp585_*) — ver
+// 03-normalization/index.js _extractVariablesFromSource(). No es una
+// selección de conveniencia: openmeteo_cmip6 (la otra fuente de proyección
+// de este pipeline) no tiene NINGUNA dimensión de escenario, así que "ssp245"
+// y "ssp585" no son 2 de N escenarios posibles — son los 2 únicos que el
+// sistema puede respaldar con datos reales hoy. Default "ssp245" (emisiones
+// moderadas) por ser el escenario de referencia ya usado como default
+// implícito en el resto del pipeline (Layer1_ClimateDataFusion.js v1, y la
+// selección de RCP intermedio como caso base en la literatura IPCC AR6).
+export const SUPPORTED_SCENARIOS = ["ssp245", "ssp585"];
+export const ScenarioEnum = z.enum(SUPPORTED_SCENARIOS);
+// Etiquetas de negocio — nunca mostrar el código SSP crudo en UI (mismo
+// principio que server/ai/scientificValidator.js RAW_SSP_CODE ya aplica del
+// lado de la IA).
+export const SCENARIO_LABELS = {
+  ssp245: "Emisiones moderadas",
+  ssp585: "Altas emisiones",
+};
+
 export const CoverageActionEnum = z.enum(["direct", "nearest_neighbor", "interpolated", "out_of_coverage"]);
 // Adapters (RawSourceResponseSchema) only ever emit available/out_of_coverage/
 // failed. "partial" (a multivariate source where some but not all variables
@@ -235,6 +256,24 @@ export const CanonicalVariableSchema = z.object({
   data_time_range: DataTimeRangeSchema,
   processing_timestamp: z.string(),
   methodology: CanonicalMethodologySchema,
+  // Solo presente (no-null) cuando la variable proviene de un bloque de
+  // proyección con escenario explícito en la fuente (hoy: bloques
+  // ensemble-all-sspXXX de supabase_climate_cells). null para observaciones
+  // actuales, líneas base históricas, y proyecciones de fuentes sin
+  // dimensión de escenario (openmeteo_cmip6) — no se infiere ni se rellena,
+  // solo se declara cuando la fuente lo declaró primero.
+  scenario: ScenarioEnum.optional().nullable(),
+  // p10/p90 del ensemble, cuando la fuente los expone junto a la mediana
+  // (supabase_climate_cells) — nunca fabricado para fuentes que no lo dan.
+  uncertainty_range: z.object({
+    p10: z.number().nullable(),
+    p90: z.number().nullable(),
+  }).optional().nullable(),
+  // Declara explícitamente cuando este valor es un proxy de granularidad más
+  // amplia que el punto consultado (ej. indicador socioeconómico nacional
+  // usado como proxy de capacidad adaptativa local) — ver auditoría de
+  // transformación de datos, hallazgo P4.
+  spatial_granularity: z.enum(["point", "national"]).optional(),
 });
 
 // Each component carries its computed value AND the reason it was computed
@@ -315,6 +354,7 @@ export const ClimateSignalSchema = z.object({
   anomaly_value: z.number().optional().nullable(),
   anomaly_value_reason: z.string().optional().nullable(),
   anomaly_unit: z.string().optional().nullable(),
+  scenario: ScenarioEnum.optional().nullable(),
   rules_applied: z.array(z.string()),
 });
 
@@ -504,8 +544,16 @@ export const BusinessImpactSchema = z.object({
 export const PresentationInputSchema = z.object({
   location: LocationSchema,
   sector: z.string().optional(),
+  // Auditoría de transformación de datos, hallazgo P2: eco del parámetro de
+  // escenario de la consulta — opcional/nullable porque ejecuciones previas
+  // a este cambio (artefactos persistidos) no lo tienen.
+  scenario: ScenarioEnum.optional().nullable(),
   assessments: z.array(z.object({ phenomenon_id: z.string() }).passthrough()).optional().default([]),
   phenomena: z.array(z.object({ phenomenon_id: z.string() }).passthrough()).optional().default([]),
+  // Auditoría de brecha funcional (D1 §1): fenómenos evaluados sin evidencia
+  // suficiente para activarse — Stage 05 los produce, Stage 07 ahora los
+  // proyecta (ver phenomena_not_detected en execute()).
+  phenomena_not_detected: z.array(z.object({ name: z.string(), reason: z.string() }).passthrough()).optional().default([]),
   transition_risks: z.array(z.object({}).passthrough()).optional().default([]),
   view: z.enum(["executive", "analyst"]).optional().default("executive"),
   execution_id: z.string().optional(),
